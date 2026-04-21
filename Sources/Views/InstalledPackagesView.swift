@@ -175,7 +175,10 @@ struct InstalledPackagesView: View {
 
         case .loaded:
             if let package = viewModel.selectedPackage {
-                InstalledPackageDetailView(package: package)
+                InstalledPackageDetailView(
+                    package: package,
+                    dependencySnapshot: viewModel.dependencySnapshot(for: package)
+                )
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             } else {
                 ContentUnavailableView(
@@ -202,6 +205,7 @@ struct InstalledPackagesView: View {
 
 private struct InstalledPackageDetailView: View {
     let package: InstalledPackage
+    let dependencySnapshot: InstalledPackageDependencySnapshot?
 
     var body: some View {
         ScrollView {
@@ -209,6 +213,19 @@ private struct InstalledPackageDetailView: View {
                 titleBlock
                 metadataCard
                 packageStateCard
+
+                if let dependencySnapshot {
+                    dependencySummaryCard(snapshot: dependencySnapshot)
+
+                    ForEach(dependencySnapshot.dependencyGroups) { group in
+                        InstalledPackageCard(title: group.title) {
+                            InstalledPackageTagFlow(items: group.items)
+                        }
+                    }
+
+                    dependencyTreeCard(snapshot: dependencySnapshot)
+                    dependentTreeCard(snapshot: dependencySnapshot)
+                }
 
                 if !package.installedVersions.isEmpty {
                     installedVersionsCard
@@ -307,6 +324,52 @@ private struct InstalledPackageDetailView: View {
         }
     }
 
+    private func dependencySummaryCard(snapshot: InstalledPackageDependencySnapshot) -> some View {
+        InstalledPackageCard(title: "Dependency Summary") {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 12)], spacing: 12) {
+                ForEach(snapshot.summaryMetrics) { metric in
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(metric.value)
+                            .font(.title2.monospacedDigit())
+                            .bold()
+
+                        Text(metric.title)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+                    .background(
+                        Color(nsColor: .controlBackgroundColor),
+                        in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    )
+                }
+            }
+        }
+    }
+
+    private func dependencyTreeCard(snapshot: InstalledPackageDependencySnapshot) -> some View {
+        InstalledPackageCard(title: "Dependency Tree") {
+            if snapshot.dependencyTree.isEmpty {
+                Text("No installed dependency tree is available for this package.")
+                    .foregroundStyle(.secondary)
+            } else {
+                InstalledPackageTreeView(rows: snapshot.dependencyTree)
+            }
+        }
+    }
+
+    private func dependentTreeCard(snapshot: InstalledPackageDependencySnapshot) -> some View {
+        InstalledPackageCard(title: "Dependents") {
+            if snapshot.dependentTree.isEmpty {
+                Text("No installed packages currently depend on this package.")
+                    .foregroundStyle(.secondary)
+            } else {
+                InstalledPackageTreeView(rows: snapshot.dependentTree)
+            }
+        }
+    }
+
     private var installedVersionsCard: some View {
         InstalledPackageCard(title: "Installed Versions") {
             VStack(alignment: .leading, spacing: 10) {
@@ -356,6 +419,30 @@ private struct InstalledPackageStateSummary: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Package state summary")
+    }
+}
+
+private struct InstalledPackageTreeView: View {
+    let rows: [InstalledPackageTreeRow]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(rows) { row in
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Color.clear
+                        .frame(width: CGFloat(row.depth) * 18, height: 1)
+
+                    Image(systemName: row.depth == 0 ? "arrow.turn.down.right" : "arrow.turn.right.down")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+
+                    Text(row.title)
+                        .font(.body.monospaced())
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
     }
 }
 

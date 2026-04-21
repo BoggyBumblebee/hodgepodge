@@ -1,5 +1,14 @@
 import Foundation
 
+struct InstalledPackageDependencyGroup: Identifiable, Equatable, Sendable {
+    let title: String
+    let items: [String]
+
+    var id: String {
+        title
+    }
+}
+
 enum InstalledPackagesLoadState: Equatable {
     case idle
     case loading
@@ -81,6 +90,13 @@ struct InstalledPackage: Identifiable, Equatable, Hashable, Sendable {
     let autoUpdates: Bool
     let isDeprecated: Bool
     let isDisabled: Bool
+    let directDependencies: [String]
+    let buildDependencies: [String]
+    let testDependencies: [String]
+    let recommendedDependencies: [String]
+    let optionalDependencies: [String]
+    let requirements: [String]
+    let directRuntimeDependencies: [String]
     let runtimeDependencies: [String]
 
     var id: String {
@@ -148,6 +164,19 @@ struct InstalledPackage: Identifiable, Equatable, Hashable, Sendable {
         }
 
         return rows
+    }
+
+    var dependencyGroups: [InstalledPackageDependencyGroup] {
+        [
+            InstalledPackageDependencyGroup(title: "Direct Runtime Dependencies", items: directRuntimeDependencies),
+            InstalledPackageDependencyGroup(title: "Declared Dependencies", items: directDependencies),
+            InstalledPackageDependencyGroup(title: "Build Dependencies", items: buildDependencies),
+            InstalledPackageDependencyGroup(title: "Test Dependencies", items: testDependencies),
+            InstalledPackageDependencyGroup(title: "Recommended Dependencies", items: recommendedDependencies),
+            InstalledPackageDependencyGroup(title: "Optional Dependencies", items: optionalDependencies),
+            InstalledPackageDependencyGroup(title: "Requirements", items: requirements)
+        ]
+        .filter { !$0.items.isEmpty }
     }
 
     private func yesNo(_ value: Bool) -> String {

@@ -172,6 +172,13 @@ final class ViewRenderingTests: XCTestCase {
             autoUpdates: false,
             isDeprecated: false,
             isDisabled: false,
+            directDependencies: ["openssl@3"],
+            buildDependencies: ["pkgconf"],
+            testDependencies: [],
+            recommendedDependencies: [],
+            optionalDependencies: [],
+            requirements: ["xcode 15.3 (build)"],
+            directRuntimeDependencies: ["openssl@3"],
             runtimeDependencies: ["openssl@3"]
         )
         let viewModel = makeInstalledPackagesModel()

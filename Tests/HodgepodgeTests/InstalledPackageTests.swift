@@ -72,6 +72,23 @@ final class InstalledPackageTests: XCTestCase {
         XCTAssertEqual(cask.packageStateRows.first(where: { $0.title == "Auto Updates" })?.value, "Yes")
     }
 
+    func testDependencyGroupsIncludeOnlyPopulatedSections() {
+        let package = makePackage(
+            directDependencies: ["fmt"],
+            buildDependencies: ["cmake"],
+            testDependencies: ["swiftlint"],
+            requirements: ["xcode 15.3 (build)"],
+            directRuntimeDependencies: ["fmt"],
+            runtimeDependencies: ["fmt", "zlib"]
+        )
+
+        XCTAssertEqual(
+            package.dependencyGroups.map(\.title),
+            ["Direct Runtime Dependencies", "Declared Dependencies", "Build Dependencies", "Test Dependencies", "Requirements"]
+        )
+        XCTAssertEqual(package.dependencyGroups.first?.items, ["fmt"])
+    }
+
     private func makePackage(
         kind: CatalogPackageKind = .formula,
         isPinned: Bool = false,
@@ -82,7 +99,15 @@ final class InstalledPackageTests: XCTestCase {
         isInstalledAsDependency: Bool = false,
         autoUpdates: Bool = false,
         isDeprecated: Bool = false,
-        isDisabled: Bool = false
+        isDisabled: Bool = false,
+        directDependencies: [String] = [],
+        buildDependencies: [String] = [],
+        testDependencies: [String] = [],
+        recommendedDependencies: [String] = [],
+        optionalDependencies: [String] = [],
+        requirements: [String] = [],
+        directRuntimeDependencies: [String] = [],
+        runtimeDependencies: [String] = []
     ) -> InstalledPackage {
         InstalledPackage(
             kind: kind,
@@ -105,7 +130,14 @@ final class InstalledPackageTests: XCTestCase {
             autoUpdates: autoUpdates,
             isDeprecated: isDeprecated,
             isDisabled: isDisabled,
-            runtimeDependencies: []
+            directDependencies: directDependencies,
+            buildDependencies: buildDependencies,
+            testDependencies: testDependencies,
+            recommendedDependencies: recommendedDependencies,
+            optionalDependencies: optionalDependencies,
+            requirements: requirements,
+            directRuntimeDependencies: directRuntimeDependencies,
+            runtimeDependencies: runtimeDependencies
         )
     }
 }

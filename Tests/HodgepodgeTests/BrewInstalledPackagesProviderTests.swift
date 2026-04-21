@@ -20,6 +20,18 @@ final class BrewInstalledPackagesProviderTests: XCTestCase {
                           "homepage": "https://example.com/wget",
                           "aliases": [],
                           "oldnames": [],
+                          "dependencies": ["libidn2", "openssl@3"],
+                          "build_dependencies": ["pkgconf"],
+                          "test_dependencies": [],
+                          "recommended_dependencies": [],
+                          "optional_dependencies": [],
+                          "requirements": [
+                            {
+                              "name": "xcode",
+                              "version": "15.3",
+                              "contexts": ["build"]
+                            }
+                          ],
                           "versions": {
                             "stable": "1.25.0",
                             "head": "HEAD"
@@ -29,8 +41,8 @@ final class BrewInstalledPackagesProviderTests: XCTestCase {
                               "version": "1.25.0",
                               "time": 1710000000,
                               "runtime_dependencies": [
-                                { "full_name": "libidn2" },
-                                { "full_name": "openssl@3" }
+                                { "full_name": "libidn2", "declared_directly": true },
+                                { "full_name": "openssl@3", "declared_directly": false }
                               ],
                               "installed_as_dependency": false,
                               "installed_on_request": true
@@ -81,6 +93,10 @@ final class BrewInstalledPackagesProviderTests: XCTestCase {
         XCTAssertTrue(packages[1].isPinned)
         XCTAssertTrue(packages[1].isLeaf)
         XCTAssertTrue(packages[1].isInstalledOnRequest)
+        XCTAssertEqual(packages[1].directDependencies, ["libidn2", "openssl@3"])
+        XCTAssertEqual(packages[1].buildDependencies, ["pkgconf"])
+        XCTAssertEqual(packages[1].requirements, ["xcode 15.3 (build)"])
+        XCTAssertEqual(packages[1].directRuntimeDependencies, ["libidn2"])
         XCTAssertEqual(packages[1].runtimeDependencies, ["libidn2", "openssl@3"])
     }
 

@@ -62,6 +62,15 @@ final class InstalledPackagesViewModel: ObservableObject {
         ]
     }
 
+    func dependencySnapshot(for package: InstalledPackage) -> InstalledPackageDependencySnapshot? {
+        guard case .loaded(let packages) = packagesState else {
+            return nil
+        }
+
+        let graph = InstalledPackageDependencyGraph(packages: packages)
+        return graph.snapshot(for: package)
+    }
+
     func loadIfNeeded() {
         guard case .idle = packagesState else {
             return
@@ -198,5 +207,185 @@ struct InstalledPackageStateCount: Identifiable, Equatable {
 
     var id: String {
         title
+    }
+}
+
+struct InstalledPackageDependencySnapshot: Equatable {
+    let summaryMetrics: [InstalledPackageDependencyMetric]
+    let dependencyGroups: [InstalledPackageDependencyGroup]
+    let dependencyTree: [InstalledPackageTreeRow]
+    let dependentTree: [InstalledPackageTreeRow]
+}
+
+struct InstalledPackageDependencyMetric: Identifiable, Equatable {
+    let title: String
+    let value: String
+
+    var id: String {
+        title
+    }
+}
+
+struct InstalledPackageTreeRow: Identifiable, Equatable {
+    let title: String
+    let depth: Int
+
+    var id: String {
+        "\(depth):\(title)"
+    }
+}
+
+private struct InstalledPackageDependencyGraph {
+    private let packagesByName: [String: InstalledPackage]
+    private let packagesByFullName: [String: InstalledPackage]
+    private let dependencyLookup: [String: [InstalledPackage]]
+    private let dependentLookup: [String: [InstalledPackage]]
+
+    init(packages: [InstalledPackage]) {
+        packagesByName = Dictionary(uniqueKeysWithValues: packages.map { ($0.slug, $0) })
+        packagesByFullName = Dictionary(uniqueKeysWithValues: packages.map { ($0.fullName, $0) })
+
+        var dependencyLookup: [String: [InstalledPackage]] = [:]
+        var dependentLookup: [String: [InstalledPackage]] = [:]
+
+        for package in packages {
+            let directDependencies = Self.resolveInstalledPackages(
+                for: package,
+                packagesByName: packagesByName,
+                packagesByFullName: packagesByFullName
+            )
+            dependencyLookup[package.id] = directDependencies
+
+            for dependency in directDependencies {
+                dependentLookup[dependency.id, default: []].append(package)
+            }
+        }
+
+        self.dependencyLookup = dependencyLookup.mapValues(Self.sortPackages)
+        self.dependentLookup = dependentLookup.mapValues(Self.sortPackages)
+    }
+
+    func snapshot(for package: InstalledPackage) -> InstalledPackageDependencySnapshot {
+        let directDependencies = dependencyLookup[package.id] ?? []
+        let directDependents = dependentLookup[package.id] ?? []
+        let transitiveDependencies = walkTree(from: package.id, using: dependencyLookup)
+        let transitiveDependents = walkTree(from: package.id, using: dependentLookup)
+
+        return InstalledPackageDependencySnapshot(
+            summaryMetrics: [
+                InstalledPackageDependencyMetric(title: "Direct Dependencies", value: "\(directDependencies.count)"),
+                InstalledPackageDependencyMetric(title: "Transitive Dependencies", value: "\(transitiveDependencies.count)"),
+                InstalledPackageDependencyMetric(title: "Direct Dependents", value: "\(directDependents.count)"),
+                InstalledPackageDependencyMetric(title: "Transitive Dependents", value: "\(transitiveDependents.count)")
+            ],
+            dependencyGroups: package.dependencyGroups,
+            dependencyTree: buildTreeRows(from: package.id, using: dependencyLookup),
+            dependentTree: buildTreeRows(from: package.id, using: dependentLookup)
+        )
+    }
+
+    private func resolveInstalledPackages(for package: InstalledPackage) -> [InstalledPackage] {
+        Self.resolveInstalledPackages(
+            for: package,
+            packagesByName: packagesByName,
+            packagesByFullName: packagesByFullName
+        )
+    }
+
+    private static func resolveInstalledPackages(
+        for package: InstalledPackage,
+        packagesByName: [String: InstalledPackage],
+        packagesByFullName: [String: InstalledPackage]
+    ) -> [InstalledPackage] {
+        let relationNames: [String] = if package.kind == .formula {
+            Array(Set(package.directDependencies + package.directRuntimeDependencies))
+        } else {
+            []
+        }
+
+        return relationNames.compactMap { name in
+            resolvePackage(
+                named: name,
+                packagesByName: packagesByName,
+                packagesByFullName: packagesByFullName
+            )
+        }
+    }
+
+    private func resolvePackage(named name: String) -> InstalledPackage? {
+        Self.resolvePackage(
+            named: name,
+            packagesByName: packagesByName,
+            packagesByFullName: packagesByFullName
+        )
+    }
+
+    private static func resolvePackage(
+        named name: String,
+        packagesByName: [String: InstalledPackage],
+        packagesByFullName: [String: InstalledPackage]
+    ) -> InstalledPackage? {
+        packagesByFullName[name] ?? packagesByName[name]
+    }
+
+    private func walkTree(from packageID: String, using lookup: [String: [InstalledPackage]]) -> Set<String> {
+        var visited: Set<String> = []
+        var stack = lookup[packageID]?.map(\.id) ?? []
+
+        while let next = stack.popLast() {
+            if visited.insert(next).inserted {
+                stack.append(contentsOf: lookup[next]?.map(\.id) ?? [])
+            }
+        }
+
+        return visited
+    }
+
+    private func buildTreeRows(from packageID: String, using lookup: [String: [InstalledPackage]]) -> [InstalledPackageTreeRow] {
+        var rows: [InstalledPackageTreeRow] = []
+        var path: Set<String> = [packageID]
+
+        appendRows(
+            for: packageID,
+            depth: 0,
+            lookup: lookup,
+            path: &path,
+            rows: &rows
+        )
+
+        return rows
+    }
+
+    private func appendRows(
+        for packageID: String,
+        depth: Int,
+        lookup: [String: [InstalledPackage]],
+        path: inout Set<String>,
+        rows: inout [InstalledPackageTreeRow]
+    ) {
+        for package in lookup[packageID] ?? [] {
+            rows.append(InstalledPackageTreeRow(title: package.title, depth: depth))
+
+            if path.insert(package.id).inserted {
+                appendRows(
+                    for: package.id,
+                    depth: depth + 1,
+                    lookup: lookup,
+                    path: &path,
+                    rows: &rows
+                )
+                path.remove(package.id)
+            }
+        }
+    }
+
+    private static func sortPackages(_ packages: [InstalledPackage]) -> [InstalledPackage] {
+        packages.sorted { lhs, rhs in
+            let result = lhs.title.localizedCaseInsensitiveCompare(rhs.title)
+            if result != .orderedSame {
+                return result == .orderedAscending
+            }
+            return lhs.id < rhs.id
+        }
     }
 }

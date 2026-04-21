@@ -185,6 +185,46 @@ final class InstalledPackagesViewModelTests: XCTestCase {
         )
     }
 
+    func testDependencySnapshotBuildsTreesAndMetrics() {
+        let packages = [
+            makePackage(
+                slug: "wget",
+                title: "wget",
+                directDependencies: ["openssl@3", "zlib"],
+                directRuntimeDependencies: ["openssl@3"]
+            ),
+            makePackage(
+                slug: "openssl@3",
+                title: "openssl@3",
+                directDependencies: ["zlib"],
+                directRuntimeDependencies: ["zlib"]
+            ),
+            makePackage(
+                slug: "zlib",
+                title: "zlib",
+                isLeaf: true
+            )
+        ]
+        let viewModel = InstalledPackagesViewModel(
+            provider: MockInstalledPackagesProvider(result: .success(packages))
+        )
+        viewModel.packagesState = .loaded(packages)
+
+        let snapshot = viewModel.dependencySnapshot(for: packages[0])
+
+        XCTAssertEqual(
+            snapshot?.summaryMetrics,
+            [
+                InstalledPackageDependencyMetric(title: "Direct Dependencies", value: "2"),
+                InstalledPackageDependencyMetric(title: "Transitive Dependencies", value: "2"),
+                InstalledPackageDependencyMetric(title: "Direct Dependents", value: "0"),
+                InstalledPackageDependencyMetric(title: "Transitive Dependents", value: "0")
+            ]
+        )
+        XCTAssertEqual(snapshot?.dependencyTree.map(\.title), ["openssl@3", "zlib", "zlib"])
+        XCTAssertEqual(snapshot?.dependentTree, [])
+    }
+
     private func waitUntil(
         maxIterations: Int = 50,
         file: StaticString = #filePath,
@@ -213,7 +253,15 @@ final class InstalledPackagesViewModelTests: XCTestCase {
         isInstalledOnRequest: Bool = false,
         isInstalledAsDependency: Bool = false,
         autoUpdates: Bool = false,
-        isLeaf: Bool = false
+        isLeaf: Bool = false,
+        directDependencies: [String] = [],
+        buildDependencies: [String] = [],
+        testDependencies: [String] = [],
+        recommendedDependencies: [String] = [],
+        optionalDependencies: [String] = [],
+        requirements: [String] = [],
+        directRuntimeDependencies: [String] = [],
+        runtimeDependencies: [String] = []
     ) -> InstalledPackage {
         InstalledPackage(
             kind: kind,
@@ -236,7 +284,14 @@ final class InstalledPackagesViewModelTests: XCTestCase {
             autoUpdates: autoUpdates,
             isDeprecated: false,
             isDisabled: false,
-            runtimeDependencies: []
+            directDependencies: directDependencies,
+            buildDependencies: buildDependencies,
+            testDependencies: testDependencies,
+            recommendedDependencies: recommendedDependencies,
+            optionalDependencies: optionalDependencies,
+            requirements: requirements,
+            directRuntimeDependencies: directRuntimeDependencies,
+            runtimeDependencies: runtimeDependencies
         )
     }
 

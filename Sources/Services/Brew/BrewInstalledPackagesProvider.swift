@@ -78,6 +78,12 @@ private struct InstalledFormulaResponse: Decodable {
     let homepage: URL?
     let aliases: [String]
     let oldnames: [String]
+    let dependencies: [String]
+    let buildDependencies: [String]
+    let testDependencies: [String]
+    let recommendedDependencies: [String]
+    let optionalDependencies: [String]
+    let requirements: [RequirementResponse]
     let versions: VersionsResponse
     let installed: [InstalledVersionResponse]
     let linkedKeg: String?
@@ -94,6 +100,12 @@ private struct InstalledFormulaResponse: Decodable {
         case homepage
         case aliases
         case oldnames
+        case dependencies
+        case buildDependencies = "build_dependencies"
+        case testDependencies = "test_dependencies"
+        case recommendedDependencies = "recommended_dependencies"
+        case optionalDependencies = "optional_dependencies"
+        case requirements
         case versions
         case installed
         case linkedKeg = "linked_keg"
@@ -135,9 +147,36 @@ private struct InstalledFormulaResponse: Decodable {
 
     struct RuntimeDependencyResponse: Decodable {
         let fullName: String
+        let declaredDirectly: Bool
 
         private enum CodingKeys: String, CodingKey {
             case fullName = "full_name"
+            case declaredDirectly = "declared_directly"
+        }
+
+        init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            fullName = try container.decode(String.self, forKey: .fullName)
+            declaredDirectly = try container.decodeIfPresent(Bool.self, forKey: .declaredDirectly) ?? false
+        }
+    }
+
+    struct RequirementResponse: Decodable {
+        let name: String
+        let version: String?
+        let contexts: [String]
+
+        init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            name = try container.decode(String.self, forKey: .name)
+            version = try container.decodeIfPresent(String.self, forKey: .version)
+            contexts = try container.decodeIfPresent([String].self, forKey: .contexts) ?? []
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case name
+            case version
+            case contexts
         }
     }
 
@@ -150,6 +189,12 @@ private struct InstalledFormulaResponse: Decodable {
         homepage = try container.decodeIfPresent(URL.self, forKey: .homepage)
         aliases = try container.decodeIfPresent([String].self, forKey: .aliases) ?? []
         oldnames = try container.decodeIfPresent([String].self, forKey: .oldnames) ?? []
+        dependencies = try container.decodeIfPresent([String].self, forKey: .dependencies) ?? []
+        buildDependencies = try container.decodeIfPresent([String].self, forKey: .buildDependencies) ?? []
+        testDependencies = try container.decodeIfPresent([String].self, forKey: .testDependencies) ?? []
+        recommendedDependencies = try container.decodeIfPresent([String].self, forKey: .recommendedDependencies) ?? []
+        optionalDependencies = try container.decodeIfPresent([String].self, forKey: .optionalDependencies) ?? []
+        requirements = try container.decodeIfPresent([RequirementResponse].self, forKey: .requirements) ?? []
         versions = try container.decode(VersionsResponse.self, forKey: .versions)
         installed = try container.decodeIfPresent([InstalledVersionResponse].self, forKey: .installed) ?? []
         linkedKeg = try container.decodeIfPresent(String.self, forKey: .linkedKeg)
@@ -213,9 +258,21 @@ private extension InstalledPackage {
     init(_ response: InstalledFormulaResponse, leafFormulae: Set<String>) {
         let installedVersions = response.installed.map(\.version)
         let latestInstallTime = response.installed.compactMap(\.time).max()
+        let directRuntimeDependencies = Array(
+            Set(
+                response.installed.flatMap {
+                    $0.runtimeDependencies
+                        .filter(\.declaredDirectly)
+                        .map(\.fullName)
+                }
+            )
+        ).sorted()
         let runtimeDependencies = Array(
             Set(response.installed.flatMap { $0.runtimeDependencies.map(\.fullName) })
         ).sorted()
+        let requirements = response.requirements.map { requirement in
+            Self.formatRequirement(requirement)
+        }
         let isLeaf = leafFormulae.contains(response.name) || leafFormulae.contains(response.fullName)
         let selectedVersion = response.linkedKeg
             .flatMap { $0.isEmpty ? nil : $0 }
@@ -245,6 +302,13 @@ private extension InstalledPackage {
             autoUpdates: false,
             isDeprecated: response.deprecated,
             isDisabled: response.disabled,
+            directDependencies: response.dependencies,
+            buildDependencies: response.buildDependencies,
+            testDependencies: response.testDependencies,
+            recommendedDependencies: response.recommendedDependencies,
+            optionalDependencies: response.optionalDependencies,
+            requirements: requirements,
+            directRuntimeDependencies: directRuntimeDependencies,
             runtimeDependencies: runtimeDependencies
         )
     }
@@ -273,7 +337,25 @@ private extension InstalledPackage {
             autoUpdates: response.autoUpdates,
             isDeprecated: response.deprecated,
             isDisabled: response.disabled,
+            directDependencies: [],
+            buildDependencies: [],
+            testDependencies: [],
+            recommendedDependencies: [],
+            optionalDependencies: [],
+            requirements: [],
+            directRuntimeDependencies: [],
             runtimeDependencies: []
         )
+    }
+
+    private static func formatRequirement(_ requirement: InstalledFormulaResponse.RequirementResponse) -> String {
+        let versionSuffix = requirement.version.map { " \($0)" } ?? ""
+        let contextSuffix = if requirement.contexts.isEmpty {
+            ""
+        } else {
+            " (\(requirement.contexts.joined(separator: ", ")))"
+        }
+
+        return "\(requirement.name)\(versionSuffix)\(contextSuffix)"
     }
 }
