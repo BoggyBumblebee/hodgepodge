@@ -39,7 +39,8 @@ final class InstalledPackagesViewModelTests: XCTestCase {
                 title: "Alpha",
                 version: "1.0.0",
                 installedAt: Date(timeIntervalSince1970: 100),
-                isInstalledOnRequest: true
+                isInstalledOnRequest: true,
+                isLeaf: true
             ),
             makePackage(
                 kind: .cask,
@@ -73,6 +74,9 @@ final class InstalledPackagesViewModelTests: XCTestCase {
         viewModel.scope = .all
         viewModel.activeFilters = [.installedAsDependency]
         XCTAssertEqual(viewModel.filteredPackages.map(\.title), ["Beta"])
+
+        viewModel.activeFilters = [.leaves]
+        XCTAssertEqual(viewModel.filteredPackages.map(\.title), ["Alpha"])
 
         viewModel.activeFilters = []
         viewModel.sortOption = .name
@@ -159,6 +163,28 @@ final class InstalledPackagesViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.selectedPackage, refreshed)
     }
 
+    func testStateCountsReflectPackageStateInventory() {
+        let packages = [
+            makePackage(isPinned: true, isLinked: true, isInstalledOnRequest: true, isLeaf: true),
+            makePackage(slug: "beta", title: "Beta", isInstalledAsDependency: true),
+            makePackage(kind: .cask, slug: "docker-desktop", title: "Docker Desktop", autoUpdates: true)
+        ]
+        let viewModel = InstalledPackagesViewModel(
+            provider: MockInstalledPackagesProvider(result: .success(packages))
+        )
+        viewModel.packagesState = .loaded(packages)
+
+        XCTAssertEqual(
+            viewModel.stateCounts,
+            [
+                InstalledPackageStateCount(title: "On Request", count: 1),
+                InstalledPackageStateCount(title: "Dependency", count: 1),
+                InstalledPackageStateCount(title: "Leaves", count: 1),
+                InstalledPackageStateCount(title: "Pinned", count: 1)
+            ]
+        )
+    }
+
     private func waitUntil(
         maxIterations: Int = 50,
         file: StaticString = #filePath,
@@ -182,9 +208,12 @@ final class InstalledPackagesViewModelTests: XCTestCase {
         version: String = "1.25.0",
         tap: String = "homebrew/core",
         installedAt: Date? = Date(timeIntervalSince1970: 100),
+        isPinned: Bool = false,
+        isLinked: Bool? = nil,
         isInstalledOnRequest: Bool = false,
         isInstalledAsDependency: Bool = false,
-        autoUpdates: Bool = false
+        autoUpdates: Bool = false,
+        isLeaf: Bool = false
     ) -> InstalledPackage {
         InstalledPackage(
             kind: kind,
@@ -197,9 +226,10 @@ final class InstalledPackagesViewModelTests: XCTestCase {
             tap: tap,
             installedVersions: [version],
             installedAt: installedAt,
-            linkedVersion: kind == .formula ? version : nil,
-            isPinned: false,
-            isLinked: kind == .formula,
+            linkedVersion: resolvedLinkedVersion(kind: kind, version: version, isLinked: isLinked),
+            isPinned: isPinned,
+            isLinked: isLinked ?? (kind == .formula),
+            isLeaf: isLeaf,
             isOutdated: false,
             isInstalledOnRequest: isInstalledOnRequest,
             isInstalledAsDependency: isInstalledAsDependency,
@@ -208,6 +238,18 @@ final class InstalledPackagesViewModelTests: XCTestCase {
             isDisabled: false,
             runtimeDependencies: []
         )
+    }
+
+    private func resolvedLinkedVersion(
+        kind: CatalogPackageKind,
+        version: String,
+        isLinked: Bool?
+    ) -> String? {
+        if let isLinked {
+            return isLinked ? version : nil
+        }
+
+        return kind == .formula ? version : nil
     }
 }
 

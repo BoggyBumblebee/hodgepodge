@@ -49,6 +49,19 @@ final class InstalledPackagesViewModel: ObservableObject {
         activeFilters.count
     }
 
+    var stateCounts: [InstalledPackageStateCount] {
+        guard case .loaded(let packages) = packagesState else {
+            return []
+        }
+
+        return [
+            InstalledPackageStateCount(title: "On Request", count: packages.filter(\.isInstalledOnRequest).count),
+            InstalledPackageStateCount(title: "Dependency", count: packages.filter(\.isInstalledAsDependency).count),
+            InstalledPackageStateCount(title: "Leaves", count: packages.filter(\.isLeaf).count),
+            InstalledPackageStateCount(title: "Pinned", count: packages.filter(\.isPinned).count)
+        ]
+    }
+
     func loadIfNeeded() {
         guard case .idle = packagesState else {
             return
@@ -101,6 +114,8 @@ final class InstalledPackagesViewModel: ObservableObject {
                 package.isPinned
             case .linked:
                 package.isLinked
+            case .leaves:
+                package.isLeaf
             case .outdated:
                 package.isOutdated
             case .installedOnRequest:
@@ -174,5 +189,14 @@ extension InstalledPackagesViewModel {
                 runner: runner
             )
         )
+    }
+}
+
+struct InstalledPackageStateCount: Identifiable, Equatable {
+    let title: String
+    let count: Int
+
+    var id: String {
+        title
     }
 }

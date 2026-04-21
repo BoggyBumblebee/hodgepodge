@@ -27,12 +27,30 @@ struct BrewInstalledPackagesProvider: InstalledPackagesProviding, @unchecked Sen
             executable: installation.brewPath,
             arguments: ["info", "--json=v2", "--installed"]
         )
+        let leafFormulae = try await fetchLeafFormulae(using: installation.brewPath)
         let response = try decoder.decode(InstalledPackagesResponse.self, from: Data(result.stdout.utf8))
 
-        return (response.formulae.map(InstalledPackage.init) + response.casks.map(InstalledPackage.init))
+        return (
+            response.formulae.map { InstalledPackage($0, leafFormulae: leafFormulae) } +
+            response.casks.map(InstalledPackage.init)
+        )
             .sorted { lhs, rhs in
                 lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
             }
+    }
+
+    private func fetchLeafFormulae(using brewPath: String) async throws -> Set<String> {
+        let result = try await runner.run(
+            executable: brewPath,
+            arguments: ["leaves"]
+        )
+
+        let formulae = result.stdout
+            .split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        return Set(formulae)
     }
 }
 
@@ -192,12 +210,13 @@ private struct InstalledCaskResponse: Decodable {
 }
 
 private extension InstalledPackage {
-    init(_ response: InstalledFormulaResponse) {
+    init(_ response: InstalledFormulaResponse, leafFormulae: Set<String>) {
         let installedVersions = response.installed.map(\.version)
         let latestInstallTime = response.installed.compactMap(\.time).max()
         let runtimeDependencies = Array(
             Set(response.installed.flatMap { $0.runtimeDependencies.map(\.fullName) })
         ).sorted()
+        let isLeaf = leafFormulae.contains(response.name) || leafFormulae.contains(response.fullName)
         let selectedVersion = response.linkedKeg
             .flatMap { $0.isEmpty ? nil : $0 }
             ?? installedVersions.last
@@ -219,6 +238,7 @@ private extension InstalledPackage {
             linkedVersion: response.linkedKeg,
             isPinned: response.pinned,
             isLinked: response.linkedKeg?.isEmpty == false,
+            isLeaf: isLeaf,
             isOutdated: response.outdated,
             isInstalledOnRequest: response.installed.contains { $0.installedOnRequest },
             isInstalledAsDependency: response.installed.contains { $0.installedAsDependency },
@@ -246,6 +266,7 @@ private extension InstalledPackage {
             linkedVersion: nil,
             isPinned: false,
             isLinked: false,
+            isLeaf: false,
             isOutdated: response.outdated,
             isInstalledOnRequest: true,
             isInstalledAsDependency: false,

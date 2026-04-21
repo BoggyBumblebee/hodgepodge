@@ -8,7 +8,7 @@ final class BrewInstalledPackagesProviderTests: XCTestCase {
         let provider = BrewInstalledPackagesProvider(
             brewLocator: ProviderTestBrewLocator(),
             runner: ProviderTestCommandRunner(
-                stdout:
+                infoStdout:
                     """
                     {
                       "formulae": [
@@ -62,6 +62,8 @@ final class BrewInstalledPackagesProviderTests: XCTestCase {
                       ]
                     }
                     """
+                ,
+                leavesStdout: "wget\n"
             )
         )
 
@@ -77,6 +79,7 @@ final class BrewInstalledPackagesProviderTests: XCTestCase {
         XCTAssertEqual(packages[1].fullName, "homebrew/core/wget")
         XCTAssertEqual(packages[1].linkedVersion, "1.25.0")
         XCTAssertTrue(packages[1].isPinned)
+        XCTAssertTrue(packages[1].isLeaf)
         XCTAssertTrue(packages[1].isInstalledOnRequest)
         XCTAssertEqual(packages[1].runtimeDependencies, ["libidn2", "openssl@3"])
     }
@@ -85,7 +88,7 @@ final class BrewInstalledPackagesProviderTests: XCTestCase {
         let provider = BrewInstalledPackagesProvider(
             brewLocator: ProviderTestBrewLocator(),
             runner: ProviderTestCommandRunner(
-                stdout:
+                infoStdout:
                     """
                     {
                       "formulae": [
@@ -110,6 +113,8 @@ final class BrewInstalledPackagesProviderTests: XCTestCase {
                       "casks": []
                     }
                     """
+                ,
+                leavesStdout: ""
             )
         )
 
@@ -129,13 +134,22 @@ private struct ProviderTestBrewLocator: BrewLocating {
 }
 
 private struct ProviderTestCommandRunner: CommandRunning {
-    let stdout: String
+    let infoStdout: String
+    let leavesStdout: String
 
     func run(
         executable: String,
         arguments: [String],
         onOutput: (@MainActor @Sendable (CommandOutputChunk) -> Void)?
     ) async throws -> CommandResult {
-        CommandResult(stdout: stdout, stderr: "", exitCode: 0)
+        let stdout = if arguments == ["info", "--json=v2", "--installed"] {
+            infoStdout
+        } else if arguments == ["leaves"] {
+            leavesStdout
+        } else {
+            ""
+        }
+
+        return CommandResult(stdout: stdout, stderr: "", exitCode: 0)
     }
 }

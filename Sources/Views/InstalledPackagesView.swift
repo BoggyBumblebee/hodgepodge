@@ -111,6 +111,10 @@ struct InstalledPackagesView: View {
             }
             .pickerStyle(.segmented)
 
+            if !viewModel.stateCounts.isEmpty {
+                InstalledPackageStateSummary(counts: viewModel.stateCounts)
+            }
+
             HStack(spacing: 12) {
                 Menu {
                     ForEach(InstalledPackageFilterOption.allCases) { filter in
@@ -204,6 +208,7 @@ private struct InstalledPackageDetailView: View {
             VStack(alignment: .leading, spacing: 20) {
                 titleBlock
                 metadataCard
+                packageStateCard
 
                 if !package.installedVersions.isEmpty {
                     installedVersionsCard
@@ -288,13 +293,15 @@ private struct InstalledPackageDetailView: View {
                 if let installedAt = package.installedAt {
                     metadataRow("Installed At", installedAt.formatted(date: .abbreviated, time: .shortened))
                 }
+            }
+        }
+    }
 
-                metadataRow("Outdated", package.isOutdated ? "Yes" : "No")
-                metadataRow("Deprecated", package.isDeprecated ? "Yes" : "No")
-                metadataRow("Disabled", package.isDisabled ? "Yes" : "No")
-
-                if package.kind == .cask {
-                    metadataRow("Auto Updates", package.autoUpdates ? "Yes" : "No")
+    private var packageStateCard: some View {
+        InstalledPackageCard(title: "Package State") {
+            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 16, verticalSpacing: 12) {
+                ForEach(package.packageStateRows, id: \.title) { row in
+                    metadataRow(row.title, row.value)
                 }
             }
         }
@@ -321,6 +328,34 @@ private struct InstalledPackageDetailView: View {
             Text(value)
                 .textSelection(.enabled)
         }
+    }
+}
+
+private struct InstalledPackageStateSummary: View {
+    let counts: [InstalledPackageStateCount]
+
+    var body: some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 12)], spacing: 12) {
+            ForEach(counts) { count in
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("\(count.count)")
+                        .font(.title2.monospacedDigit())
+                        .bold()
+
+                    Text(count.title)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
+                .background(
+                    Color(nsColor: .controlBackgroundColor),
+                    in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                )
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Package state summary")
     }
 }
 

@@ -10,6 +10,7 @@ enum InstalledPackagesLoadState: Equatable {
 enum InstalledPackageFilterOption: String, CaseIterable, Identifiable, Hashable {
     case pinned
     case linked
+    case leaves
     case outdated
     case installedOnRequest
     case installedAsDependency
@@ -23,6 +24,8 @@ enum InstalledPackageFilterOption: String, CaseIterable, Identifiable, Hashable 
             "Pinned"
         case .linked:
             "Linked"
+        case .leaves:
+            "Leaves"
         case .outdated:
             "Outdated"
         case .installedOnRequest:
@@ -71,6 +74,7 @@ struct InstalledPackage: Identifiable, Equatable, Hashable, Sendable {
     let linkedVersion: String?
     let isPinned: Bool
     let isLinked: Bool
+    let isLeaf: Bool
     let isOutdated: Bool
     let isInstalledOnRequest: Bool
     let isInstalledAsDependency: Bool
@@ -91,6 +95,9 @@ struct InstalledPackage: Identifiable, Equatable, Hashable, Sendable {
         }
         if isLinked {
             badges.append("Linked")
+        }
+        if isLeaf {
+            badges.append("Leaf")
         }
         if isOutdated {
             badges.append("Outdated")
@@ -122,5 +129,28 @@ struct InstalledPackage: Identifiable, Equatable, Hashable, Sendable {
             return "Installed as a dependency"
         }
         return "Install source unavailable"
+    }
+
+    var packageStateRows: [(title: String, value: String)] {
+        var rows: [(String, String)] = [
+            ("Pinned", yesNo(isPinned)),
+            ("Outdated", yesNo(isOutdated)),
+            ("Deprecated", yesNo(isDeprecated)),
+            ("Disabled", yesNo(isDisabled))
+        ]
+
+        if kind == .formula {
+            rows.insert(("Linked", yesNo(isLinked)), at: 1)
+            rows.insert(("Leaf", yesNo(isLeaf)), at: 2)
+            rows.append(("Install Source", installSourceDescription))
+        } else {
+            rows.insert(("Auto Updates", yesNo(autoUpdates)), at: 1)
+        }
+
+        return rows
+    }
+
+    private func yesNo(_ value: Bool) -> String {
+        value ? "Yes" : "No"
     }
 }

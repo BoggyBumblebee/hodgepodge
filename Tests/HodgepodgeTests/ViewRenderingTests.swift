@@ -165,6 +165,7 @@ final class ViewRenderingTests: XCTestCase {
             linkedVersion: "1.25.0",
             isPinned: true,
             isLinked: true,
+            isLeaf: true,
             isOutdated: false,
             isInstalledOnRequest: true,
             isInstalledAsDependency: false,
