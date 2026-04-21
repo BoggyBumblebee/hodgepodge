@@ -71,6 +71,15 @@ final class InstalledPackagesViewModel: ObservableObject {
         return graph.snapshot(for: package)
     }
 
+    func selectPackage(id: String) {
+        guard case .loaded(let packages) = packagesState,
+              let package = packages.first(where: { $0.id == id }) else {
+            return
+        }
+
+        selectedPackage = package
+    }
+
     func loadIfNeeded() {
         guard case .idle = packagesState else {
             return
@@ -227,12 +236,10 @@ struct InstalledPackageDependencyMetric: Identifiable, Equatable {
 }
 
 struct InstalledPackageTreeRow: Identifiable, Equatable {
+    let id: String
+    let packageID: String
     let title: String
     let depth: Int
-
-    var id: String {
-        "\(depth):\(title)"
-    }
 }
 
 private struct InstalledPackageDependencyGraph {
@@ -343,7 +350,7 @@ private struct InstalledPackageDependencyGraph {
 
     private func buildTreeRows(from packageID: String, using lookup: [String: [InstalledPackage]]) -> [InstalledPackageTreeRow] {
         var rows: [InstalledPackageTreeRow] = []
-        var path: Set<String> = [packageID]
+        var path: [String] = [packageID]
 
         appendRows(
             for: packageID,
@@ -360,13 +367,21 @@ private struct InstalledPackageDependencyGraph {
         for packageID: String,
         depth: Int,
         lookup: [String: [InstalledPackage]],
-        path: inout Set<String>,
+        path: inout [String],
         rows: inout [InstalledPackageTreeRow]
     ) {
         for package in lookup[packageID] ?? [] {
-            rows.append(InstalledPackageTreeRow(title: package.title, depth: depth))
+            rows.append(
+                InstalledPackageTreeRow(
+                    id: (path + [package.id]).joined(separator: ">"),
+                    packageID: package.id,
+                    title: package.title,
+                    depth: depth
+                )
+            )
 
-            if path.insert(package.id).inserted {
+            if !path.contains(package.id) {
+                path.append(package.id)
                 appendRows(
                     for: package.id,
                     depth: depth + 1,
@@ -374,7 +389,7 @@ private struct InstalledPackageDependencyGraph {
                     path: &path,
                     rows: &rows
                 )
-                path.remove(package.id)
+                _ = path.popLast()
             }
         }
     }

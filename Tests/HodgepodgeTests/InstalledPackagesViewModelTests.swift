@@ -225,6 +225,22 @@ final class InstalledPackagesViewModelTests: XCTestCase {
         XCTAssertEqual(snapshot?.dependentTree, [])
     }
 
+    func testSelectPackageUpdatesSelectionWhenIDExists() {
+        let packages = [
+            makePackage(slug: "wget", title: "wget"),
+            makePackage(slug: "openssl@3", title: "openssl@3")
+        ]
+        let viewModel = InstalledPackagesViewModel(
+            provider: MockInstalledPackagesProvider(result: .success(packages))
+        )
+        viewModel.packagesState = .loaded(packages)
+        viewModel.selectedPackage = packages[0]
+
+        viewModel.selectPackage(id: packages[1].id)
+
+        XCTAssertEqual(viewModel.selectedPackage, packages[1])
+    }
+
     private func waitUntil(
         maxIterations: Int = 50,
         file: StaticString = #filePath,

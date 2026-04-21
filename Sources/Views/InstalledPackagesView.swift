@@ -177,7 +177,8 @@ struct InstalledPackagesView: View {
             if let package = viewModel.selectedPackage {
                 InstalledPackageDetailView(
                     package: package,
-                    dependencySnapshot: viewModel.dependencySnapshot(for: package)
+                    dependencySnapshot: viewModel.dependencySnapshot(for: package),
+                    onSelectPackage: viewModel.selectPackage(id:)
                 )
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             } else {
@@ -206,6 +207,7 @@ struct InstalledPackagesView: View {
 private struct InstalledPackageDetailView: View {
     let package: InstalledPackage
     let dependencySnapshot: InstalledPackageDependencySnapshot?
+    let onSelectPackage: (String) -> Void
 
     var body: some View {
         ScrollView {
@@ -354,7 +356,10 @@ private struct InstalledPackageDetailView: View {
                 Text("No installed dependency tree is available for this package.")
                     .foregroundStyle(.secondary)
             } else {
-                InstalledPackageTreeView(rows: snapshot.dependencyTree)
+                InstalledPackageTreeView(
+                    rows: snapshot.dependencyTree,
+                    onSelectPackage: onSelectPackage
+                )
             }
         }
     }
@@ -365,7 +370,10 @@ private struct InstalledPackageDetailView: View {
                 Text("No installed packages currently depend on this package.")
                     .foregroundStyle(.secondary)
             } else {
-                InstalledPackageTreeView(rows: snapshot.dependentTree)
+                InstalledPackageTreeView(
+                    rows: snapshot.dependentTree,
+                    onSelectPackage: onSelectPackage
+                )
             }
         }
     }
@@ -424,23 +432,31 @@ private struct InstalledPackageStateSummary: View {
 
 private struct InstalledPackageTreeView: View {
     let rows: [InstalledPackageTreeRow]
+    let onSelectPackage: (String) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             ForEach(rows) { row in
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Color.clear
-                        .frame(width: CGFloat(row.depth) * 18, height: 1)
+                Button {
+                    onSelectPackage(row.packageID)
+                } label: {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Color.clear
+                            .frame(width: CGFloat(row.depth) * 18, height: 1)
 
-                    Image(systemName: row.depth == 0 ? "arrow.turn.down.right" : "arrow.turn.right.down")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
+                        Image(systemName: row.depth == 0 ? "arrow.turn.down.right" : "arrow.turn.right.down")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
 
-                    Text(row.title)
-                        .font(.body.monospaced())
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        Text(row.title)
+                            .font(.body.monospaced())
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 }
+                .buttonStyle(.plain)
+                .contentShape(Rectangle())
+                .accessibilityLabel("Open installed package \(row.title)")
+                .help("Open \(row.title)")
             }
         }
     }
