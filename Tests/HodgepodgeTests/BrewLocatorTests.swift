@@ -120,7 +120,11 @@ private struct MockCommand {
 private struct MockCommandRunner: CommandRunning {
     let responses: [MockCommand]
 
-    func run(executable: String, arguments: [String]) async throws -> CommandResult {
+    func run(
+        executable: String,
+        arguments: [String],
+        onOutput: (@MainActor @Sendable (CommandOutputChunk) -> Void)?
+    ) async throws -> CommandResult {
         guard let response = responses.first(where: { $0.executable == executable && $0.arguments == arguments }) else {
             throw BrewLocatorError.brewNotFound
         }

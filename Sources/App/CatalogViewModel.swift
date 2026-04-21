@@ -4,6 +4,8 @@ import Foundation
 final class CatalogViewModel: ObservableObject {
     @Published var packagesState: CatalogPackagesLoadState = .idle
     @Published var detailState: CatalogDetailLoadState = .idle
+    @Published var actionState: CatalogPackageActionState = .idle
+    @Published var actionLogs: [CatalogPackageActionLogEntry] = []
     @Published var searchText = ""
     @Published var scope: CatalogScope = .all
     @Published var activeFilters: Set<CatalogFilterOption> = []
@@ -11,10 +13,22 @@ final class CatalogViewModel: ObservableObject {
     @Published var selectedPackage: CatalogPackageSummary?
 
     private let apiClient: any HomebrewAPIClienting
+    private let commandExecutor: any BrewCommandExecuting
     private var detailCache: [String: CatalogPackageDetail] = [:]
+    private var actionTask: Task<Void, Never>?
+    private var nextLogIdentifier = 0
+    private var pendingLogText: [CatalogPackageActionLogKind: String] = [:]
 
-    init(apiClient: any HomebrewAPIClienting) {
+    init(
+        apiClient: any HomebrewAPIClienting,
+        commandExecutor: any BrewCommandExecuting
+    ) {
         self.apiClient = apiClient
+        self.commandExecutor = commandExecutor
+    }
+
+    deinit {
+        actionTask?.cancel()
     }
 
     var filteredPackages: [CatalogPackageSummary] {
@@ -47,6 +61,10 @@ final class CatalogViewModel: ObservableObject {
 
     var activeFilterCount: Int {
         activeFilters.count
+    }
+
+    var hasRunningAction: Bool {
+        actionState.isRunning
     }
 
     func loadIfNeeded() {
@@ -147,6 +165,64 @@ final class CatalogViewModel: ObservableObject {
         activeFilters.contains(filter)
     }
 
+    func runAction(_ actionKind: CatalogPackageActionKind, for detail: CatalogPackageDetail) {
+        let command = detail.actionCommand(for: actionKind)
+
+        actionTask?.cancel()
+        actionTask = nil
+        resetActionOutput()
+        actionState = .running(command)
+        appendLog(.system, "Preparing \(actionKind.title.lowercased()) for \(detail.title).")
+
+        actionTask = Task { @MainActor [commandExecutor] in
+            do {
+                let result = try await commandExecutor.execute(command: command) { [weak self] kind, text in
+                    self?.appendLog(kind, text)
+                }
+                flushPendingLogs()
+                appendLog(.system, "\(actionKind.title) finished with exit code \(result.exitCode).")
+                actionState = .succeeded(command, result)
+            } catch is CancellationError {
+                flushPendingLogs()
+                appendLog(.system, "\(actionKind.title) cancelled.")
+                actionState = .cancelled(command)
+            } catch {
+                flushPendingLogs()
+                appendLog(.system, error.localizedDescription)
+                actionState = .failed(command, error.localizedDescription)
+            }
+
+            actionTask = nil
+        }
+    }
+
+    func cancelAction() {
+        actionTask?.cancel()
+    }
+
+    func clearActionOutput() {
+        actionTask?.cancel()
+        actionTask = nil
+        resetActionOutput()
+        actionState = .idle
+    }
+
+    func actionState(for detail: CatalogPackageDetail) -> CatalogPackageActionState {
+        guard actionState.command?.packageID == detail.packageID else {
+            return .idle
+        }
+
+        return actionState
+    }
+
+    func actionLogs(for detail: CatalogPackageDetail) -> [CatalogPackageActionLogEntry] {
+        guard actionState.command?.packageID == detail.packageID else {
+            return []
+        }
+
+        return actionLogs
+    }
+
     private func matchesActiveFilters(for package: CatalogPackageSummary) -> Bool {
         activeFilters.allSatisfy { filter in
             switch filter {
@@ -201,10 +277,74 @@ final class CatalogViewModel: ObservableObject {
         }
         return fallback
     }
+
+    private func appendLog(_ kind: CatalogPackageActionLogKind, _ text: String) {
+        switch kind {
+        case .system:
+            let line = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !line.isEmpty else {
+                return
+            }
+            appendLogLine(kind, line)
+        case .stdout, .stderr:
+            var buffered = pendingLogText[kind, default: ""]
+            buffered.append(text)
+
+            let lines = buffered.components(separatedBy: .newlines)
+            pendingLogText[kind] = lines.last ?? ""
+
+            for line in lines.dropLast() {
+                let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else {
+                    continue
+                }
+                appendLogLine(kind, trimmed)
+            }
+        }
+    }
+
+    private func appendLogLine(_ kind: CatalogPackageActionLogKind, _ line: String) {
+        actionLogs.append(
+            CatalogPackageActionLogEntry(
+                id: nextLogIdentifier,
+                kind: kind,
+                text: line
+            )
+        )
+        nextLogIdentifier += 1
+    }
+
+    private func flushPendingLogs() {
+        for kind in [CatalogPackageActionLogKind.stdout, .stderr] {
+            let line = pendingLogText[kind, default: ""].trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !line.isEmpty else {
+                continue
+            }
+
+            appendLogLine(kind, line)
+        }
+
+        pendingLogText.removeAll()
+    }
+
+    private func resetActionOutput() {
+        actionLogs.removeAll()
+        nextLogIdentifier = 0
+        pendingLogText.removeAll()
+    }
 }
 
 extension CatalogViewModel {
     static func live() -> CatalogViewModel {
-        CatalogViewModel(apiClient: HomebrewAPIClient())
+        let runner = ProcessCommandRunner()
+        let brewLocator = BrewLocator(runner: runner)
+
+        return CatalogViewModel(
+            apiClient: HomebrewAPIClient(),
+            commandExecutor: BrewCommandExecutor(
+                brewLocator: brewLocator,
+                runner: runner
+            )
+        )
     }
 }

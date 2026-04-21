@@ -178,9 +178,24 @@ struct CatalogView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
         case .loaded(let detail):
-            CatalogDetailView(detail: detail) {
-                viewModel.refreshSelectedDetail()
-            }
+            CatalogDetailView(
+                detail: detail,
+                actionState: viewModel.actionState(for: detail),
+                actionLogs: viewModel.actionLogs(for: detail),
+                hasRunningAction: viewModel.hasRunningAction,
+                refreshAction: {
+                    viewModel.refreshSelectedDetail()
+                },
+                runAction: { actionKind, detail in
+                    viewModel.runAction(actionKind, for: detail)
+                },
+                cancelAction: {
+                    viewModel.cancelAction()
+                },
+                clearActionOutput: {
+                    viewModel.clearActionOutput()
+                }
+            )
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
     }
@@ -215,7 +230,15 @@ struct CatalogView: View {
 
 private struct CatalogDetailView: View {
     let detail: CatalogPackageDetail
+    let actionState: CatalogPackageActionState
+    let actionLogs: [CatalogPackageActionLogEntry]
+    let hasRunningAction: Bool
     let refreshAction: () -> Void
+    let runAction: (CatalogPackageActionKind, CatalogPackageDetail) -> Void
+    let cancelAction: () -> Void
+    let clearActionOutput: () -> Void
+
+    @State private var pendingConfirmation: CatalogPackageActionCommand?
 
     var body: some View {
         ScrollView {
@@ -258,6 +281,26 @@ private struct CatalogDetailView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .confirmationDialog(
+            pendingConfirmation?.confirmationTitle ?? "Install Package",
+            isPresented: confirmationBinding,
+            titleVisibility: .visible
+        ) {
+            Button(pendingConfirmation?.kind.title ?? "Install") {
+                guard let pendingConfirmation else {
+                    return
+                }
+
+                runAction(pendingConfirmation.kind, detail)
+                self.pendingConfirmation = nil
+            }
+
+            Button("Cancel", role: .cancel) {
+                pendingConfirmation = nil
+            }
+        } message: {
+            Text(pendingConfirmation?.confirmationMessage ?? "")
+        }
     }
 
     private var titleBlock: some View {
@@ -302,6 +345,25 @@ private struct CatalogDetailView: View {
     private var actionBlock: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
+                Button("Install...") {
+                    pendingConfirmation = detail.actionCommand(for: .install)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(hasRunningAction)
+                .accessibilityLabel("Install package")
+
+                Button("Fetch") {
+                    runAction(.fetch, detail)
+                }
+                .disabled(hasRunningAction)
+                .accessibilityLabel("Fetch package")
+
+                if actionState.isRunning {
+                    Button("Cancel", action: cancelAction)
+                        .keyboardShortcut(.cancelAction)
+                        .accessibilityLabel("Cancel running package command")
+                }
+
                 if let homepage = detail.homepage {
                     Link("Open Homepage", destination: homepage)
                         .accessibilityLabel("Open package homepage")
@@ -327,9 +389,78 @@ private struct CatalogDetailView: View {
             }
 
             commandBlock(title: "Install", command: detail.installCommand)
+            commandBlock(title: "Fetch", command: detail.fetchCommand)
+            actionSummary
 
-            if detail.kind == .formula {
-                commandBlock(title: "Fetch", command: detail.fetchCommand)
+            if actionState.command != nil {
+                actionLogBlock
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var actionSummary: some View {
+        switch actionState {
+        case .idle:
+            EmptyView()
+        case .running(let command):
+            statusBanner(
+                text: "\(command.kind.title) is running...",
+                systemImage: "terminal",
+                color: .blue
+            )
+        case .succeeded(let command, let result):
+            statusBanner(
+                text: "\(command.kind.title) completed with exit code \(result.exitCode).",
+                systemImage: "checkmark.circle.fill",
+                color: .green
+            )
+        case .failed(let command, let message):
+            statusBanner(
+                text: "\(command.kind.title) failed: \(message)",
+                systemImage: "xmark.octagon.fill",
+                color: .red
+            )
+        case .cancelled(let command):
+            statusBanner(
+                text: "\(command.kind.title) was cancelled.",
+                systemImage: "stop.circle.fill",
+                color: .orange
+            )
+        }
+    }
+
+    private var actionLogBlock: some View {
+        DetailCard(title: "Command Output") {
+            VStack(alignment: .leading, spacing: 12) {
+                if let command = actionState.command {
+                    commandBlock(title: "Executed Command", command: command.command)
+                }
+
+                if actionLogs.isEmpty {
+                    Text("Command output will appear here as Homebrew writes to stdout and stderr.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 8) {
+                            ForEach(actionLogs) { entry in
+                                Text(entry.text)
+                                    .font(.caption.monospaced())
+                                    .foregroundStyle(logColor(for: entry.kind))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .textSelection(.enabled)
+                            }
+                        }
+                    }
+                    .frame(minHeight: 120, maxHeight: 220)
+                    .padding(12)
+                    .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+
+                if !actionState.isRunning {
+                    Button("Clear Output", action: clearActionOutput)
+                        .accessibilityLabel("Clear command output")
+                }
             }
         }
     }
@@ -426,6 +557,16 @@ private struct CatalogDetailView: View {
         }
     }
 
+    private func statusBanner(text: String, systemImage: String, color: Color) -> some View {
+        Label(text, systemImage: systemImage)
+            .font(.callout.weight(.semibold))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .foregroundStyle(color)
+    }
+
     private func sectionTitle(_ title: String) -> some View {
         Text(title)
             .font(.title3)
@@ -442,6 +583,28 @@ private struct CatalogDetailView: View {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(string, forType: .string)
+    }
+
+    private func logColor(for kind: CatalogPackageActionLogKind) -> Color {
+        switch kind {
+        case .system:
+            .secondary
+        case .stdout:
+            .primary
+        case .stderr:
+            .red
+        }
+    }
+
+    private var confirmationBinding: Binding<Bool> {
+        Binding(
+            get: { pendingConfirmation != nil },
+            set: { isPresented in
+                if !isPresented {
+                    pendingConfirmation = nil
+                }
+            }
+        )
     }
 }
 

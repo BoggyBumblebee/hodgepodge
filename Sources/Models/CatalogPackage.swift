@@ -226,22 +226,18 @@ enum JSONValue: Decodable, Equatable, Sendable {
 
         if container.decodeNil() {
             self = .null
-        } else if let value = try? container.decode(String.self) {
-            self = .string(value)
-        } else if let value = try? container.decode(Double.self) {
-            self = .number(value)
-        } else if let value = try? container.decode(Bool.self) {
-            self = .bool(value)
-        } else if let value = try? container.decode([String: JSONValue].self) {
-            self = .object(value)
-        } else if let value = try? container.decode([JSONValue].self) {
-            self = .array(value)
-        } else {
-            throw DecodingError.typeMismatch(
-                JSONValue.self,
-                DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Unsupported JSON value.")
-            )
+            return
         }
+
+        if let decoded = try Self.decodeNonNullValue(from: container) {
+            self = decoded
+            return
+        }
+
+        throw DecodingError.typeMismatch(
+            JSONValue.self,
+            DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Unsupported JSON value.")
+        )
     }
 
     var flattenedDescription: String {
@@ -287,5 +283,37 @@ enum JSONValue: Decodable, Equatable, Sendable {
         case .null:
             return []
         }
+    }
+
+    private static func decodeNonNullValue(from container: any SingleValueDecodingContainer) throws -> JSONValue? {
+        if let value = try decode(String.self, from: container, wrap: JSONValue.string) {
+            return value
+        }
+
+        if let value = try decode(Double.self, from: container, wrap: JSONValue.number) {
+            return value
+        }
+
+        if let value = try decode(Bool.self, from: container, wrap: JSONValue.bool) {
+            return value
+        }
+
+        if let value = try decode([String: JSONValue].self, from: container, wrap: JSONValue.object) {
+            return value
+        }
+
+        return try decode([JSONValue].self, from: container, wrap: JSONValue.array)
+    }
+
+    private static func decode<Value: Decodable>(
+        _ type: Value.Type,
+        from container: any SingleValueDecodingContainer,
+        wrap: (Value) -> JSONValue
+    ) throws -> JSONValue? {
+        guard let value = try? container.decode(type) else {
+            return nil
+        }
+
+        return wrap(value)
     }
 }

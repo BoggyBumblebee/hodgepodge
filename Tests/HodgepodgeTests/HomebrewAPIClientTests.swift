@@ -196,6 +196,59 @@ final class HomebrewAPIClientTests: XCTestCase {
         XCTAssertEqual(detail.analytics.first?.value, "1,200")
     }
 
+    func testFetchFormulaDetailAllowsNullCollections() async throws {
+        let client = makeClient { request in
+            switch request.url?.path {
+            case "/api/formula/act.json":
+                return .ok(
+                    """
+                    {
+                      "name": "act",
+                      "full_name": "homebrew/core/act",
+                      "aliases": [],
+                      "oldnames": [],
+                      "desc": "Run GitHub Actions locally",
+                      "homepage": "https://example.com/act",
+                      "versions": { "stable": "0.2.81", "head": null, "bottle": true },
+                      "tap": "homebrew/core",
+                      "license": "MIT",
+                      "dependencies": ["go"],
+                      "build_dependencies": ["go"],
+                      "test_dependencies": [],
+                      "recommended_dependencies": [],
+                      "optional_dependencies": [],
+                      "head_dependencies": null,
+                      "uses_from_macos": [],
+                      "requirements": [],
+                      "conflicts_with": [],
+                      "caveats": null,
+                      "bottle": null,
+                      "variations": {},
+                      "deprecated": false,
+                      "disabled": false
+                    }
+                    """
+                )
+            default:
+                return .notFound
+            }
+        }
+
+        let detail = try await client.fetchDetail(
+            for: CatalogPackageSummary.fixture(
+                slug: "act",
+                title: "act",
+                subtitle: "Run GitHub Actions locally",
+                version: "0.2.81",
+                homepage: URL(string: "https://example.com/act")
+            )
+        )
+
+        XCTAssertEqual(detail.slug, "act")
+        XCTAssertTrue(detail.dependencySections.allSatisfy { $0.title != "Head Dependencies" })
+        XCTAssertEqual(detail.dependencies, ["go"])
+    }
+
     func testFetchCaskDetailFlattensArtifacts() async throws {
         let client = makeClient { request in
             switch request.url?.path {

@@ -38,7 +38,7 @@ final class CatalogViewModelTests: XCTestCase {
             analytics: []
         )
         let apiClient = MockCatalogAPIClient(packages: .success([package]), details: [package.id: .success(detail)])
-        let viewModel = CatalogViewModel(apiClient: apiClient)
+        let viewModel = makeViewModel(apiClient: apiClient)
 
         viewModel.loadIfNeeded()
         await waitUntil {
@@ -63,7 +63,7 @@ final class CatalogViewModelTests: XCTestCase {
             homepage: nil,
             tap: "homebrew/cask"
         )
-        let viewModel = CatalogViewModel(apiClient: MockCatalogAPIClient(packages: .success([]), details: [:]))
+        let viewModel = makeViewModel(apiClient: MockCatalogAPIClient(packages: .success([]), details: [:]))
         viewModel.packagesState = .loaded([formula, cask])
 
         viewModel.searchText = "docker"
@@ -99,7 +99,7 @@ final class CatalogViewModelTests: XCTestCase {
             tap: "homebrew/core",
             isDeprecated: true
         )
-        let viewModel = CatalogViewModel(apiClient: MockCatalogAPIClient(packages: .success([]), details: [:]))
+        let viewModel = makeViewModel(apiClient: MockCatalogAPIClient(packages: .success([]), details: [:]))
         viewModel.packagesState = .loaded([cask, deprecated, formula])
 
         viewModel.activeFilters = [.hasCaveats]
@@ -160,7 +160,7 @@ final class CatalogViewModelTests: XCTestCase {
             packages: .success([first, second]),
             details: [second.id: .success(detail)]
         )
-        let viewModel = CatalogViewModel(apiClient: apiClient)
+        let viewModel = makeViewModel(apiClient: apiClient)
 
         viewModel.packagesState = .loaded([first, second])
         viewModel.selectPackage(second)
@@ -177,7 +177,7 @@ final class CatalogViewModelTests: XCTestCase {
     }
 
     func testRefreshCatalogStoresFailureMessage() async {
-        let viewModel = CatalogViewModel(
+        let viewModel = makeViewModel(
             apiClient: MockCatalogAPIClient(
                 packages: .failure(HomebrewAPIClientError.requestFailed(503)),
                 details: [:]
@@ -197,7 +197,7 @@ final class CatalogViewModelTests: XCTestCase {
     }
 
     func testToggleAndClearFiltersUpdateState() {
-        let viewModel = CatalogViewModel(apiClient: MockCatalogAPIClient(packages: .success([]), details: [:]))
+        let viewModel = makeViewModel(apiClient: MockCatalogAPIClient(packages: .success([]), details: [:]))
 
         XCTAssertFalse(viewModel.isFilterActive(.hasCaveats))
 
@@ -228,7 +228,7 @@ final class CatalogViewModelTests: XCTestCase {
             ]
         )
         let apiClient = CyclingCatalogAPIClient(details: [originalDetail, refreshedDetail])
-        let viewModel = CatalogViewModel(apiClient: apiClient)
+        let viewModel = makeViewModel(apiClient: apiClient)
 
         viewModel.packagesState = .loaded([package])
         viewModel.selectPackage(package)
@@ -247,11 +247,128 @@ final class CatalogViewModelTests: XCTestCase {
     }
 
     func testRefreshSelectedDetailResetsToIdleWhenNothingSelected() {
-        let viewModel = CatalogViewModel(apiClient: MockCatalogAPIClient(packages: .success([]), details: [:]))
+        let viewModel = makeViewModel(apiClient: MockCatalogAPIClient(packages: .success([]), details: [:]))
 
         viewModel.refreshSelectedDetail()
 
         XCTAssertEqual(viewModel.detailState, .idle)
+    }
+
+    func testRunActionStoresSuccessStateAndStreamsLogs() async {
+        let detail = CatalogPackageDetail.fixture()
+        let result = CommandResult(stdout: "Fetched\n", stderr: "", exitCode: 0)
+        let executor = MockBrewCommandExecutor(
+            result: .success(result),
+            events: [
+                (.stdout, "Downloading...\n"),
+                (.stdout, "Fetched\n")
+            ]
+        )
+        let viewModel = makeViewModel(commandExecutor: executor)
+
+        viewModel.runAction(.fetch, for: detail)
+        await waitUntil {
+            viewModel.actionState == .succeeded(detail.actionCommand(for: .fetch), result)
+        }
+
+        XCTAssertEqual(viewModel.actionState, .succeeded(detail.actionCommand(for: .fetch), result))
+        XCTAssertEqual(
+            viewModel.actionLogs.map(\.text),
+            [
+                "Preparing fetch for wget.",
+                "Using Homebrew at /opt/homebrew/bin/brew",
+                "$ /opt/homebrew/bin/brew fetch wget",
+                "Downloading...",
+                "Fetched",
+                "Fetch finished with exit code 0."
+            ]
+        )
+    }
+
+    func testRunActionStoresFailureState() async {
+        let detail = CatalogPackageDetail.fixture(kind: .cask, slug: "docker-desktop", title: "Docker Desktop")
+        let failure = CommandRunnerError.nonZeroExitCode(
+            CommandResult(stdout: "", stderr: "Already installed\n", exitCode: 1)
+        )
+        let viewModel = makeViewModel(
+            commandExecutor: MockBrewCommandExecutor(
+                result: .failure(failure),
+                events: [(.stderr, "Already installed\n")]
+            )
+        )
+
+        viewModel.runAction(.install, for: detail)
+        await waitUntil {
+            viewModel.actionState == .failed(detail.actionCommand(for: .install), "Already installed")
+        }
+
+        XCTAssertEqual(viewModel.actionState, .failed(detail.actionCommand(for: .install), "Already installed"))
+        XCTAssertEqual(viewModel.actionLogs.last?.text, "Already installed")
+    }
+
+    func testCancelActionStoresCancelledState() async {
+        let detail = CatalogPackageDetail.fixture()
+        let executor = SuspendingBrewCommandExecutor()
+        let viewModel = makeViewModel(commandExecutor: executor)
+
+        viewModel.runAction(.fetch, for: detail)
+        await waitUntil {
+            viewModel.actionState == .running(detail.actionCommand(for: .fetch))
+        }
+
+        viewModel.cancelAction()
+        await waitUntil {
+            viewModel.actionState == .cancelled(detail.actionCommand(for: .fetch))
+        }
+
+        XCTAssertEqual(viewModel.actionState, .cancelled(detail.actionCommand(for: .fetch)))
+    }
+
+    func testActionStateAndLogsOnlyApplyToMatchingDetail() async {
+        let first = CatalogPackageDetail.fixture(slug: "wget", title: "wget")
+        let second = CatalogPackageDetail.fixture(kind: .cask, slug: "docker-desktop", title: "Docker Desktop")
+        let result = CommandResult(stdout: "", stderr: "", exitCode: 0)
+        let viewModel = makeViewModel(
+            commandExecutor: MockBrewCommandExecutor(result: .success(result), events: [])
+        )
+
+        viewModel.runAction(.fetch, for: first)
+        await waitUntil {
+            viewModel.actionState == .succeeded(first.actionCommand(for: .fetch), result)
+        }
+
+        XCTAssertEqual(viewModel.actionState(for: first), .succeeded(first.actionCommand(for: .fetch), result))
+        XCTAssertEqual(viewModel.actionState(for: second), .idle)
+        XCTAssertFalse(viewModel.actionLogs(for: first).isEmpty)
+        XCTAssertTrue(viewModel.actionLogs(for: second).isEmpty)
+    }
+
+    func testClearActionOutputResetsActionState() async {
+        let detail = CatalogPackageDetail.fixture()
+        let result = CommandResult(stdout: "", stderr: "", exitCode: 0)
+        let viewModel = makeViewModel(
+            commandExecutor: MockBrewCommandExecutor(result: .success(result), events: [])
+        )
+
+        viewModel.runAction(.fetch, for: detail)
+        await waitUntil {
+            viewModel.actionState == .succeeded(detail.actionCommand(for: .fetch), result)
+        }
+
+        viewModel.clearActionOutput()
+
+        XCTAssertEqual(viewModel.actionState, .idle)
+        XCTAssertTrue(viewModel.actionLogs.isEmpty)
+    }
+
+    private func makeViewModel(
+        apiClient: any HomebrewAPIClienting = MockCatalogAPIClient(packages: .success([]), details: [:]),
+        commandExecutor: any BrewCommandExecuting = MockBrewCommandExecutor(result: .success(CommandResult(stdout: "", stderr: "", exitCode: 0)))
+    ) -> CatalogViewModel {
+        CatalogViewModel(
+            apiClient: apiClient,
+            commandExecutor: commandExecutor
+        )
     }
 
     private func waitUntil(
@@ -286,6 +403,37 @@ private final class CyclingCatalogAPIClient: HomebrewAPIClienting, @unchecked Se
     func fetchDetail(for package: CatalogPackageSummary) async throws -> CatalogPackageDetail {
         defer { fetchDetailCallCount += 1 }
         return details[min(fetchDetailCallCount, details.count - 1)]
+    }
+}
+
+private struct MockBrewCommandExecutor: BrewCommandExecuting, Sendable {
+    let result: Result<CommandResult, Error>
+    var events: [(CatalogPackageActionLogKind, String)] = []
+
+    func execute(
+        command: CatalogPackageActionCommand,
+        onLog: @escaping @MainActor @Sendable (CatalogPackageActionLogKind, String) -> Void
+    ) async throws -> CommandResult {
+        await onLog(.system, "Using Homebrew at /opt/homebrew/bin/brew")
+        await onLog(.system, "$ /opt/homebrew/bin/brew \(command.arguments.joined(separator: " "))")
+
+        for (kind, text) in events {
+            await onLog(kind, text)
+        }
+
+        return try result.get()
+    }
+}
+
+private struct SuspendingBrewCommandExecutor: BrewCommandExecuting, Sendable {
+    func execute(
+        command: CatalogPackageActionCommand,
+        onLog: @escaping @MainActor @Sendable (CatalogPackageActionLogKind, String) -> Void
+    ) async throws -> CommandResult {
+        await onLog(.system, "Using Homebrew at /opt/homebrew/bin/brew")
+        await onLog(.system, "$ /opt/homebrew/bin/brew \(command.arguments.joined(separator: " "))")
+        try await Task.sleep(for: .seconds(60))
+        return CommandResult(stdout: "", stderr: "", exitCode: 0)
     }
 }
 

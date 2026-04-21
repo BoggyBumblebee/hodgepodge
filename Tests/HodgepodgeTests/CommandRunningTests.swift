@@ -1,6 +1,7 @@
 import XCTest
 @testable import Hodgepodge
 
+@MainActor
 final class CommandRunningTests: XCTestCase {
     func testProcessCommandRunnerCapturesSuccessfulOutput() async throws {
         let runner = ProcessCommandRunner()
@@ -24,6 +25,48 @@ final class CommandRunningTests: XCTestCase {
             }
 
             XCTAssertEqual(result.exitCode, 1)
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+
+    func testProcessCommandRunnerStreamsStdoutAndStderr() async throws {
+        let runner = ProcessCommandRunner()
+        var chunks: [CommandOutputChunk] = []
+
+        let result = try await runner.run(
+            executable: "/bin/sh",
+            arguments: ["-c", "printf 'hello\\n'; printf 'warning\\n' >&2"],
+            onOutput: { chunk in
+                chunks.append(chunk)
+            }
+        )
+
+        XCTAssertEqual(result.stdout, "hello\n")
+        XCTAssertEqual(result.stderr, "warning\n")
+        XCTAssertEqual(chunks.count, 2)
+        XCTAssertTrue(chunks.contains(CommandOutputChunk(stream: .stdout, text: "hello\n")))
+        XCTAssertTrue(chunks.contains(CommandOutputChunk(stream: .stderr, text: "warning\n")))
+    }
+
+    func testProcessCommandRunnerCancelsLongRunningCommand() async {
+        let runner = ProcessCommandRunner()
+        let task = Task {
+            try await runner.run(
+                executable: "/bin/sh",
+                arguments: ["-c", "sleep 10"],
+                onOutput: nil
+            )
+        }
+
+        await Task.yield()
+        task.cancel()
+
+        do {
+            _ = try await task.value
+            XCTFail("Expected cancellation to throw.")
+        } catch is CancellationError {
+            XCTAssertTrue(true)
         } catch {
             XCTFail("Unexpected error: \(error)")
         }

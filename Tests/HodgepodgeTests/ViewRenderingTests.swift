@@ -103,7 +103,10 @@ final class ViewRenderingTests: XCTestCase {
     }
 
     private func makeCatalogModel() -> CatalogViewModel {
-        CatalogViewModel(apiClient: ViewTestCatalogAPIClient())
+        CatalogViewModel(
+            apiClient: ViewTestCatalogAPIClient(),
+            commandExecutor: ViewTestBrewCommandExecutor()
+        )
     }
 
     private func render<Content: View>(_ view: Content) -> NSHostingView<Content> {
@@ -170,5 +173,15 @@ private struct ViewTestCatalogAPIClient: HomebrewAPIClienting, Sendable {
             artifactSections: [],
             analytics: []
         )
+    }
+}
+
+private struct ViewTestBrewCommandExecutor: BrewCommandExecuting, Sendable {
+    func execute(
+        command: CatalogPackageActionCommand,
+        onLog: @escaping @MainActor @Sendable (CatalogPackageActionLogKind, String) -> Void
+    ) async throws -> CommandResult {
+        await onLog(.system, "$ /opt/homebrew/bin/brew \(command.arguments.joined(separator: " "))")
+        return CommandResult(stdout: "", stderr: "", exitCode: 0)
     }
 }

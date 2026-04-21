@@ -26,7 +26,7 @@ struct HomebrewAPIClient: HomebrewAPIClienting, @unchecked Sendable {
 
     init(
         session: URLSession = .shared,
-        baseURL: URL = URL(string: "https://formulae.brew.sh/api/")!,
+        baseURL: URL = HomebrewAPIClient.defaultBaseURL,
         decoder: JSONDecoder = JSONDecoder()
     ) {
         self.session = session
@@ -75,6 +75,19 @@ struct HomebrewAPIClient: HomebrewAPIClienting, @unchecked Sendable {
 
         return try decoder.decode(Response.self, from: data)
     }
+
+    private static let defaultBaseURL: URL = {
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = "formulae.brew.sh"
+        components.path = "/api"
+
+        guard let url = components.url else {
+            preconditionFailure("Unable to build the default Homebrew API base URL.")
+        }
+
+        return url
+    }()
 }
 
 private struct FormulaSummaryResponse: Decodable {
@@ -188,6 +201,43 @@ private struct FormulaDetailResponse: Decodable {
         case disableReplacementCask = "disable_replacement_cask"
         case analytics
     }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        name = try container.decode(String.self, forKey: .name)
+        fullName = try container.decode(String.self, forKey: .fullName)
+        aliases = try container.decodeIfPresent([String].self, forKey: .aliases) ?? []
+        oldnames = try container.decodeIfPresent([String].self, forKey: .oldnames) ?? []
+        desc = try container.decodeIfPresent(String.self, forKey: .desc)
+        homepage = try container.decodeIfPresent(URL.self, forKey: .homepage)
+        versions = try container.decode(FormulaSummaryResponse.VersionsResponse.self, forKey: .versions)
+        tap = try container.decode(String.self, forKey: .tap)
+        license = try container.decodeIfPresent(String.self, forKey: .license)
+        dependencies = try container.decodeIfPresent([String].self, forKey: .dependencies) ?? []
+        buildDependencies = try container.decodeIfPresent([String].self, forKey: .buildDependencies) ?? []
+        testDependencies = try container.decodeIfPresent([String].self, forKey: .testDependencies) ?? []
+        recommendedDependencies = try container.decodeIfPresent([String].self, forKey: .recommendedDependencies) ?? []
+        optionalDependencies = try container.decodeIfPresent([String].self, forKey: .optionalDependencies) ?? []
+        headDependencies = try container.decodeIfPresent([String].self, forKey: .headDependencies) ?? []
+        usesFromMacOS = try container.decodeIfPresent([String].self, forKey: .usesFromMacOS) ?? []
+        requirements = try container.decodeIfPresent([JSONValue].self, forKey: .requirements) ?? []
+        conflictsWith = try container.decodeIfPresent([String].self, forKey: .conflictsWith) ?? []
+        caveats = try container.decodeIfPresent(String.self, forKey: .caveats)
+        bottle = try container.decodeIfPresent(BottleResponse.self, forKey: .bottle)
+        variations = try container.decodeIfPresent([String: JSONValue].self, forKey: .variations) ?? [:]
+        deprecated = try container.decodeIfPresent(Bool.self, forKey: .deprecated) ?? false
+        deprecationDate = try container.decodeIfPresent(String.self, forKey: .deprecationDate)
+        deprecationReason = try container.decodeIfPresent(String.self, forKey: .deprecationReason)
+        deprecationReplacementFormula = try container.decodeIfPresent(String.self, forKey: .deprecationReplacementFormula)
+        deprecationReplacementCask = try container.decodeIfPresent(String.self, forKey: .deprecationReplacementCask)
+        disabled = try container.decodeIfPresent(Bool.self, forKey: .disabled) ?? false
+        disableDate = try container.decodeIfPresent(String.self, forKey: .disableDate)
+        disableReason = try container.decodeIfPresent(String.self, forKey: .disableReason)
+        disableReplacementFormula = try container.decodeIfPresent(String.self, forKey: .disableReplacementFormula)
+        disableReplacementCask = try container.decodeIfPresent(String.self, forKey: .disableReplacementCask)
+        analytics = try container.decodeIfPresent(AnalyticsResponse.self, forKey: .analytics)
+    }
 }
 
 private struct CaskDetailResponse: Decodable {
@@ -248,6 +298,38 @@ private struct CaskDetailResponse: Decodable {
         case disableReplacementCask = "disable_replacement_cask"
         case analytics
     }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        token = try container.decode(String.self, forKey: .token)
+        fullToken = try container.decode(String.self, forKey: .fullToken)
+        name = try container.decodeIfPresent([String].self, forKey: .name) ?? []
+        oldTokens = try container.decodeIfPresent([String].self, forKey: .oldTokens) ?? []
+        desc = try container.decodeIfPresent(String.self, forKey: .desc)
+        homepage = try container.decodeIfPresent(URL.self, forKey: .homepage)
+        version = try container.decode(String.self, forKey: .version)
+        tap = try container.decode(String.self, forKey: .tap)
+        caveats = try container.decodeIfPresent(String.self, forKey: .caveats)
+        dependsOn = try container.decodeIfPresent([String: JSONValue].self, forKey: .dependsOn)
+        conflictsWith = try container.decodeIfPresent([String: JSONValue].self, forKey: .conflictsWith)
+        artifacts = try container.decodeIfPresent([JSONValue].self, forKey: .artifacts) ?? []
+        variations = try container.decodeIfPresent([String: JSONValue].self, forKey: .variations) ?? [:]
+        downloadURL = try container.decodeIfPresent(URL.self, forKey: .downloadURL)
+        checksum = try container.decodeIfPresent(String.self, forKey: .checksum)
+        autoUpdates = try container.decodeIfPresent(Bool.self, forKey: .autoUpdates)
+        deprecated = try container.decodeIfPresent(Bool.self, forKey: .deprecated) ?? false
+        deprecationDate = try container.decodeIfPresent(String.self, forKey: .deprecationDate)
+        deprecationReason = try container.decodeIfPresent(String.self, forKey: .deprecationReason)
+        deprecationReplacementFormula = try container.decodeIfPresent(String.self, forKey: .deprecationReplacementFormula)
+        deprecationReplacementCask = try container.decodeIfPresent(String.self, forKey: .deprecationReplacementCask)
+        disabled = try container.decodeIfPresent(Bool.self, forKey: .disabled) ?? false
+        disableDate = try container.decodeIfPresent(String.self, forKey: .disableDate)
+        disableReason = try container.decodeIfPresent(String.self, forKey: .disableReason)
+        disableReplacementFormula = try container.decodeIfPresent(String.self, forKey: .disableReplacementFormula)
+        disableReplacementCask = try container.decodeIfPresent(String.self, forKey: .disableReplacementCask)
+        analytics = try container.decodeIfPresent(AnalyticsResponse.self, forKey: .analytics)
+    }
 }
 
 private struct BottleResponse: Decodable {
@@ -274,6 +356,16 @@ private struct AnalyticsResponse: Decodable {
         case installOnRequest = "install_on_request"
         case buildError = "build_error"
     }
+}
+
+private struct LifecycleStatusSnapshot {
+    let sectionTitle: String
+    let statusLabel: String
+    let isActive: Bool
+    let date: String?
+    let reason: String?
+    let replacementFormula: String?
+    let replacementCask: String?
 }
 
 private extension CatalogPackageSummary {
@@ -335,16 +427,26 @@ private extension CatalogPackageDetail {
 
         let lifecycleSections = Self.makeLifecycleSections(
             conflicts: response.conflictsWith,
-            deprecated: response.deprecated,
-            deprecationDate: response.deprecationDate,
-            deprecationReason: response.deprecationReason,
-            deprecationReplacementFormula: response.deprecationReplacementFormula,
-            deprecationReplacementCask: response.deprecationReplacementCask,
-            disabled: response.disabled,
-            disableDate: response.disableDate,
-            disableReason: response.disableReason,
-            disableReplacementFormula: response.disableReplacementFormula,
-            disableReplacementCask: response.disableReplacementCask
+            statuses: [
+                LifecycleStatusSnapshot(
+                    sectionTitle: "Deprecation",
+                    statusLabel: "Deprecated",
+                    isActive: response.deprecated,
+                    date: response.deprecationDate,
+                    reason: response.deprecationReason,
+                    replacementFormula: response.deprecationReplacementFormula,
+                    replacementCask: response.deprecationReplacementCask
+                ),
+                LifecycleStatusSnapshot(
+                    sectionTitle: "Disabled",
+                    statusLabel: "Disabled",
+                    isActive: response.disabled,
+                    date: response.disableDate,
+                    reason: response.disableReason,
+                    replacementFormula: response.disableReplacementFormula,
+                    replacementCask: response.disableReplacementCask
+                )
+            ]
         )
 
         self.init(
@@ -393,16 +495,26 @@ private extension CatalogPackageDetail {
         )
         let lifecycleSections = Self.makeLifecycleSections(
             conflicts: conflicts,
-            deprecated: response.deprecated,
-            deprecationDate: response.deprecationDate,
-            deprecationReason: response.deprecationReason,
-            deprecationReplacementFormula: response.deprecationReplacementFormula,
-            deprecationReplacementCask: response.deprecationReplacementCask,
-            disabled: response.disabled,
-            disableDate: response.disableDate,
-            disableReason: response.disableReason,
-            disableReplacementFormula: response.disableReplacementFormula,
-            disableReplacementCask: response.disableReplacementCask
+            statuses: [
+                LifecycleStatusSnapshot(
+                    sectionTitle: "Deprecation",
+                    statusLabel: "Deprecated",
+                    isActive: response.deprecated,
+                    date: response.deprecationDate,
+                    reason: response.deprecationReason,
+                    replacementFormula: response.deprecationReplacementFormula,
+                    replacementCask: response.deprecationReplacementCask
+                ),
+                LifecycleStatusSnapshot(
+                    sectionTitle: "Disabled",
+                    statusLabel: "Disabled",
+                    isActive: response.disabled,
+                    date: response.disableDate,
+                    reason: response.disableReason,
+                    replacementFormula: response.disableReplacementFormula,
+                    replacementCask: response.disableReplacementCask
+                )
+            ]
         )
         let artifactSections = Self.makeArtifactSections(from: response.artifacts)
 
@@ -531,42 +643,27 @@ private extension CatalogPackageDetail {
     }
 
     private static func makeArtifactSections(from artifacts: [JSONValue]) -> [CatalogDetailSection] {
-        artifacts.compactMap { artifact in
+        var sections: [CatalogDetailSection] = []
+
+        for artifact in artifacts {
             guard case .object(let values) = artifact else {
-                return nil
+                continue
             }
 
-            let items = values
-                .sorted { $0.key < $1.key }
-                .flatMap { key, value -> [String] in
-                    let flattenedItems = value.flattenedItems
-                    if flattenedItems.isEmpty {
-                        return []
-                    }
-
-                    return flattenedItems.map { "\(key): \($0)" }
-                }
-
+            let items = makeArtifactItems(from: values)
             guard let title = values.keys.sorted().first, !items.isEmpty else {
-                return nil
+                continue
             }
 
-            return CatalogDetailSection(title: title.capitalized, items: items, style: .list)
+            sections.append(CatalogDetailSection(title: title.capitalized, items: items, style: .list))
         }
+
+        return sections
     }
 
     private static func makeLifecycleSections(
         conflicts: [String],
-        deprecated: Bool,
-        deprecationDate: String?,
-        deprecationReason: String?,
-        deprecationReplacementFormula: String?,
-        deprecationReplacementCask: String?,
-        disabled: Bool,
-        disableDate: String?,
-        disableReason: String?,
-        disableReplacementFormula: String?,
-        disableReplacementCask: String?
+        statuses: [LifecycleStatusSnapshot]
     ) -> [CatalogDetailSection] {
         var sections: [CatalogDetailSection] = []
 
@@ -574,35 +671,36 @@ private extension CatalogPackageDetail {
             sections.append(conflictsSection)
         }
 
-        if deprecated {
-            let replacements = [deprecationReplacementFormula, deprecationReplacementCask].compactMap { $0 }
-            let notes = compactLines(
-                "Status: Deprecated",
-                deprecationDate.map { "Date: \($0)" },
-                deprecationReason.map { "Reason: \($0)" },
-                replacements.isEmpty ? nil : "Replacement: \(replacements.joined(separator: ", "))"
-            )
-
-            if let section = makeListSection("Deprecation", notes) {
-                sections.append(section)
-            }
-        }
-
-        if disabled {
-            let replacements = [disableReplacementFormula, disableReplacementCask].compactMap { $0 }
-            let notes = compactLines(
-                "Status: Disabled",
-                disableDate.map { "Date: \($0)" },
-                disableReason.map { "Reason: \($0)" },
-                replacements.isEmpty ? nil : "Replacement: \(replacements.joined(separator: ", "))"
-            )
-
-            if let section = makeListSection("Disabled", notes) {
+        for status in statuses where status.isActive {
+            if let section = makeListSection(status.sectionTitle, makeLifecycleNotes(from: status)) {
                 sections.append(section)
             }
         }
 
         return sections
+    }
+
+    private static func makeArtifactItems(from values: [String: JSONValue]) -> [String] {
+        var items: [String] = []
+
+        for (key, value) in values.sorted(by: { $0.key < $1.key }) {
+            for flattenedItem in value.flattenedItems where !flattenedItem.isEmpty {
+                items.append("\(key): \(flattenedItem)")
+            }
+        }
+
+        return items
+    }
+
+    private static func makeLifecycleNotes(from status: LifecycleStatusSnapshot) -> [String] {
+        let replacements = [status.replacementFormula, status.replacementCask].compactMap { $0 }
+
+        return compactLines(
+            "Status: \(status.statusLabel)",
+            status.date.map { "Date: \($0)" },
+            status.reason.map { "Reason: \($0)" },
+            replacements.isEmpty ? nil : "Replacement: \(replacements.joined(separator: ", "))"
+        )
     }
 
     private static func flattenedValues(from value: JSONValue?) -> [String] {

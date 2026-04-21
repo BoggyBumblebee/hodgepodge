@@ -15,6 +15,38 @@ final class CatalogPackageTests: XCTestCase {
         XCTAssertEqual(detail.fetchCommand, "brew fetch --cask docker-desktop")
     }
 
+    func testActionCommandsReflectActionKindAndPackageKind() {
+        let formulaDetail = CatalogPackageDetail.fixture()
+        let caskDetail = CatalogPackageDetail.fixture(kind: .cask, slug: "docker-desktop", title: "Docker Desktop")
+
+        XCTAssertEqual(CatalogPackageActionKind.install.title, "Install")
+        XCTAssertEqual(CatalogPackageActionKind.fetch.title, "Fetch")
+        XCTAssertTrue(CatalogPackageActionKind.install.requiresConfirmation)
+        XCTAssertFalse(CatalogPackageActionKind.fetch.requiresConfirmation)
+
+        XCTAssertEqual(
+            formulaDetail.actionCommand(for: .fetch),
+            CatalogPackageActionCommand(
+                kind: .fetch,
+                packageID: "formula:wget",
+                packageTitle: "wget",
+                command: "brew fetch wget",
+                arguments: ["fetch", "wget"]
+            )
+        )
+        XCTAssertEqual(
+            caskDetail.actionCommand(for: .install),
+            CatalogPackageActionCommand(
+                kind: .install,
+                packageID: "cask:docker-desktop",
+                packageTitle: "Docker Desktop",
+                command: "brew install --cask docker-desktop",
+                arguments: ["install", "--cask", "docker-desktop"]
+            )
+        )
+        XCTAssertEqual(caskDetail.packageID, "cask:docker-desktop")
+    }
+
     func testMetadataDetailsIncludeOptionalValuesWhenPresent() {
         let detail = CatalogPackageDetail.fixture(
             fullName: "homebrew/cask/docker-desktop",
