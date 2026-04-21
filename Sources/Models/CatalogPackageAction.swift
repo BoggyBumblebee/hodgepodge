@@ -49,6 +49,47 @@ struct CatalogPackageActionLogEntry: Identifiable, Equatable, Sendable {
     let timestamp: Date
 }
 
+enum CatalogPackageActionHistoryOutcome: Equatable, Sendable {
+    case succeeded(Int32)
+    case failed(String)
+    case cancelled
+
+    var title: String {
+        switch self {
+        case .succeeded:
+            "Completed"
+        case .failed:
+            "Failed"
+        case .cancelled:
+            "Cancelled"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .succeeded(let exitCode):
+            "Exit code \(exitCode)"
+        case .failed(let message):
+            message
+        case .cancelled:
+            "Stopped before completion"
+        }
+    }
+}
+
+struct CatalogPackageActionHistoryEntry: Identifiable, Equatable, Sendable {
+    let id: Int
+    let command: CatalogPackageActionCommand
+    let startedAt: Date
+    let finishedAt: Date
+    let outcome: CatalogPackageActionHistoryOutcome
+    let outputLineCount: Int
+
+    var duration: TimeInterval {
+        max(0, finishedAt.timeIntervalSince(startedAt))
+    }
+}
+
 struct CatalogPackageActionProgress: Equatable, Sendable {
     let command: CatalogPackageActionCommand
     let startedAt: Date

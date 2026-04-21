@@ -276,6 +276,19 @@ final class CatalogViewModelTests: XCTestCase {
         XCTAssertEqual(succeededResult(from: viewModel.actionState), result)
         XCTAssertNotNil(viewModel.actionState.progress?.finishedAt)
         XCTAssertEqual(
+            viewModel.actionHistory(for: detail),
+            [
+                CatalogPackageActionHistoryEntry(
+                    id: 0,
+                    command: detail.actionCommand(for: .fetch),
+                    startedAt: viewModel.actionState.progress?.startedAt ?? .distantPast,
+                    finishedAt: viewModel.actionState.progress?.finishedAt ?? .distantFuture,
+                    outcome: .succeeded(0),
+                    outputLineCount: 6
+                )
+            ]
+        )
+        XCTAssertEqual(
             viewModel.actionLogs.map(\.text),
             [
                 "Preparing fetch for wget.",
@@ -310,6 +323,7 @@ final class CatalogViewModelTests: XCTestCase {
         XCTAssertEqual(failedMessage(from: viewModel.actionState), "Already installed")
         XCTAssertNotNil(viewModel.actionState.progress?.finishedAt)
         XCTAssertEqual(viewModel.actionLogs.last?.text, "Already installed")
+        XCTAssertEqual(viewModel.actionHistory(for: detail).first?.outcome, .failed("Already installed"))
     }
 
     func testCancelActionStoresCancelledState() async {
@@ -331,6 +345,7 @@ final class CatalogViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.actionState.command, detail.actionCommand(for: .fetch))
         XCTAssertTrue(isCancelled(viewModel.actionState))
         XCTAssertNotNil(viewModel.actionState.progress?.finishedAt)
+        XCTAssertEqual(viewModel.actionHistory(for: detail).first?.outcome, .cancelled)
     }
 
     func testActionStateAndLogsOnlyApplyToMatchingDetail() async {
@@ -352,6 +367,8 @@ final class CatalogViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.actionState(for: second), .idle)
         XCTAssertFalse(viewModel.actionLogs(for: first).isEmpty)
         XCTAssertTrue(viewModel.actionLogs(for: second).isEmpty)
+        XCTAssertEqual(viewModel.actionHistory(for: first).count, 1)
+        XCTAssertTrue(viewModel.actionHistory(for: second).isEmpty)
     }
 
     func testClearActionOutputResetsActionState() async {
@@ -371,6 +388,7 @@ final class CatalogViewModelTests: XCTestCase {
 
         XCTAssertEqual(viewModel.actionState, .idle)
         XCTAssertTrue(viewModel.actionLogs.isEmpty)
+        XCTAssertEqual(viewModel.actionHistory(for: detail).count, 1)
     }
 
     private func makeViewModel(

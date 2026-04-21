@@ -6,6 +6,7 @@ final class CatalogViewModel: ObservableObject {
     @Published var detailState: CatalogDetailLoadState = .idle
     @Published var actionState: CatalogPackageActionState = .idle
     @Published var actionLogs: [CatalogPackageActionLogEntry] = []
+    @Published var actionHistory: [CatalogPackageActionHistoryEntry] = []
     @Published var searchText = ""
     @Published var scope: CatalogScope = .all
     @Published var activeFilters: Set<CatalogFilterOption> = []
@@ -17,6 +18,7 @@ final class CatalogViewModel: ObservableObject {
     private var detailCache: [String: CatalogPackageDetail] = [:]
     private var actionTask: Task<Void, Never>?
     private var nextLogIdentifier = 0
+    private var nextHistoryIdentifier = 0
     private var pendingLogText: [CatalogPackageActionLogKind: String] = [:]
 
     init(
@@ -182,15 +184,33 @@ final class CatalogViewModel: ObservableObject {
                 }
                 flushPendingLogs()
                 appendLog(.system, "\(actionKind.title) finished with exit code \(result.exitCode).")
-                actionState = .succeeded(progress.finished(at: Date()), result)
+                let completedProgress = progress.finished(at: Date())
+                actionState = .succeeded(completedProgress, result)
+                appendHistoryEntry(
+                    command: command,
+                    progress: completedProgress,
+                    outcome: .succeeded(result.exitCode)
+                )
             } catch is CancellationError {
                 flushPendingLogs()
                 appendLog(.system, "\(actionKind.title) cancelled.")
-                actionState = .cancelled(progress.finished(at: Date()))
+                let completedProgress = progress.finished(at: Date())
+                actionState = .cancelled(completedProgress)
+                appendHistoryEntry(
+                    command: command,
+                    progress: completedProgress,
+                    outcome: .cancelled
+                )
             } catch {
                 flushPendingLogs()
                 appendLog(.system, error.localizedDescription)
-                actionState = .failed(progress.finished(at: Date()), error.localizedDescription)
+                let completedProgress = progress.finished(at: Date())
+                actionState = .failed(completedProgress, error.localizedDescription)
+                appendHistoryEntry(
+                    command: command,
+                    progress: completedProgress,
+                    outcome: .failed(error.localizedDescription)
+                )
             }
 
             actionTask = nil
@@ -222,6 +242,10 @@ final class CatalogViewModel: ObservableObject {
         }
 
         return actionLogs
+    }
+
+    func actionHistory(for detail: CatalogPackageDetail) -> [CatalogPackageActionHistoryEntry] {
+        actionHistory.filter { $0.command.packageID == detail.packageID }
     }
 
     private func matchesActiveFilters(for package: CatalogPackageSummary) -> Bool {
@@ -333,6 +357,33 @@ final class CatalogViewModel: ObservableObject {
         actionLogs.removeAll()
         nextLogIdentifier = 0
         pendingLogText.removeAll()
+    }
+
+    private func appendHistoryEntry(
+        command: CatalogPackageActionCommand,
+        progress: CatalogPackageActionProgress,
+        outcome: CatalogPackageActionHistoryOutcome
+    ) {
+        guard let finishedAt = progress.finishedAt else {
+            return
+        }
+
+        actionHistory.insert(
+            CatalogPackageActionHistoryEntry(
+                id: nextHistoryIdentifier,
+                command: command,
+                startedAt: progress.startedAt,
+                finishedAt: finishedAt,
+                outcome: outcome,
+                outputLineCount: actionLogs.count
+            ),
+            at: 0
+        )
+        nextHistoryIdentifier += 1
+
+        if actionHistory.count > 50 {
+            actionHistory.removeLast(actionHistory.count - 50)
+        }
     }
 }
 

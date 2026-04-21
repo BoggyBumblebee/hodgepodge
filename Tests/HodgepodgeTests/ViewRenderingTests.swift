@@ -146,6 +146,16 @@ final class ViewRenderingTests: XCTestCase {
                 timestamp: Date(timeIntervalSince1970: 1_002)
             )
         ]
+        viewModel.actionHistory = [
+            CatalogPackageActionHistoryEntry(
+                id: 0,
+                command: command,
+                startedAt: Date(timeIntervalSince1970: 900),
+                finishedAt: Date(timeIntervalSince1970: 950),
+                outcome: .succeeded(0),
+                outputLineCount: 4
+            )
+        ]
 
         XCTAssertNotNil(render(CatalogView(viewModel: viewModel)))
     }

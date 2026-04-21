@@ -63,6 +63,26 @@ final class CatalogPackageTests: XCTestCase {
         XCTAssertEqual(CatalogPackageActionState.succeeded(completed, CommandResult(stdout: "", stderr: "", exitCode: 0)).progress, completed)
     }
 
+    func testActionHistoryOutcomeAndDurationAreStable() {
+        let command = CatalogPackageDetail.fixture().actionCommand(for: .install)
+        let entry = CatalogPackageActionHistoryEntry(
+            id: 7,
+            command: command,
+            startedAt: Date(timeIntervalSince1970: 1_000),
+            finishedAt: Date(timeIntervalSince1970: 1_135),
+            outcome: .failed("Already installed"),
+            outputLineCount: 4
+        )
+
+        XCTAssertEqual(CatalogPackageActionHistoryOutcome.succeeded(0).title, "Completed")
+        XCTAssertEqual(CatalogPackageActionHistoryOutcome.succeeded(0).detail, "Exit code 0")
+        XCTAssertEqual(CatalogPackageActionHistoryOutcome.cancelled.title, "Cancelled")
+        XCTAssertEqual(CatalogPackageActionHistoryOutcome.cancelled.detail, "Stopped before completion")
+        XCTAssertEqual(entry.duration, 135, accuracy: 0.001)
+        XCTAssertEqual(entry.outcome.title, "Failed")
+        XCTAssertEqual(entry.outcome.detail, "Already installed")
+    }
+
     func testMetadataDetailsIncludeOptionalValuesWhenPresent() {
         let detail = CatalogPackageDetail.fixture(
             fullName: "homebrew/cask/docker-desktop",

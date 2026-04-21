@@ -182,6 +182,7 @@ struct CatalogView: View {
                 detail: detail,
                 actionState: viewModel.actionState(for: detail),
                 actionLogs: viewModel.actionLogs(for: detail),
+                actionHistory: viewModel.actionHistory(for: detail),
                 hasRunningAction: viewModel.hasRunningAction,
                 refreshAction: {
                     viewModel.refreshSelectedDetail()
@@ -232,6 +233,7 @@ private struct CatalogDetailView: View {
     let detail: CatalogPackageDetail
     let actionState: CatalogPackageActionState
     let actionLogs: [CatalogPackageActionLogEntry]
+    let actionHistory: [CatalogPackageActionHistoryEntry]
     let hasRunningAction: Bool
     let refreshAction: () -> Void
     let runAction: (CatalogPackageActionKind, CatalogPackageDetail) -> Void
@@ -346,14 +348,14 @@ private struct CatalogDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
                 Button("Install...") {
-                    pendingConfirmation = detail.actionCommand(for: .install)
+                    beginAction(.install)
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(hasRunningAction)
                 .accessibilityLabel("Install package")
 
                 Button("Fetch") {
-                    runAction(.fetch, detail)
+                    beginAction(.fetch)
                 }
                 .disabled(hasRunningAction)
                 .accessibilityLabel("Fetch package")
@@ -391,6 +393,7 @@ private struct CatalogDetailView: View {
             commandBlock(title: "Install", command: detail.installCommand)
             commandBlock(title: "Fetch", command: detail.fetchCommand)
             actionSummary
+            actionHistoryBlock
 
             if actionState.command != nil {
                 actionLogBlock
@@ -472,6 +475,23 @@ private struct CatalogDetailView: View {
                 if !actionState.isRunning {
                     Button("Clear Output", action: clearActionOutput)
                         .accessibilityLabel("Clear command output")
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var actionHistoryBlock: some View {
+        if !actionHistory.isEmpty {
+            DetailCard(title: "Command History") {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Recent install and fetch runs for this package.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    ForEach(actionHistory) { entry in
+                        actionHistoryRow(entry)
+                    }
                 }
             }
         }
@@ -640,11 +660,14 @@ private struct CatalogDetailView: View {
         _ progress: CatalogPackageActionProgress,
         referenceDate: Date
     ) -> String {
+        formattedDuration(progress.elapsedTime(at: referenceDate))
+    }
+
+    private func formattedDuration(_ elapsed: TimeInterval) -> String {
         let formatter = DateComponentsFormatter()
         formatter.allowedUnits = [.minute, .second]
         formatter.zeroFormattingBehavior = [.pad]
 
-        let elapsed = progress.elapsedTime(at: referenceDate)
         return formatter.string(from: elapsed) ?? "00:00"
     }
 
@@ -664,6 +687,94 @@ private struct CatalogDetailView: View {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(string, forType: .string)
+    }
+
+    private func beginAction(_ kind: CatalogPackageActionKind) {
+        if kind.requiresConfirmation {
+            pendingConfirmation = detail.actionCommand(for: kind)
+            return
+        }
+
+        runAction(kind, detail)
+    }
+
+    private func actionHistoryRow(_ entry: CatalogPackageActionHistoryEntry) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center, spacing: 12) {
+                statusBadge(for: entry.outcome)
+
+                Text(entry.command.kind.title)
+                    .font(.headline)
+
+                Spacer()
+
+                Text(entry.startedAt, format: .dateTime.hour().minute().second())
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.secondary)
+            }
+
+            Text(entry.command.command)
+                .font(.caption.monospaced())
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .textSelection(.enabled)
+
+            HStack(spacing: 12) {
+                actionHistoryMetric("Outcome", entry.outcome.title)
+                actionHistoryMetric("Detail", entry.outcome.detail)
+                actionHistoryMetric("Duration", formattedDuration(entry.duration))
+                actionHistoryMetric("Output", "\(entry.outputLineCount) lines")
+            }
+
+            HStack(spacing: 12) {
+                Button(entry.command.kind == .install ? "Install Again..." : "Fetch Again") {
+                    beginAction(entry.command.kind)
+                }
+                .disabled(hasRunningAction)
+
+                Button("Copy Command") {
+                    copyToPasteboard(entry.command.command)
+                }
+            }
+        }
+        .padding(14)
+        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private func actionHistoryMetric(_ title: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
+            Text(value)
+                .font(.caption.monospaced())
+                .lineLimit(2)
+                .textSelection(.enabled)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func statusBadge(for outcome: CatalogPackageActionHistoryOutcome) -> some View {
+        Text(outcome.title)
+            .font(.caption2.weight(.semibold))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(statusColor(for: outcome).opacity(0.14), in: Capsule())
+            .foregroundStyle(statusColor(for: outcome))
+    }
+
+    private func statusColor(for outcome: CatalogPackageActionHistoryOutcome) -> Color {
+        switch outcome {
+        case .succeeded:
+            .green
+        case .failed:
+            .red
+        case .cancelled:
+            .orange
+        }
     }
 
     private var confirmationBinding: Binding<Bool> {
