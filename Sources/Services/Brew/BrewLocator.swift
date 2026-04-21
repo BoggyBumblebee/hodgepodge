@@ -23,15 +23,18 @@ struct BrewLocator: BrewLocating {
     private let runner: any CommandRunning
     private let fileManager: FileManager
     private let clock: () -> Date
+    private let executableCandidates: [String]
 
     init(
         runner: any CommandRunning,
         fileManager: FileManager = .default,
-        clock: @escaping () -> Date = Date.init
+        clock: @escaping () -> Date = Date.init,
+        executableCandidates: [String]? = nil
     ) {
         self.runner = runner
         self.fileManager = fileManager
         self.clock = clock
+        self.executableCandidates = executableCandidates ?? Self.defaultExecutableCandidates(using: fileManager)
     }
 
     func locate() async throws -> HomebrewInstallation {
@@ -58,10 +61,8 @@ struct BrewLocator: BrewLocating {
     }
 
     private func locateExecutable() async throws -> String {
-        let candidates = ["/opt/homebrew/bin/brew", "/usr/local/bin/brew", "brew"]
-
-        for candidate in candidates {
-            let isPathCandidate = candidate.contains("/")
+        for candidate in executableCandidates {
+            let isPathCandidate = candidate != (candidate as NSString).lastPathComponent
             if isPathCandidate && !fileManager.isExecutableFile(atPath: candidate) {
                 continue
             }
@@ -91,5 +92,15 @@ struct BrewLocator: BrewLocating {
     private func trimmedOutput(executable: String, arguments: [String]) async throws -> String {
         let result = try await runner.run(executable: executable, arguments: arguments)
         return result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func defaultExecutableCandidates(using fileManager: FileManager) -> [String] {
+        let rootDirectory = fileManager.homeDirectoryForCurrentUser.pathComponents.first ?? ""
+
+        return [
+            NSString.path(withComponents: [rootDirectory, "opt", "homebrew", "bin", "brew"]),
+            NSString.path(withComponents: [rootDirectory, "usr", "local", "bin", "brew"]),
+            "brew"
+        ]
     }
 }

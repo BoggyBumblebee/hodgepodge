@@ -65,6 +65,50 @@ final class BrewLocatorTests: XCTestCase {
             XCTAssertEqual(error as? BrewLocatorError, .brewNotFound)
         }
     }
+
+    func testLocateUsesCustomExecutableCandidates() async throws {
+        let runner = MockCommandRunner(
+            responses: [
+                MockCommand(
+                    executable: "/custom/tools/brew",
+                    arguments: ["--version"],
+                    result: .success(CommandResult(stdout: "Homebrew 5.1.7\n", stderr: "", exitCode: 0))
+                ),
+                MockCommand(
+                    executable: "/custom/tools/brew",
+                    arguments: ["--prefix"],
+                    result: .success(CommandResult(stdout: "/custom\n", stderr: "", exitCode: 0))
+                ),
+                MockCommand(
+                    executable: "/custom/tools/brew",
+                    arguments: ["--cellar"],
+                    result: .success(CommandResult(stdout: "/custom/Cellar\n", stderr: "", exitCode: 0))
+                ),
+                MockCommand(
+                    executable: "/custom/tools/brew",
+                    arguments: ["--repository"],
+                    result: .success(CommandResult(stdout: "/custom/Homebrew\n", stderr: "", exitCode: 0))
+                ),
+                MockCommand(
+                    executable: "/custom/tools/brew",
+                    arguments: ["tap"],
+                    result: .success(CommandResult(stdout: "homebrew/core\n", stderr: "", exitCode: 0))
+                )
+            ]
+        )
+
+        let locator = BrewLocator(
+            runner: runner,
+            fileManager: MockFileManager(executablePaths: ["/custom/tools/brew"]),
+            clock: Date.init,
+            executableCandidates: ["/custom/tools/brew"]
+        )
+
+        let installation = try await locator.locate()
+
+        XCTAssertEqual(installation.brewPath, "/custom/tools/brew")
+        XCTAssertEqual(installation.prefix, "/custom")
+    }
 }
 
 private struct MockCommand {
