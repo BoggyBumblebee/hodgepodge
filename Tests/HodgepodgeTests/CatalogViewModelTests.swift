@@ -410,15 +410,118 @@ final class CatalogViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.actionHistory(for: detail), [persistedEntry])
     }
 
+    func testClearActionHistoryRemovesOnlyMatchingPackageAndPersists() {
+        let first = CatalogPackageDetail.fixture(slug: "wget", title: "wget")
+        let second = CatalogPackageDetail.fixture(kind: .cask, slug: "docker-desktop", title: "Docker Desktop")
+        let firstEntry = CatalogPackageActionHistoryEntry(
+            id: 0,
+            command: first.actionCommand(for: .fetch),
+            startedAt: Date(timeIntervalSince1970: 10),
+            finishedAt: Date(timeIntervalSince1970: 20),
+            outcome: .succeeded(0),
+            outputLineCount: 3
+        )
+        let secondEntry = CatalogPackageActionHistoryEntry(
+            id: 1,
+            command: second.actionCommand(for: .install),
+            startedAt: Date(timeIntervalSince1970: 30),
+            finishedAt: Date(timeIntervalSince1970: 45),
+            outcome: .failed("Already installed"),
+            outputLineCount: 2
+        )
+        let historyStore = MockCatalogActionHistoryStore(initialEntries: [firstEntry, secondEntry])
+        let viewModel = makeViewModel(historyStore: historyStore)
+
+        viewModel.clearActionHistory(for: first)
+
+        XCTAssertEqual(viewModel.actionHistory(for: first), [])
+        XCTAssertEqual(viewModel.actionHistory(for: second), [secondEntry])
+        XCTAssertEqual(historyStore.savedEntries.last, [secondEntry])
+    }
+
+    func testClearAllActionHistoryRemovesEverythingAndPersists() {
+        let detail = CatalogPackageDetail.fixture()
+        let entry = CatalogPackageActionHistoryEntry(
+            id: 0,
+            command: detail.actionCommand(for: .fetch),
+            startedAt: Date(timeIntervalSince1970: 10),
+            finishedAt: Date(timeIntervalSince1970: 20),
+            outcome: .succeeded(0),
+            outputLineCount: 1
+        )
+        let historyStore = MockCatalogActionHistoryStore(initialEntries: [entry])
+        let viewModel = makeViewModel(historyStore: historyStore)
+
+        viewModel.clearAllActionHistory()
+
+        XCTAssertTrue(viewModel.actionHistory.isEmpty)
+        XCTAssertEqual(historyStore.savedEntries.last, [])
+    }
+
+    func testExportActionHistoryUsesExporterWithPackageEntries() {
+        let first = CatalogPackageDetail.fixture(slug: "wget", title: "wget")
+        let second = CatalogPackageDetail.fixture(kind: .cask, slug: "docker-desktop", title: "Docker Desktop")
+        let firstEntry = CatalogPackageActionHistoryEntry(
+            id: 0,
+            command: first.actionCommand(for: .fetch),
+            startedAt: Date(timeIntervalSince1970: 10),
+            finishedAt: Date(timeIntervalSince1970: 20),
+            outcome: .succeeded(0),
+            outputLineCount: 3
+        )
+        let secondEntry = CatalogPackageActionHistoryEntry(
+            id: 1,
+            command: second.actionCommand(for: .install),
+            startedAt: Date(timeIntervalSince1970: 30),
+            finishedAt: Date(timeIntervalSince1970: 45),
+            outcome: .failed("Already installed"),
+            outputLineCount: 2
+        )
+        let exporter = MockCatalogActionHistoryExporter()
+        let viewModel = makeViewModel(
+            historyStore: MockCatalogActionHistoryStore(initialEntries: [firstEntry, secondEntry]),
+            historyExporter: exporter
+        )
+
+        viewModel.exportActionHistory(for: first)
+
+        XCTAssertEqual(exporter.exportedEntries, [firstEntry])
+        XCTAssertEqual(exporter.suggestedFileName, "hodgepodge-wget-command-history.json")
+    }
+
+    func testExportAllActionHistoryUsesExporterWithAllEntries() {
+        let detail = CatalogPackageDetail.fixture()
+        let entry = CatalogPackageActionHistoryEntry(
+            id: 0,
+            command: detail.actionCommand(for: .fetch),
+            startedAt: Date(timeIntervalSince1970: 10),
+            finishedAt: Date(timeIntervalSince1970: 20),
+            outcome: .succeeded(0),
+            outputLineCount: 3
+        )
+        let exporter = MockCatalogActionHistoryExporter()
+        let viewModel = makeViewModel(
+            historyStore: MockCatalogActionHistoryStore(initialEntries: [entry]),
+            historyExporter: exporter
+        )
+
+        viewModel.exportAllActionHistory()
+
+        XCTAssertEqual(exporter.exportedEntries, [entry])
+        XCTAssertEqual(exporter.suggestedFileName, "hodgepodge-command-history.json")
+    }
+
     private func makeViewModel(
         apiClient: any HomebrewAPIClienting = MockCatalogAPIClient(packages: .success([]), details: [:]),
         commandExecutor: any BrewCommandExecuting = MockBrewCommandExecutor(result: .success(CommandResult(stdout: "", stderr: "", exitCode: 0))),
-        historyStore: any CatalogActionHistoryStoring = MockCatalogActionHistoryStore()
+        historyStore: any CatalogActionHistoryStoring = MockCatalogActionHistoryStore(),
+        historyExporter: any CatalogActionHistoryExporting = MockCatalogActionHistoryExporter()
     ) -> CatalogViewModel {
         CatalogViewModel(
             apiClient: apiClient,
             commandExecutor: commandExecutor,
-            actionHistoryStore: historyStore
+            actionHistoryStore: historyStore,
+            actionHistoryExporter: historyExporter
         )
     }
 
@@ -526,6 +629,20 @@ private final class MockCatalogActionHistoryStore: CatalogActionHistoryStoring, 
 
     func saveHistory(_ entries: [CatalogPackageActionHistoryEntry]) {
         savedEntries.append(entries)
+    }
+}
+
+@MainActor
+private final class MockCatalogActionHistoryExporter: CatalogActionHistoryExporting, @unchecked Sendable {
+    private(set) var exportedEntries: [CatalogPackageActionHistoryEntry] = []
+    private(set) var suggestedFileName: String?
+
+    func export(
+        entries: [CatalogPackageActionHistoryEntry],
+        suggestedFileName: String
+    ) throws {
+        exportedEntries = entries
+        self.suggestedFileName = suggestedFileName
     }
 }
 

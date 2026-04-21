@@ -16,6 +16,7 @@ final class CatalogViewModel: ObservableObject {
     private let apiClient: any HomebrewAPIClienting
     private let commandExecutor: any BrewCommandExecuting
     private let actionHistoryStore: any CatalogActionHistoryStoring
+    private let actionHistoryExporter: any CatalogActionHistoryExporting
     private var detailCache: [String: CatalogPackageDetail] = [:]
     private var actionTask: Task<Void, Never>?
     private var nextLogIdentifier = 0
@@ -25,11 +26,13 @@ final class CatalogViewModel: ObservableObject {
     init(
         apiClient: any HomebrewAPIClienting,
         commandExecutor: any BrewCommandExecuting,
-        actionHistoryStore: any CatalogActionHistoryStoring
+        actionHistoryStore: any CatalogActionHistoryStoring,
+        actionHistoryExporter: any CatalogActionHistoryExporting
     ) {
         self.apiClient = apiClient
         self.commandExecutor = commandExecutor
         self.actionHistoryStore = actionHistoryStore
+        self.actionHistoryExporter = actionHistoryExporter
         let restoredHistory = actionHistoryStore.loadHistory()
         actionHistory = restoredHistory
         nextHistoryIdentifier = (restoredHistory.map { $0.id }.max() ?? -1) + 1
@@ -254,6 +257,51 @@ final class CatalogViewModel: ObservableObject {
         actionHistory.filter { $0.command.packageID == detail.packageID }
     }
 
+    func clearActionHistory(for detail: CatalogPackageDetail) {
+        actionHistory.removeAll { $0.command.packageID == detail.packageID }
+        actionHistoryStore.saveHistory(actionHistory)
+    }
+
+    func clearAllActionHistory() {
+        actionHistory.removeAll()
+        actionHistoryStore.saveHistory(actionHistory)
+    }
+
+    func exportActionHistory(for detail: CatalogPackageDetail) {
+        let entries = actionHistory(for: detail)
+        guard !entries.isEmpty else {
+            return
+        }
+
+        do {
+            try actionHistoryExporter.export(
+                entries: entries,
+                suggestedFileName: "hodgepodge-\(detail.slug)-command-history.json"
+            )
+        } catch is CatalogActionHistoryExportError {
+            return
+        } catch {
+            return
+        }
+    }
+
+    func exportAllActionHistory() {
+        guard !actionHistory.isEmpty else {
+            return
+        }
+
+        do {
+            try actionHistoryExporter.export(
+                entries: actionHistory,
+                suggestedFileName: "hodgepodge-command-history.json"
+            )
+        } catch is CatalogActionHistoryExportError {
+            return
+        } catch {
+            return
+        }
+    }
+
     private func matchesActiveFilters(for package: CatalogPackageSummary) -> Bool {
         activeFilters.allSatisfy { filter in
             switch filter {
@@ -406,7 +454,8 @@ extension CatalogViewModel {
                 brewLocator: brewLocator,
                 runner: runner
             ),
-            actionHistoryStore: CatalogActionHistoryStore()
+            actionHistoryStore: CatalogActionHistoryStore(),
+            actionHistoryExporter: CatalogActionHistoryExporter()
         )
     }
 }

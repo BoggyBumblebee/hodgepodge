@@ -195,6 +195,18 @@ struct CatalogView: View {
                 },
                 clearActionOutput: {
                     viewModel.clearActionOutput()
+                },
+                clearActionHistory: {
+                    viewModel.clearActionHistory(for: detail)
+                },
+                clearAllActionHistory: {
+                    viewModel.clearAllActionHistory()
+                },
+                exportActionHistory: {
+                    viewModel.exportActionHistory(for: detail)
+                },
+                exportAllActionHistory: {
+                    viewModel.exportAllActionHistory()
                 }
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -239,8 +251,13 @@ private struct CatalogDetailView: View {
     let runAction: (CatalogPackageActionKind, CatalogPackageDetail) -> Void
     let cancelAction: () -> Void
     let clearActionOutput: () -> Void
+    let clearActionHistory: () -> Void
+    let clearAllActionHistory: () -> Void
+    let exportActionHistory: () -> Void
+    let exportAllActionHistory: () -> Void
 
     @State private var pendingConfirmation: CatalogPackageActionCommand?
+    @State private var pendingHistoryClearTarget: ActionHistoryClearTarget?
 
     var body: some View {
         ScrollView {
@@ -302,6 +319,32 @@ private struct CatalogDetailView: View {
             }
         } message: {
             Text(pendingConfirmation?.confirmationMessage ?? "")
+        }
+        .confirmationDialog(
+            pendingHistoryClearTarget?.title(for: detail.title) ?? "Clear History",
+            isPresented: historyClearConfirmationBinding,
+            titleVisibility: .visible
+        ) {
+            Button(
+                pendingHistoryClearTarget?.buttonTitle ?? "Clear",
+                role: .destructive
+            ) {
+                switch pendingHistoryClearTarget {
+                case .package:
+                    clearActionHistory()
+                case .all:
+                    clearAllActionHistory()
+                case .none:
+                    break
+                }
+                pendingHistoryClearTarget = nil
+            }
+
+            Button("Cancel", role: .cancel) {
+                pendingHistoryClearTarget = nil
+            }
+        } message: {
+            Text(pendingHistoryClearTarget?.message(for: detail.title) ?? "")
         }
     }
 
@@ -485,9 +528,28 @@ private struct CatalogDetailView: View {
         if !actionHistory.isEmpty {
             DetailCard(title: "Command History") {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Recent install and fetch runs for this package.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    HStack(alignment: .top) {
+                        Text("Recent install and fetch runs for this package.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        Spacer()
+
+                        Menu("Manage History") {
+                            Button("Export Package History", action: exportActionHistory)
+                            Button("Export All History", action: exportAllActionHistory)
+
+                            Divider()
+
+                            Button("Clear Package History", role: .destructive) {
+                                pendingHistoryClearTarget = .package
+                            }
+
+                            Button("Clear All History", role: .destructive) {
+                                pendingHistoryClearTarget = .all
+                            }
+                        }
+                    }
 
                     ForEach(actionHistory) { entry in
                         actionHistoryRow(entry)
@@ -786,6 +848,49 @@ private struct CatalogDetailView: View {
                 }
             }
         )
+    }
+
+    private var historyClearConfirmationBinding: Binding<Bool> {
+        Binding(
+            get: { pendingHistoryClearTarget != nil },
+            set: { isPresented in
+                if !isPresented {
+                    pendingHistoryClearTarget = nil
+                }
+            }
+        )
+    }
+}
+
+private enum ActionHistoryClearTarget {
+    case package
+    case all
+
+    var buttonTitle: String {
+        switch self {
+        case .package:
+            "Clear Package History"
+        case .all:
+            "Clear All History"
+        }
+    }
+
+    func title(for packageTitle: String) -> String {
+        switch self {
+        case .package:
+            "Clear \(packageTitle) History?"
+        case .all:
+            "Clear All Command History?"
+        }
+    }
+
+    func message(for packageTitle: String) -> String {
+        switch self {
+        case .package:
+            "This removes all saved install and fetch history for \(packageTitle)."
+        case .all:
+            "This removes all saved install and fetch history across every package."
+        }
     }
 }
 

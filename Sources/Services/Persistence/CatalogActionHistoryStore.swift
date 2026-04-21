@@ -14,14 +14,13 @@ struct CatalogActionHistoryStore: CatalogActionHistoryStoring {
     init(
         fileURL: URL? = nil,
         fileManager: FileManager = .default,
-        encoder: JSONEncoder = JSONEncoder(),
-        decoder: JSONDecoder = JSONDecoder()
+        encoder: JSONEncoder = CatalogActionHistoryCodec.makeEncoder(),
+        decoder: JSONDecoder = CatalogActionHistoryCodec.makeDecoder()
     ) {
         self.fileURL = fileURL ?? Self.defaultFileURL(fileManager: fileManager)
         self.fileManager = fileManager
         self.encoder = encoder
         self.decoder = decoder
-        self.encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
     }
 
     func loadHistory() -> [CatalogPackageActionHistoryEntry] {

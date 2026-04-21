@@ -229,7 +229,8 @@ final class ViewRenderingTests: XCTestCase {
         CatalogViewModel(
             apiClient: ViewTestCatalogAPIClient(),
             commandExecutor: ViewTestBrewCommandExecutor(),
-            actionHistoryStore: ViewTestCatalogActionHistoryStore()
+            actionHistoryStore: ViewTestCatalogActionHistoryStore(),
+            actionHistoryExporter: ViewTestCatalogActionHistoryExporter()
         )
     }
 
@@ -328,6 +329,14 @@ private struct ViewTestCatalogActionHistoryStore: CatalogActionHistoryStoring {
     }
 
     func saveHistory(_ entries: [CatalogPackageActionHistoryEntry]) {}
+}
+
+@MainActor
+private struct ViewTestCatalogActionHistoryExporter: CatalogActionHistoryExporting {
+    func export(
+        entries: [CatalogPackageActionHistoryEntry],
+        suggestedFileName: String
+    ) throws {}
 }
 
 private struct ViewTestInstalledPackagesProvider: InstalledPackagesProviding {
