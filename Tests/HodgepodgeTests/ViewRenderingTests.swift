@@ -22,13 +22,15 @@ final class ViewRenderingTests: XCTestCase {
         let model = makeModel()
         let catalogModel = makeCatalogModel()
         let installedPackagesModel = makeInstalledPackagesModel()
+        let outdatedPackagesModel = makeOutdatedPackagesModel()
 
         model.selectedSection = .overview
         XCTAssertNotNil(render(
             RootView(
                 model: model,
                 catalogModel: catalogModel,
-                installedPackagesModel: installedPackagesModel
+                installedPackagesModel: installedPackagesModel,
+                outdatedPackagesModel: outdatedPackagesModel
             )
         ))
 
@@ -37,7 +39,8 @@ final class ViewRenderingTests: XCTestCase {
             RootView(
                 model: model,
                 catalogModel: catalogModel,
-                installedPackagesModel: installedPackagesModel
+                installedPackagesModel: installedPackagesModel,
+                outdatedPackagesModel: outdatedPackagesModel
             )
         ))
 
@@ -46,7 +49,18 @@ final class ViewRenderingTests: XCTestCase {
             RootView(
                 model: model,
                 catalogModel: catalogModel,
-                installedPackagesModel: installedPackagesModel
+                installedPackagesModel: installedPackagesModel,
+                outdatedPackagesModel: outdatedPackagesModel
+            )
+        ))
+
+        model.selectedSection = .outdated
+        XCTAssertNotNil(render(
+            RootView(
+                model: model,
+                catalogModel: catalogModel,
+                installedPackagesModel: installedPackagesModel,
+                outdatedPackagesModel: outdatedPackagesModel
             )
         ))
     }
@@ -166,6 +180,24 @@ final class ViewRenderingTests: XCTestCase {
         XCTAssertNotNil(render(InstalledPackagesView(viewModel: viewModel)))
     }
 
+    func testOutdatedPackagesViewRendersLoadedState() {
+        let package = OutdatedPackage(
+            kind: .formula,
+            slug: "wget",
+            title: "wget",
+            fullName: "homebrew/core/wget",
+            installedVersions: ["1.24.5"],
+            currentVersion: "1.25.0",
+            isPinned: true,
+            pinnedVersion: "1.24.5"
+        )
+        let viewModel = makeOutdatedPackagesModel()
+        viewModel.packagesState = .loaded([package])
+        viewModel.selectedPackage = package
+
+        XCTAssertNotNil(render(OutdatedPackagesView(viewModel: viewModel)))
+    }
+
     private func makeModel() -> AppModel {
         AppModel(
             brewLocator: ViewTestBrewLocator(),
@@ -185,6 +217,12 @@ final class ViewRenderingTests: XCTestCase {
     private func makeInstalledPackagesModel() -> InstalledPackagesViewModel {
         InstalledPackagesViewModel(
             provider: ViewTestInstalledPackagesProvider()
+        )
+    }
+
+    private func makeOutdatedPackagesModel() -> OutdatedPackagesViewModel {
+        OutdatedPackagesViewModel(
+            provider: ViewTestOutdatedPackagesProvider()
         )
     }
 
@@ -267,6 +305,12 @@ private struct ViewTestBrewCommandExecutor: BrewCommandExecuting, Sendable {
 
 private struct ViewTestInstalledPackagesProvider: InstalledPackagesProviding {
     func fetchInstalledPackages() async throws -> [InstalledPackage] {
+        []
+    }
+}
+
+private struct ViewTestOutdatedPackagesProvider: OutdatedPackagesProviding {
+    func fetchOutdatedPackages() async throws -> [OutdatedPackage] {
         []
     }
 }

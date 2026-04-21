@@ -103,3 +103,27 @@ extension CatalogPackageDetail {
         )
     }
 }
+
+extension OutdatedPackage {
+    static func fixture(
+        kind: CatalogPackageKind = .formula,
+        slug: String = "wget",
+        title: String = "wget",
+        fullName: String? = nil,
+        installedVersions: [String] = ["1.24.5"],
+        currentVersion: String = "1.25.0",
+        isPinned: Bool = false,
+        pinnedVersion: String? = nil
+    ) -> OutdatedPackage {
+        OutdatedPackage(
+            kind: kind,
+            slug: slug,
+            title: title,
+            fullName: fullName ?? slug,
+            installedVersions: installedVersions,
+            currentVersion: currentVersion,
+            isPinned: isPinned,
+            pinnedVersion: pinnedVersion
+        )
+    }
+}
