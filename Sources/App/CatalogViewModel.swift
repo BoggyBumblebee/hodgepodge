@@ -6,6 +6,8 @@ final class CatalogViewModel: ObservableObject {
     @Published var detailState: CatalogDetailLoadState = .idle
     @Published var searchText = ""
     @Published var scope: CatalogScope = .all
+    @Published var activeFilters: Set<CatalogFilterOption> = []
+    @Published var sortOption: CatalogSortOption = .name
     @Published var selectedPackage: CatalogPackageSummary?
 
     private let apiClient: any HomebrewAPIClienting
@@ -21,9 +23,12 @@ final class CatalogViewModel: ObservableObject {
         }
 
         let trimmedQuery = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        return packages.filter { package in
-            let matchesScope = scope.includes(package.kind)
-            guard matchesScope else {
+        let filtered = packages.filter { package in
+            guard scope.includes(package.kind) else {
+                return false
+            }
+
+            guard matchesActiveFilters(for: package) else {
                 return false
             }
 
@@ -33,8 +38,15 @@ final class CatalogViewModel: ObservableObject {
 
             return package.title.localizedCaseInsensitiveContains(trimmedQuery) ||
                 package.slug.localizedCaseInsensitiveContains(trimmedQuery) ||
-                package.subtitle.localizedCaseInsensitiveContains(trimmedQuery)
+                package.subtitle.localizedCaseInsensitiveContains(trimmedQuery) ||
+                package.tap.localizedCaseInsensitiveContains(trimmedQuery)
         }
+
+        return filtered.sorted(by: sorter(for: sortOption))
+    }
+
+    var activeFilterCount: Int {
+        activeFilters.count
     }
 
     func loadIfNeeded() {
@@ -117,6 +129,77 @@ final class CatalogViewModel: ObservableObject {
             }
             detailState = .failed(package, error.localizedDescription)
         }
+    }
+
+    func toggleFilter(_ filter: CatalogFilterOption) {
+        if activeFilters.contains(filter) {
+            activeFilters.remove(filter)
+        } else {
+            activeFilters.insert(filter)
+        }
+    }
+
+    func clearFilters() {
+        activeFilters.removeAll()
+    }
+
+    func isFilterActive(_ filter: CatalogFilterOption) -> Bool {
+        activeFilters.contains(filter)
+    }
+
+    private func matchesActiveFilters(for package: CatalogPackageSummary) -> Bool {
+        activeFilters.allSatisfy { filter in
+            switch filter {
+            case .hasCaveats:
+                package.hasCaveats
+            case .deprecated:
+                package.isDeprecated
+            case .disabled:
+                package.isDisabled
+            case .autoUpdates:
+                package.autoUpdates
+            }
+        }
+    }
+
+    private func sorter(for option: CatalogSortOption) -> (CatalogPackageSummary, CatalogPackageSummary) -> Bool {
+        switch option {
+        case .name:
+            return { lhs, rhs in
+                Self.compare(lhs.title, rhs.title, fallback: lhs.slug < rhs.slug)
+            }
+        case .packageType:
+            return { lhs, rhs in
+                if lhs.kind != rhs.kind {
+                    return lhs.kind.rawValue < rhs.kind.rawValue
+                }
+                return Self.compare(lhs.title, rhs.title, fallback: lhs.slug < rhs.slug)
+            }
+        case .version:
+            return { lhs, rhs in
+                let result = lhs.version.localizedStandardCompare(rhs.version)
+                if result != .orderedSame {
+                    return result == .orderedAscending
+                }
+                return Self.compare(lhs.title, rhs.title, fallback: lhs.slug < rhs.slug)
+            }
+        case .tap:
+            return { lhs, rhs in
+                let result = lhs.tap.localizedCaseInsensitiveCompare(rhs.tap)
+                if result != .orderedSame {
+                    return result == .orderedAscending
+                }
+                return Self.compare(lhs.title, rhs.title, fallback: lhs.slug < rhs.slug)
+            }
+        }
+    }
+
+    private static func compare(_ lhs: String, _ rhs: String, fallback: Bool) -> Bool {
+        let result = lhs.localizedCaseInsensitiveCompare(rhs)
+        if result != .orderedSame {
+            return result == .orderedAscending
+        }
+        return fallback
     }
 }
 

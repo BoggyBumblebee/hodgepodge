@@ -19,6 +19,10 @@ final class HomebrewAPIClientTests: XCTestCase {
                         "name": "wget",
                         "desc": "Internet file retriever",
                         "homepage": "https://example.com/wget",
+                        "tap": "homebrew/core",
+                        "caveats": null,
+                        "deprecated": false,
+                        "disabled": false,
                         "versions": { "stable": "1.25.0" }
                       }
                     ]
@@ -33,6 +37,11 @@ final class HomebrewAPIClientTests: XCTestCase {
                         "name": ["Docker Desktop"],
                         "desc": "Container desktop app",
                         "homepage": "https://example.com/docker",
+                        "tap": "homebrew/cask",
+                        "caveats": "Requires Rosetta in some cases.",
+                        "deprecated": false,
+                        "disabled": false,
+                        "auto_updates": true,
                         "version": "4.68.0"
                       }
                     ]
@@ -65,6 +74,11 @@ final class HomebrewAPIClientTests: XCTestCase {
                         "name": ["AppTrap"],
                         "desc": null,
                         "homepage": "https://onnati.net/apptrap/",
+                        "tap": "homebrew/cask",
+                        "caveats": null,
+                        "deprecated": false,
+                        "disabled": false,
+                        "auto_updates": false,
                         "version": "1.3"
                       }
                     ]
@@ -158,14 +172,7 @@ final class HomebrewAPIClientTests: XCTestCase {
         }
 
         let detail = try await client.fetchDetail(
-            for: CatalogPackageSummary(
-                kind: .formula,
-                slug: "wget",
-                title: "wget",
-                subtitle: "Internet file retriever",
-                version: "1.25.0",
-                homepage: URL(string: "https://example.com/wget")
-            )
+            for: CatalogPackageSummary.fixture()
         )
 
         XCTAssertEqual(detail.slug, "wget")
@@ -251,13 +258,16 @@ final class HomebrewAPIClientTests: XCTestCase {
         }
 
         let detail = try await client.fetchDetail(
-            for: CatalogPackageSummary(
+            for: CatalogPackageSummary.fixture(
                 kind: .cask,
                 slug: "docker-desktop",
                 title: "Docker Desktop",
                 subtitle: "Container desktop app",
                 version: "4.68.0",
-                homepage: URL(string: "https://example.com/docker")
+                homepage: URL(string: "https://example.com/docker"),
+                tap: "homebrew/cask",
+                hasCaveats: true,
+                autoUpdates: true
             )
         )
 
@@ -324,13 +334,14 @@ final class HomebrewAPIClientTests: XCTestCase {
         }
 
         let detail = try await client.fetchDetail(
-            for: CatalogPackageSummary(
+            for: CatalogPackageSummary.fixture(
                 kind: .cask,
                 slug: "apptrap",
                 title: "AppTrap",
                 subtitle: "No description available.",
                 version: "1.3",
-                homepage: URL(string: "https://onnati.net/apptrap/")
+                homepage: URL(string: "https://onnati.net/apptrap/"),
+                tap: "homebrew/cask"
             )
         )
 

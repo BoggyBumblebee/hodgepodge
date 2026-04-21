@@ -81,6 +81,10 @@ private struct FormulaSummaryResponse: Decodable {
     let name: String
     let desc: String?
     let homepage: URL?
+    let tap: String
+    let caveats: String?
+    let deprecated: Bool
+    let disabled: Bool
     let versions: VersionsResponse
 
     struct VersionsResponse: Decodable {
@@ -95,7 +99,25 @@ private struct CaskSummaryResponse: Decodable {
     let name: [String]
     let desc: String?
     let homepage: URL?
+    let tap: String
+    let caveats: String?
+    let deprecated: Bool
+    let disabled: Bool
+    let autoUpdates: Bool?
     let version: String
+
+    private enum CodingKeys: String, CodingKey {
+        case token
+        case name
+        case desc
+        case homepage
+        case tap
+        case caveats
+        case deprecated
+        case disabled
+        case autoUpdates = "auto_updates"
+        case version
+    }
 }
 
 private struct FormulaDetailResponse: Decodable {
@@ -264,7 +286,12 @@ private extension CatalogPackageSummary {
             title: response.name,
             subtitle: response.desc ?? Self.fallbackDescription,
             version: response.versions.stable ?? "Unknown",
-            homepage: response.homepage
+            homepage: response.homepage,
+            tap: response.tap,
+            hasCaveats: !(response.caveats?.isEmpty ?? true),
+            isDeprecated: response.deprecated,
+            isDisabled: response.disabled,
+            autoUpdates: false
         )
     }
 
@@ -275,7 +302,12 @@ private extension CatalogPackageSummary {
             title: response.name.first ?? response.token,
             subtitle: response.desc ?? Self.fallbackDescription,
             version: response.version,
-            homepage: response.homepage
+            homepage: response.homepage,
+            tap: response.tap,
+            hasCaveats: !(response.caveats?.isEmpty ?? true),
+            isDeprecated: response.deprecated,
+            isDisabled: response.disabled,
+            autoUpdates: response.autoUpdates ?? false
         )
     }
 }

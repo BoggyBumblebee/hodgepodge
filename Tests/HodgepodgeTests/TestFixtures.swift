@@ -15,6 +15,36 @@ extension HomebrewInstallation {
     }
 }
 
+extension CatalogPackageSummary {
+    static func fixture(
+        kind: CatalogPackageKind = .formula,
+        slug: String = "wget",
+        title: String = "wget",
+        subtitle: String = "Internet file retriever",
+        version: String = "1.25.0",
+        homepage: URL? = URL(string: "https://example.com/wget"),
+        tap: String = "homebrew/core",
+        hasCaveats: Bool = false,
+        isDeprecated: Bool = false,
+        isDisabled: Bool = false,
+        autoUpdates: Bool = false
+    ) -> CatalogPackageSummary {
+        CatalogPackageSummary(
+            kind: kind,
+            slug: slug,
+            title: title,
+            subtitle: subtitle,
+            version: version,
+            homepage: homepage,
+            tap: tap,
+            hasCaveats: hasCaveats,
+            isDeprecated: isDeprecated,
+            isDisabled: isDisabled,
+            autoUpdates: autoUpdates
+        )
+    }
+}
+
 extension CatalogPackageDetail {
     static func fixture(
         kind: CatalogPackageKind = .formula,

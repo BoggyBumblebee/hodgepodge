@@ -7,7 +7,7 @@ struct CatalogView: View {
     var body: some View {
         HSplitView {
             sidebar
-                .frame(minWidth: 300, idealWidth: 340, maxWidth: 380)
+                .frame(minWidth: 420, idealWidth: 510, maxWidth: 560)
 
             detail
                 .frame(minWidth: 560, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -57,6 +57,21 @@ struct CatalogView: View {
                         Text(package.version)
                             .font(.caption.monospaced())
                             .foregroundStyle(.tertiary)
+
+                        HStack(spacing: 6) {
+                            if package.hasCaveats {
+                                summaryBadge("Caveats", color: .orange)
+                            }
+                            if package.isDeprecated {
+                                summaryBadge("Deprecated", color: .yellow)
+                            }
+                            if package.isDisabled {
+                                summaryBadge("Disabled", color: .red)
+                            }
+                            if package.autoUpdates {
+                                summaryBadge("Auto Updates", color: .blue)
+                            }
+                        }
                     }
                     .padding(.vertical, 4)
                     .tag(package)
@@ -95,6 +110,35 @@ struct CatalogView: View {
             .pickerStyle(.segmented)
 
             HStack(spacing: 12) {
+                Menu {
+                    ForEach(CatalogFilterOption.allCases) { filter in
+                        Toggle(isOn: filterBinding(filter)) {
+                            Text(filter.title)
+                        }
+                    }
+
+                    Divider()
+
+                    Button("Clear Filters") {
+                        viewModel.clearFilters()
+                    }
+                    .disabled(viewModel.activeFilters.isEmpty)
+                } label: {
+                    Label(
+                        viewModel.activeFilterCount == 0 ? "Filters" : "Filters (\(viewModel.activeFilterCount))",
+                        systemImage: "line.3.horizontal.decrease.circle"
+                    )
+                }
+                .accessibilityLabel("Catalog filters")
+
+                Picker("Sort Packages", selection: $viewModel.sortOption) {
+                    ForEach(CatalogSortOption.allCases) { option in
+                        Text(option.title).tag(option)
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(maxWidth: 180)
+
                 Button("Refresh Catalog") {
                     viewModel.refreshCatalog()
                 }
@@ -146,6 +190,26 @@ struct CatalogView: View {
             get: { viewModel.selectedPackage },
             set: { viewModel.selectPackage($0) }
         )
+    }
+
+    private func filterBinding(_ filter: CatalogFilterOption) -> Binding<Bool> {
+        Binding(
+            get: { viewModel.isFilterActive(filter) },
+            set: { isActive in
+                if isActive != viewModel.isFilterActive(filter) {
+                    viewModel.toggleFilter(filter)
+                }
+            }
+        )
+    }
+
+    private func summaryBadge(_ title: String, color: Color) -> some View {
+        Text(title)
+            .font(.caption2.weight(.semibold))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(color.opacity(0.14), in: Capsule())
+            .foregroundStyle(color)
     }
 }
 

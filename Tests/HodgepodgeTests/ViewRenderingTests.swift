@@ -42,13 +42,9 @@ final class ViewRenderingTests: XCTestCase {
     }
 
     func testCatalogViewRendersLoadedAndDetailStates() {
-        let package = CatalogPackageSummary(
-            kind: .formula,
-            slug: "wget",
-            title: "wget",
-            subtitle: "Internet file retriever",
-            version: "1.25.0",
-            homepage: nil
+        let package = CatalogPackageSummary.fixture(
+            homepage: nil,
+            hasCaveats: true
         )
         let detail = CatalogPackageDetail(
             kind: .formula,
@@ -89,6 +85,8 @@ final class ViewRenderingTests: XCTestCase {
         )
         let viewModel = makeCatalogModel()
         viewModel.packagesState = .loaded([package])
+        viewModel.activeFilters = [.hasCaveats]
+        viewModel.sortOption = .tap
         viewModel.selectedPackage = package
         viewModel.detailState = .loaded(detail)
 

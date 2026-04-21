@@ -55,6 +55,50 @@ enum CatalogScope: String, CaseIterable, Equatable, Identifiable, Sendable {
     }
 }
 
+enum CatalogFilterOption: String, CaseIterable, Equatable, Hashable, Identifiable, Sendable {
+    case hasCaveats
+    case deprecated
+    case disabled
+    case autoUpdates
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .hasCaveats:
+            "Has Caveats"
+        case .deprecated:
+            "Deprecated"
+        case .disabled:
+            "Disabled"
+        case .autoUpdates:
+            "Auto Updates"
+        }
+    }
+}
+
+enum CatalogSortOption: String, CaseIterable, Equatable, Identifiable, Sendable {
+    case name
+    case packageType
+    case version
+    case tap
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .name:
+            "Name"
+        case .packageType:
+            "Package Type"
+        case .version:
+            "Version"
+        case .tap:
+            "Tap"
+        }
+    }
+}
+
 struct CatalogPackageSummary: Identifiable, Equatable, Hashable, Sendable {
     let kind: CatalogPackageKind
     let slug: String
@@ -62,6 +106,11 @@ struct CatalogPackageSummary: Identifiable, Equatable, Hashable, Sendable {
     let subtitle: String
     let version: String
     let homepage: URL?
+    let tap: String
+    let hasCaveats: Bool
+    let isDeprecated: Bool
+    let isDisabled: Bool
+    let autoUpdates: Bool
 
     var id: String {
         "\(kind.rawValue):\(slug)"
