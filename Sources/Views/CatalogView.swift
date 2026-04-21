@@ -403,29 +403,41 @@ private struct CatalogDetailView: View {
         switch actionState {
         case .idle:
             EmptyView()
-        case .running(let command):
-            statusBanner(
-                text: "\(command.kind.title) is running...",
+        case .running(let progress):
+            actionStatusCard(
+                progress: progress,
+                title: "\(progress.command.kind.title) is running...",
+                detail: "Streaming Homebrew output live.",
                 systemImage: "terminal",
-                color: .blue
+                color: .blue,
+                isRunning: true
             )
-        case .succeeded(let command, let result):
-            statusBanner(
-                text: "\(command.kind.title) completed with exit code \(result.exitCode).",
+        case .succeeded(let progress, let result):
+            actionStatusCard(
+                progress: progress,
+                title: "\(progress.command.kind.title) completed.",
+                detail: "Homebrew exited with code \(result.exitCode).",
                 systemImage: "checkmark.circle.fill",
-                color: .green
+                color: .green,
+                isRunning: false
             )
-        case .failed(let command, let message):
-            statusBanner(
-                text: "\(command.kind.title) failed: \(message)",
+        case .failed(let progress, let message):
+            actionStatusCard(
+                progress: progress,
+                title: "\(progress.command.kind.title) failed.",
+                detail: message,
                 systemImage: "xmark.octagon.fill",
-                color: .red
+                color: .red,
+                isRunning: false
             )
-        case .cancelled(let command):
-            statusBanner(
-                text: "\(command.kind.title) was cancelled.",
+        case .cancelled(let progress):
+            actionStatusCard(
+                progress: progress,
+                title: "\(progress.command.kind.title) was cancelled.",
+                detail: "The Homebrew command stopped before completion.",
                 systemImage: "stop.circle.fill",
-                color: .orange
+                color: .orange,
+                isRunning: false
             )
         }
     }
@@ -441,20 +453,20 @@ private struct CatalogDetailView: View {
                     Text("Command output will appear here as Homebrew writes to stdout and stderr.")
                         .foregroundStyle(.secondary)
                 } else {
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 8) {
-                            ForEach(actionLogs) { entry in
-                                Text(entry.text)
-                                    .font(.caption.monospaced())
-                                    .foregroundStyle(logColor(for: entry.kind))
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .textSelection(.enabled)
-                            }
+                    HStack {
+                        Text("\(actionLogs.count) log \(actionLogs.count == 1 ? "entry" : "entries")")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        if actionState.isRunning {
+                            Label("Streaming live", systemImage: "waveform")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.blue)
                         }
                     }
-                    .frame(minHeight: 120, maxHeight: 220)
-                    .padding(12)
-                    .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+                    ActionLogConsole(entries: actionLogs)
+                        .frame(minHeight: 150, maxHeight: 260)
                 }
 
                 if !actionState.isRunning {
@@ -557,6 +569,59 @@ private struct CatalogDetailView: View {
         }
     }
 
+    private func actionStatusCard(
+        progress: CatalogPackageActionProgress,
+        title: String,
+        detail: String,
+        systemImage: String,
+        color: Color,
+        isRunning: Bool
+    ) -> some View {
+        DetailCard(title: "Action Status") {
+            TimelineView(.periodic(from: progress.startedAt, by: 1)) { context in
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(alignment: .center, spacing: 12) {
+                        if isRunning {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+
+                        statusBanner(text: title, systemImage: systemImage, color: color)
+                    }
+
+                    Text(detail)
+                        .foregroundStyle(.secondary)
+
+                    LazyVGrid(
+                        columns: [GridItem(.adaptive(minimum: 160), alignment: .leading)],
+                        alignment: .leading,
+                        spacing: 10
+                    ) {
+                        actionMetric("Command", progress.command.kind.title)
+                        actionMetric("Started", formattedTime(progress.startedAt))
+                        actionMetric("Duration", formattedDuration(progress, referenceDate: context.date))
+                        actionMetric("Output Lines", "\(actionLogs.count)")
+                    }
+                }
+            }
+        }
+    }
+
+    private func actionMetric(_ title: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Text(value)
+                .font(.callout.monospaced())
+                .textSelection(.enabled)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
     private func statusBanner(text: String, systemImage: String, color: Color) -> some View {
         Label(text, systemImage: systemImage)
             .font(.callout.weight(.semibold))
@@ -565,6 +630,22 @@ private struct CatalogDetailView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             .foregroundStyle(color)
+    }
+
+    private func formattedTime(_ date: Date) -> String {
+        date.formatted(date: .omitted, time: .standard)
+    }
+
+    private func formattedDuration(
+        _ progress: CatalogPackageActionProgress,
+        referenceDate: Date
+    ) -> String {
+        let formatter = DateComponentsFormatter()
+        formatter.allowedUnits = [.minute, .second]
+        formatter.zeroFormattingBehavior = [.pad]
+
+        let elapsed = progress.elapsedTime(at: referenceDate)
+        return formatter.string(from: elapsed) ?? "00:00"
     }
 
     private func sectionTitle(_ title: String) -> some View {
@@ -585,17 +666,6 @@ private struct CatalogDetailView: View {
         pasteboard.setString(string, forType: .string)
     }
 
-    private func logColor(for kind: CatalogPackageActionLogKind) -> Color {
-        switch kind {
-        case .system:
-            .secondary
-        case .stdout:
-            .primary
-        case .stderr:
-            .red
-        }
-    }
-
     private var confirmationBinding: Binding<Bool> {
         Binding(
             get: { pendingConfirmation != nil },
@@ -605,6 +675,80 @@ private struct CatalogDetailView: View {
                 }
             }
         )
+    }
+}
+
+private struct ActionLogConsole: View {
+    let entries: [CatalogPackageActionLogEntry]
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 8) {
+                    ForEach(entries) { entry in
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text(entry.timestamp, format: .dateTime.hour().minute().second())
+                                .font(.caption2.monospaced())
+                                .foregroundStyle(.tertiary)
+
+                            Text(label(for: entry.kind))
+                                .font(.caption2.weight(.semibold))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 3)
+                                .background(labelColor(for: entry.kind).opacity(0.15), in: Capsule())
+                                .foregroundStyle(labelColor(for: entry.kind))
+
+                            Text(entry.text)
+                                .font(.caption.monospaced())
+                                .foregroundStyle(.primary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .textSelection(.enabled)
+                        }
+                        .id(entry.id)
+                    }
+                }
+                .padding(12)
+            }
+            .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .onAppear {
+                scrollToLatest(using: proxy)
+            }
+            .onChange(of: entries.last?.id) { _, _ in
+                scrollToLatest(using: proxy)
+            }
+        }
+    }
+
+    private func scrollToLatest(using proxy: ScrollViewProxy) {
+        guard let latestID = entries.last?.id else {
+            return
+        }
+
+        withAnimation(.easeOut(duration: 0.18)) {
+            proxy.scrollTo(latestID, anchor: .bottom)
+        }
+    }
+
+    private func label(for kind: CatalogPackageActionLogKind) -> String {
+        switch kind {
+        case .system:
+            "SYSTEM"
+        case .stdout:
+            "STDOUT"
+        case .stderr:
+            "STDERR"
+        }
+    }
+
+    private func labelColor(for kind: CatalogPackageActionLogKind) -> Color {
+        switch kind {
+        case .system:
+            .secondary
+        case .stdout:
+            .blue
+        case .stderr:
+            .red
+        }
     }
 }
 

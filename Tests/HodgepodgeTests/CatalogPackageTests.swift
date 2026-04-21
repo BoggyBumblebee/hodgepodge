@@ -47,6 +47,22 @@ final class CatalogPackageTests: XCTestCase {
         XCTAssertEqual(caskDetail.packageID, "cask:docker-desktop")
     }
 
+    func testActionProgressTracksCommandAndElapsedTime() {
+        let command = CatalogPackageDetail.fixture().actionCommand(for: .fetch)
+        let startedAt = Date(timeIntervalSince1970: 1_000)
+        let finishedAt = Date(timeIntervalSince1970: 1_095)
+        let progress = CatalogPackageActionProgress(command: command, startedAt: startedAt)
+        let completed = progress.finished(at: finishedAt)
+
+        XCTAssertEqual(progress.command, command)
+        XCTAssertNil(progress.finishedAt)
+        XCTAssertEqual(progress.elapsedTime(at: finishedAt), 95, accuracy: 0.001)
+        XCTAssertEqual(completed.finishedAt, finishedAt)
+        XCTAssertEqual(completed.elapsedTime(at: Date(timeIntervalSince1970: 1_200)), 95, accuracy: 0.001)
+        XCTAssertEqual(CatalogPackageActionState.running(progress).command, command)
+        XCTAssertEqual(CatalogPackageActionState.succeeded(completed, CommandResult(stdout: "", stderr: "", exitCode: 0)).progress, completed)
+    }
+
     func testMetadataDetailsIncludeOptionalValuesWhenPresent() {
         let detail = CatalogPackageDetail.fixture(
             fullName: "homebrew/cask/docker-desktop",

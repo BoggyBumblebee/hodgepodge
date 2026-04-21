@@ -167,11 +167,12 @@ final class CatalogViewModel: ObservableObject {
 
     func runAction(_ actionKind: CatalogPackageActionKind, for detail: CatalogPackageDetail) {
         let command = detail.actionCommand(for: actionKind)
+        let progress = CatalogPackageActionProgress(command: command, startedAt: Date())
 
         actionTask?.cancel()
         actionTask = nil
         resetActionOutput()
-        actionState = .running(command)
+        actionState = .running(progress)
         appendLog(.system, "Preparing \(actionKind.title.lowercased()) for \(detail.title).")
 
         actionTask = Task { @MainActor [commandExecutor] in
@@ -181,15 +182,15 @@ final class CatalogViewModel: ObservableObject {
                 }
                 flushPendingLogs()
                 appendLog(.system, "\(actionKind.title) finished with exit code \(result.exitCode).")
-                actionState = .succeeded(command, result)
+                actionState = .succeeded(progress.finished(at: Date()), result)
             } catch is CancellationError {
                 flushPendingLogs()
                 appendLog(.system, "\(actionKind.title) cancelled.")
-                actionState = .cancelled(command)
+                actionState = .cancelled(progress.finished(at: Date()))
             } catch {
                 flushPendingLogs()
                 appendLog(.system, error.localizedDescription)
-                actionState = .failed(command, error.localizedDescription)
+                actionState = .failed(progress.finished(at: Date()), error.localizedDescription)
             }
 
             actionTask = nil
@@ -278,14 +279,14 @@ final class CatalogViewModel: ObservableObject {
         return fallback
     }
 
-    private func appendLog(_ kind: CatalogPackageActionLogKind, _ text: String) {
+    private func appendLog(_ kind: CatalogPackageActionLogKind, _ text: String, timestamp: Date = Date()) {
         switch kind {
         case .system:
             let line = text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !line.isEmpty else {
                 return
             }
-            appendLogLine(kind, line)
+            appendLogLine(kind, line, timestamp: timestamp)
         case .stdout, .stderr:
             var buffered = pendingLogText[kind, default: ""]
             buffered.append(text)
@@ -298,17 +299,18 @@ final class CatalogViewModel: ObservableObject {
                 guard !trimmed.isEmpty else {
                     continue
                 }
-                appendLogLine(kind, trimmed)
+                appendLogLine(kind, trimmed, timestamp: timestamp)
             }
         }
     }
 
-    private func appendLogLine(_ kind: CatalogPackageActionLogKind, _ line: String) {
+    private func appendLogLine(_ kind: CatalogPackageActionLogKind, _ line: String, timestamp: Date = Date()) {
         actionLogs.append(
             CatalogPackageActionLogEntry(
                 id: nextLogIdentifier,
                 kind: kind,
-                text: line
+                text: line,
+                timestamp: timestamp
             )
         )
         nextLogIdentifier += 1

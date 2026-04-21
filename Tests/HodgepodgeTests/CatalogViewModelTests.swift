@@ -268,10 +268,13 @@ final class CatalogViewModelTests: XCTestCase {
 
         viewModel.runAction(.fetch, for: detail)
         await waitUntil {
-            viewModel.actionState == .succeeded(detail.actionCommand(for: .fetch), result)
+            viewModel.actionState.command == detail.actionCommand(for: .fetch) &&
+                succeededResult(from: viewModel.actionState) == result
         }
 
-        XCTAssertEqual(viewModel.actionState, .succeeded(detail.actionCommand(for: .fetch), result))
+        XCTAssertEqual(viewModel.actionState.command, detail.actionCommand(for: .fetch))
+        XCTAssertEqual(succeededResult(from: viewModel.actionState), result)
+        XCTAssertNotNil(viewModel.actionState.progress?.finishedAt)
         XCTAssertEqual(
             viewModel.actionLogs.map(\.text),
             [
@@ -283,6 +286,7 @@ final class CatalogViewModelTests: XCTestCase {
                 "Fetch finished with exit code 0."
             ]
         )
+        XCTAssertTrue(viewModel.actionLogs.allSatisfy { $0.timestamp <= Date() })
     }
 
     func testRunActionStoresFailureState() async {
@@ -299,10 +303,12 @@ final class CatalogViewModelTests: XCTestCase {
 
         viewModel.runAction(.install, for: detail)
         await waitUntil {
-            viewModel.actionState == .failed(detail.actionCommand(for: .install), "Already installed")
+            failedMessage(from: viewModel.actionState) == "Already installed"
         }
 
-        XCTAssertEqual(viewModel.actionState, .failed(detail.actionCommand(for: .install), "Already installed"))
+        XCTAssertEqual(viewModel.actionState.command, detail.actionCommand(for: .install))
+        XCTAssertEqual(failedMessage(from: viewModel.actionState), "Already installed")
+        XCTAssertNotNil(viewModel.actionState.progress?.finishedAt)
         XCTAssertEqual(viewModel.actionLogs.last?.text, "Already installed")
     }
 
@@ -313,15 +319,18 @@ final class CatalogViewModelTests: XCTestCase {
 
         viewModel.runAction(.fetch, for: detail)
         await waitUntil {
-            viewModel.actionState == .running(detail.actionCommand(for: .fetch))
+            viewModel.actionState.command == detail.actionCommand(for: .fetch) &&
+                viewModel.actionState.isRunning
         }
 
         viewModel.cancelAction()
         await waitUntil {
-            viewModel.actionState == .cancelled(detail.actionCommand(for: .fetch))
+            isCancelled(viewModel.actionState)
         }
 
-        XCTAssertEqual(viewModel.actionState, .cancelled(detail.actionCommand(for: .fetch)))
+        XCTAssertEqual(viewModel.actionState.command, detail.actionCommand(for: .fetch))
+        XCTAssertTrue(isCancelled(viewModel.actionState))
+        XCTAssertNotNil(viewModel.actionState.progress?.finishedAt)
     }
 
     func testActionStateAndLogsOnlyApplyToMatchingDetail() async {
@@ -334,10 +343,12 @@ final class CatalogViewModelTests: XCTestCase {
 
         viewModel.runAction(.fetch, for: first)
         await waitUntil {
-            viewModel.actionState == .succeeded(first.actionCommand(for: .fetch), result)
+            viewModel.actionState.command == first.actionCommand(for: .fetch) &&
+                succeededResult(from: viewModel.actionState) == result
         }
 
-        XCTAssertEqual(viewModel.actionState(for: first), .succeeded(first.actionCommand(for: .fetch), result))
+        XCTAssertEqual(viewModel.actionState(for: first).command, first.actionCommand(for: .fetch))
+        XCTAssertEqual(succeededResult(from: viewModel.actionState(for: first)), result)
         XCTAssertEqual(viewModel.actionState(for: second), .idle)
         XCTAssertFalse(viewModel.actionLogs(for: first).isEmpty)
         XCTAssertTrue(viewModel.actionLogs(for: second).isEmpty)
@@ -352,7 +363,8 @@ final class CatalogViewModelTests: XCTestCase {
 
         viewModel.runAction(.fetch, for: detail)
         await waitUntil {
-            viewModel.actionState == .succeeded(detail.actionCommand(for: .fetch), result)
+            viewModel.actionState.command == detail.actionCommand(for: .fetch) &&
+                succeededResult(from: viewModel.actionState) == result
         }
 
         viewModel.clearActionOutput()
@@ -385,6 +397,30 @@ final class CatalogViewModelTests: XCTestCase {
         }
 
         XCTFail("Condition was not met in time.", file: file, line: line)
+    }
+
+    private func succeededResult(from state: CatalogPackageActionState) -> CommandResult? {
+        guard case .succeeded(_, let result) = state else {
+            return nil
+        }
+
+        return result
+    }
+
+    private func failedMessage(from state: CatalogPackageActionState) -> String? {
+        guard case .failed(_, let message) = state else {
+            return nil
+        }
+
+        return message
+    }
+
+    private func isCancelled(_ state: CatalogPackageActionState) -> Bool {
+        if case .cancelled = state {
+            return true
+        }
+
+        return false
     }
 }
 

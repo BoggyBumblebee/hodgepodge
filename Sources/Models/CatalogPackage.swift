@@ -272,17 +272,18 @@ enum JSONValue: Decodable, Equatable, Sendable {
 
     var flattenedItems: [String] {
         switch self {
-        case .string, .number, .bool:
-            let description = flattenedDescription
-            return description.isEmpty ? [] : [description]
+        case .string, .number, .bool, .object:
+            return flattenedItemList
         case .array(let values):
             return values.flatMap(\.flattenedItems)
-        case .object:
-            let description = flattenedDescription
-            return description.isEmpty ? [] : [description]
         case .null:
             return []
         }
+    }
+
+    private var flattenedItemList: [String] {
+        let description = flattenedDescription
+        return description.isEmpty ? [] : [description]
     }
 
     private static func decodeNonNullValue(from container: any SingleValueDecodingContainer) throws -> JSONValue? {

@@ -46,24 +46,58 @@ struct CatalogPackageActionLogEntry: Identifiable, Equatable, Sendable {
     let id: Int
     let kind: CatalogPackageActionLogKind
     let text: String
+    let timestamp: Date
+}
+
+struct CatalogPackageActionProgress: Equatable, Sendable {
+    let command: CatalogPackageActionCommand
+    let startedAt: Date
+    let finishedAt: Date?
+
+    init(
+        command: CatalogPackageActionCommand,
+        startedAt: Date,
+        finishedAt: Date? = nil
+    ) {
+        self.command = command
+        self.startedAt = startedAt
+        self.finishedAt = finishedAt
+    }
+
+    func finished(at date: Date) -> CatalogPackageActionProgress {
+        CatalogPackageActionProgress(
+            command: command,
+            startedAt: startedAt,
+            finishedAt: date
+        )
+    }
+
+    func elapsedTime(at referenceDate: Date = .now) -> TimeInterval {
+        let endDate = finishedAt ?? referenceDate
+        return max(0, endDate.timeIntervalSince(startedAt))
+    }
 }
 
 enum CatalogPackageActionState: Equatable, Sendable {
     case idle
-    case running(CatalogPackageActionCommand)
-    case succeeded(CatalogPackageActionCommand, CommandResult)
-    case failed(CatalogPackageActionCommand, String)
-    case cancelled(CatalogPackageActionCommand)
+    case running(CatalogPackageActionProgress)
+    case succeeded(CatalogPackageActionProgress, CommandResult)
+    case failed(CatalogPackageActionProgress, String)
+    case cancelled(CatalogPackageActionProgress)
 
     var command: CatalogPackageActionCommand? {
+        progress?.command
+    }
+
+    var progress: CatalogPackageActionProgress? {
         switch self {
         case .idle:
             nil
-        case .running(let command),
-                .succeeded(let command, _),
-                .failed(let command, _),
-                .cancelled(let command):
-            command
+        case .running(let progress),
+                .succeeded(let progress, _),
+                .failed(let progress, _),
+                .cancelled(let progress):
+            progress
         }
     }
 

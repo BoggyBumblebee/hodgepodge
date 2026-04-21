@@ -89,6 +89,27 @@ final class ViewRenderingTests: XCTestCase {
         viewModel.sortOption = .tap
         viewModel.selectedPackage = package
         viewModel.detailState = .loaded(detail)
+        let command = detail.actionCommand(for: .fetch)
+        viewModel.actionState = .running(
+            CatalogPackageActionProgress(
+                command: command,
+                startedAt: Date(timeIntervalSince1970: 1_000)
+            )
+        )
+        viewModel.actionLogs = [
+            CatalogPackageActionLogEntry(
+                id: 0,
+                kind: .system,
+                text: "Preparing fetch for wget.",
+                timestamp: Date(timeIntervalSince1970: 1_001)
+            ),
+            CatalogPackageActionLogEntry(
+                id: 1,
+                kind: .stdout,
+                text: "Downloading...",
+                timestamp: Date(timeIntervalSince1970: 1_002)
+            )
+        ]
 
         XCTAssertNotNil(render(CatalogView(viewModel: viewModel)))
     }
