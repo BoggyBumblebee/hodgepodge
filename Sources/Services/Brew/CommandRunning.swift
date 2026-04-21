@@ -81,37 +81,14 @@ struct ProcessCommandRunner: CommandRunning {
                     onOutput: onOutput
                 )
 
-                process.terminationHandler = { process in
-                    stdoutPipe.fileHandleForReading.readabilityHandler = nil
-                    stderrPipe.fileHandleForReading.readabilityHandler = nil
-
-                    if let error = appendRemainingOutput(
-                        from: stdoutPipe.fileHandleForReading,
-                        stream: .stdout,
-                        outputBuffer: outputBuffer,
-                        onOutput: onOutput
-                    ) ?? appendRemainingOutput(
-                        from: stderrPipe.fileHandleForReading,
-                        stream: .stderr,
-                        outputBuffer: outputBuffer,
-                        onOutput: onOutput
-                    ) {
-                        state.resume(continuation, with: .failure(error))
-                        return
-                    }
-
-                    if state.wasCancelled {
-                        state.resume(continuation, with: .failure(CancellationError()))
-                        return
-                    }
-
-                    let result = outputBuffer.result(exitCode: process.terminationStatus)
-                    if result.exitCode == 0 {
-                        state.resume(continuation, with: .success(result))
-                    } else {
-                        state.resume(continuation, with: .failure(CommandRunnerError.nonZeroExitCode(result)))
-                    }
-                }
+                process.terminationHandler = makeTerminationHandler(
+                    stdoutHandle: stdoutPipe.fileHandleForReading,
+                    stderrHandle: stderrPipe.fileHandleForReading,
+                    outputBuffer: outputBuffer,
+                    onOutput: onOutput,
+                    state: state,
+                    continuation: continuation
+                )
 
                 do {
                     try process.run()
@@ -142,6 +119,62 @@ struct ProcessCommandRunner: CommandRunning {
                 onOutput: onOutput
             )
         }
+    }
+
+    private nonisolated func makeTerminationHandler(
+        stdoutHandle: FileHandle,
+        stderrHandle: FileHandle,
+        outputBuffer: OutputBuffer,
+        onOutput: (@MainActor @Sendable (CommandOutputChunk) -> Void)?,
+        state: ProcessRunState,
+        continuation: CheckedContinuation<CommandResult, Error>
+    ) -> @Sendable (Process) -> Void {
+        { process in
+            stdoutHandle.readabilityHandler = nil
+            stderrHandle.readabilityHandler = nil
+
+            if let error = appendTerminationOutput(
+                stdoutHandle: stdoutHandle,
+                stderrHandle: stderrHandle,
+                outputBuffer: outputBuffer,
+                onOutput: onOutput
+            ) {
+                state.resume(continuation, with: .failure(error))
+                return
+            }
+
+            if state.wasCancelled {
+                state.resume(continuation, with: .failure(CancellationError()))
+                return
+            }
+
+            let result = outputBuffer.result(exitCode: process.terminationStatus)
+            let completion: Result<CommandResult, Error> = if result.exitCode == 0 {
+                .success(result)
+            } else {
+                .failure(CommandRunnerError.nonZeroExitCode(result))
+            }
+            state.resume(continuation, with: completion)
+        }
+    }
+
+    private nonisolated func appendTerminationOutput(
+        stdoutHandle: FileHandle,
+        stderrHandle: FileHandle,
+        outputBuffer: OutputBuffer,
+        onOutput: (@MainActor @Sendable (CommandOutputChunk) -> Void)?
+    ) -> CommandRunnerError? {
+        appendRemainingOutput(
+            from: stdoutHandle,
+            stream: .stdout,
+            outputBuffer: outputBuffer,
+            onOutput: onOutput
+        ) ?? appendRemainingOutput(
+            from: stderrHandle,
+            stream: .stderr,
+            outputBuffer: outputBuffer,
+            onOutput: onOutput
+        )
     }
 
     private nonisolated func appendRemainingOutput(

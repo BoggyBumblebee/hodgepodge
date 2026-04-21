@@ -23,10 +23,11 @@ struct HomebrewAPIClient: HomebrewAPIClienting, @unchecked Sendable {
     private let session: URLSession
     private let baseURL: URL
     private let decoder: JSONDecoder
+    private static let defaultAPIPathComponent = "api"
 
     init(
         session: URLSession = .shared,
-        baseURL: URL = HomebrewAPIClient.defaultBaseURL,
+        baseURL: URL = HomebrewAPIClient.defaultBaseURL(),
         decoder: JSONDecoder = JSONDecoder()
     ) {
         self.session = session
@@ -76,18 +77,19 @@ struct HomebrewAPIClient: HomebrewAPIClienting, @unchecked Sendable {
         return try decoder.decode(Response.self, from: data)
     }
 
-    private static let defaultBaseURL: URL = {
+    private static func defaultBaseURL(
+        apiPathComponent: String = defaultAPIPathComponent
+    ) -> URL {
         var components = URLComponents()
         components.scheme = "https"
         components.host = "formulae.brew.sh"
-        components.path = "/api"
 
-        guard let url = components.url else {
+        guard let hostURL = components.url else {
             preconditionFailure("Unable to build the default Homebrew API base URL.")
         }
 
-        return url
-    }()
+        return hostURL.appendingPathComponent(apiPathComponent)
+    }
 }
 
 private struct FormulaSummaryResponse: Decodable {
