@@ -24,6 +24,7 @@ final class ViewRenderingTests: XCTestCase {
         let installedPackagesModel = makeInstalledPackagesModel()
         let outdatedPackagesModel = makeOutdatedPackagesModel()
         let servicesModel = makeServicesModel()
+        let maintenanceModel = makeMaintenanceModel()
 
         model.selectedSection = .overview
         XCTAssertNotNil(render(
@@ -32,7 +33,8 @@ final class ViewRenderingTests: XCTestCase {
                 catalogModel: catalogModel,
                 installedPackagesModel: installedPackagesModel,
                 outdatedPackagesModel: outdatedPackagesModel,
-                servicesModel: servicesModel
+                servicesModel: servicesModel,
+                maintenanceModel: maintenanceModel
             )
         ))
 
@@ -43,7 +45,8 @@ final class ViewRenderingTests: XCTestCase {
                 catalogModel: catalogModel,
                 installedPackagesModel: installedPackagesModel,
                 outdatedPackagesModel: outdatedPackagesModel,
-                servicesModel: servicesModel
+                servicesModel: servicesModel,
+                maintenanceModel: maintenanceModel
             )
         ))
 
@@ -54,7 +57,8 @@ final class ViewRenderingTests: XCTestCase {
                 catalogModel: catalogModel,
                 installedPackagesModel: installedPackagesModel,
                 outdatedPackagesModel: outdatedPackagesModel,
-                servicesModel: servicesModel
+                servicesModel: servicesModel,
+                maintenanceModel: maintenanceModel
             )
         ))
 
@@ -65,7 +69,8 @@ final class ViewRenderingTests: XCTestCase {
                 catalogModel: catalogModel,
                 installedPackagesModel: installedPackagesModel,
                 outdatedPackagesModel: outdatedPackagesModel,
-                servicesModel: servicesModel
+                servicesModel: servicesModel,
+                maintenanceModel: maintenanceModel
             )
         ))
 
@@ -76,7 +81,20 @@ final class ViewRenderingTests: XCTestCase {
                 catalogModel: catalogModel,
                 installedPackagesModel: installedPackagesModel,
                 outdatedPackagesModel: outdatedPackagesModel,
-                servicesModel: servicesModel
+                servicesModel: servicesModel,
+                maintenanceModel: maintenanceModel
+            )
+        ))
+
+        model.selectedSection = .maintenance
+        XCTAssertNotNil(render(
+            RootView(
+                model: model,
+                catalogModel: catalogModel,
+                installedPackagesModel: installedPackagesModel,
+                outdatedPackagesModel: outdatedPackagesModel,
+                servicesModel: servicesModel,
+                maintenanceModel: maintenanceModel
             )
         ))
     }
@@ -255,6 +273,28 @@ final class ViewRenderingTests: XCTestCase {
         XCTAssertNotNil(render(ServicesView(viewModel: viewModel)))
     }
 
+    func testMaintenanceViewRendersLoadedState() {
+        let viewModel = makeMaintenanceModel()
+        viewModel.dashboardState = .loaded(.fixture())
+        viewModel.selectedOutputSource = .liveAction
+        viewModel.actionState = .running(
+            BrewMaintenanceActionProgress(
+                command: BrewMaintenanceActionCommand(task: .cleanup, arguments: ["cleanup"]),
+                startedAt: Date(timeIntervalSince1970: 1_000)
+            )
+        )
+        viewModel.actionLogs = [
+            CommandLogEntry(
+                id: 0,
+                kind: .stdout,
+                text: "Removing...",
+                timestamp: Date(timeIntervalSince1970: 1_001)
+            )
+        ]
+
+        XCTAssertNotNil(render(MaintenanceView(viewModel: viewModel)))
+    }
+
     private func makeModel() -> AppModel {
         AppModel(
             brewLocator: ViewTestBrewLocator(),
@@ -289,6 +329,13 @@ final class ViewRenderingTests: XCTestCase {
         ServicesViewModel(
             provider: ViewTestBrewServicesProvider(),
             commandExecutor: ViewTestServicesCommandExecutor()
+        )
+    }
+
+    private func makeMaintenanceModel() -> MaintenanceViewModel {
+        MaintenanceViewModel(
+            provider: ViewTestBrewMaintenanceProvider(),
+            commandExecutor: ViewTestMaintenanceCommandExecutor()
         )
     }
 
@@ -404,6 +451,21 @@ private struct ViewTestBrewServicesProvider: BrewServicesProviding {
 }
 
 private struct ViewTestServicesCommandExecutor: BrewCommandExecuting {
+    func execute(
+        arguments: [String],
+        onLog: @escaping @MainActor @Sendable (CatalogPackageActionLogKind, String) -> Void
+    ) async throws -> CommandResult {
+        CommandResult(stdout: "", stderr: "", exitCode: 0)
+    }
+}
+
+private struct ViewTestBrewMaintenanceProvider: BrewMaintenanceProviding {
+    func fetchDashboard() async throws -> BrewMaintenanceDashboard {
+        .fixture()
+    }
+}
+
+private struct ViewTestMaintenanceCommandExecutor: BrewCommandExecuting {
     func execute(
         arguments: [String],
         onLog: @escaping @MainActor @Sendable (CatalogPackageActionLogKind, String) -> Void

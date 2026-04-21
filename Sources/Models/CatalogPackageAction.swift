@@ -131,66 +131,8 @@ struct CatalogPackageActionHistoryEntry: Codable, Identifiable, Equatable, Senda
     }
 }
 
-struct CatalogPackageActionProgress: Equatable, Sendable {
-    let command: CatalogPackageActionCommand
-    let startedAt: Date
-    let finishedAt: Date?
-
-    init(
-        command: CatalogPackageActionCommand,
-        startedAt: Date,
-        finishedAt: Date? = nil
-    ) {
-        self.command = command
-        self.startedAt = startedAt
-        self.finishedAt = finishedAt
-    }
-
-    func finished(at date: Date) -> CatalogPackageActionProgress {
-        CatalogPackageActionProgress(
-            command: command,
-            startedAt: startedAt,
-            finishedAt: date
-        )
-    }
-
-    func elapsedTime(at referenceDate: Date = .now) -> TimeInterval {
-        let endDate = finishedAt ?? referenceDate
-        return max(0, endDate.timeIntervalSince(startedAt))
-    }
-}
-
-enum CatalogPackageActionState: Equatable, Sendable {
-    case idle
-    case running(CatalogPackageActionProgress)
-    case succeeded(CatalogPackageActionProgress, CommandResult)
-    case failed(CatalogPackageActionProgress, String)
-    case cancelled(CatalogPackageActionProgress)
-
-    var command: CatalogPackageActionCommand? {
-        progress?.command
-    }
-
-    var progress: CatalogPackageActionProgress? {
-        switch self {
-        case .idle:
-            nil
-        case .running(let progress),
-                .succeeded(let progress, _),
-                .failed(let progress, _),
-                .cancelled(let progress):
-            progress
-        }
-    }
-
-    var isRunning: Bool {
-        if case .running = self {
-            return true
-        }
-
-        return false
-    }
-}
+typealias CatalogPackageActionProgress = CommandExecutionProgress<CatalogPackageActionCommand>
+typealias CatalogPackageActionState = CommandExecutionState<CatalogPackageActionCommand>
 
 extension CatalogPackageDetail {
     var packageID: String {

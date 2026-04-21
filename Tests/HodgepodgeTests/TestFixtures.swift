@@ -173,3 +173,89 @@ extension BrewService {
         )
     }
 }
+
+extension BrewConfigSnapshot {
+    static func fixture(
+        values: [String: String] = [
+            "HOMEBREW_VERSION": "5.1.7",
+            "HOMEBREW_PREFIX": "/opt/homebrew",
+            "macOS": "26.4.1-arm64",
+            "Xcode": "26.4.1",
+            "Branch": "stable",
+            "Core tap JSON": "21 Apr 20:33 UTC"
+        ],
+        rawOutput: String = """
+        HOMEBREW_VERSION: 5.1.7
+        HOMEBREW_PREFIX: /opt/homebrew
+        macOS: 26.4.1-arm64
+        Xcode: 26.4.1
+        Branch: stable
+        Core tap JSON: 21 Apr 20:33 UTC
+        """
+    ) -> BrewConfigSnapshot {
+        BrewConfigSnapshot(values: values, rawOutput: rawOutput)
+    }
+}
+
+extension BrewDoctorSnapshot {
+    static func fixture(
+        warningCount: Int = 2,
+        warnings: [String] = [
+            "The following directories are not writable by your user.",
+            "Some installed casks are deprecated or disabled."
+        ],
+        rawOutput: String = """
+        Warning: The following directories are not writable by your user.
+        Warning: Some installed casks are deprecated or disabled.
+        """
+    ) -> BrewDoctorSnapshot {
+        BrewDoctorSnapshot(warningCount: warningCount, warnings: warnings, rawOutput: rawOutput)
+    }
+}
+
+extension BrewMaintenanceDryRunSnapshot {
+    static func fixture(
+        task: BrewMaintenanceTask = .cleanup,
+        itemCount: Int = 1,
+        spaceFreedEstimate: String? = "2.3KB",
+        warnings: [String] = [],
+        items: [String] = ["/Users/cmb/Library/Caches/Homebrew/example.tar.gz"],
+        rawOutput: String = """
+        Would remove: /Users/cmb/Library/Caches/Homebrew/example.tar.gz
+        ==> This operation would free approximately 2.3KB of disk space.
+        """
+    ) -> BrewMaintenanceDryRunSnapshot {
+        BrewMaintenanceDryRunSnapshot(
+            task: task,
+            itemCount: itemCount,
+            spaceFreedEstimate: spaceFreedEstimate,
+            warnings: warnings,
+            items: items,
+            rawOutput: rawOutput
+        )
+    }
+}
+
+extension BrewMaintenanceDashboard {
+    static func fixture(
+        config: BrewConfigSnapshot = .fixture(),
+        doctor: BrewDoctorSnapshot = .fixture(),
+        cleanup: BrewMaintenanceDryRunSnapshot = .fixture(task: .cleanup),
+        autoremove: BrewMaintenanceDryRunSnapshot = .fixture(
+            task: .autoremove,
+            itemCount: 0,
+            spaceFreedEstimate: nil,
+            items: [],
+            rawOutput: ""
+        ),
+        capturedAt: Date = Date(timeIntervalSince1970: 1_700_000_000)
+    ) -> BrewMaintenanceDashboard {
+        BrewMaintenanceDashboard(
+            config: config,
+            doctor: doctor,
+            cleanup: cleanup,
+            autoremove: autoremove,
+            capturedAt: capturedAt
+        )
+    }
+}

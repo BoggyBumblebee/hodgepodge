@@ -21,7 +21,7 @@ struct BrewService: Identifiable, Equatable, Hashable, Sendable {
     let interval: String?
     let cron: String?
 
-    var id: String { name }
+    var id: String { serviceName }
 
     var title: String {
         name
@@ -219,57 +219,5 @@ struct BrewServiceActionCommand: Equatable, Sendable {
     }
 }
 
-struct BrewServiceActionProgress: Equatable, Sendable {
-    let command: BrewServiceActionCommand
-    let startedAt: Date
-    let finishedAt: Date?
-
-    init(
-        command: BrewServiceActionCommand,
-        startedAt: Date,
-        finishedAt: Date? = nil
-    ) {
-        self.command = command
-        self.startedAt = startedAt
-        self.finishedAt = finishedAt
-    }
-
-    func finished(at date: Date) -> BrewServiceActionProgress {
-        BrewServiceActionProgress(command: command, startedAt: startedAt, finishedAt: date)
-    }
-
-    func elapsedTime(at referenceDate: Date = .now) -> TimeInterval {
-        max(0, (finishedAt ?? referenceDate).timeIntervalSince(startedAt))
-    }
-}
-
-enum BrewServiceActionState: Equatable, Sendable {
-    case idle
-    case running(BrewServiceActionProgress)
-    case succeeded(BrewServiceActionProgress, CommandResult)
-    case failed(BrewServiceActionProgress, String)
-    case cancelled(BrewServiceActionProgress)
-
-    var command: BrewServiceActionCommand? {
-        progress?.command
-    }
-
-    var progress: BrewServiceActionProgress? {
-        switch self {
-        case .idle:
-            nil
-        case .running(let progress),
-                .succeeded(let progress, _),
-                .failed(let progress, _),
-                .cancelled(let progress):
-            progress
-        }
-    }
-
-    var isRunning: Bool {
-        if case .running = self {
-            return true
-        }
-        return false
-    }
-}
+typealias BrewServiceActionProgress = CommandExecutionProgress<BrewServiceActionCommand>
+typealias BrewServiceActionState = CommandExecutionState<BrewServiceActionCommand>
