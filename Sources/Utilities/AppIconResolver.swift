@@ -1,14 +1,42 @@
 import AppKit
 
+@MainActor
+protocol ApplicationIconImageProviding {
+    var resolvedApplicationIconImage: NSImage? { get }
+}
+
+protocol WorkspaceFileIconProviding {
+    func icon(forFile path: String) -> NSImage
+}
+
+protocol BundleImageResourceQuerying {
+    var bundlePath: String { get }
+    func image(named name: String) -> NSImage?
+}
+
+@MainActor
+extension NSApplication: ApplicationIconImageProviding {
+    var resolvedApplicationIconImage: NSImage? {
+        applicationIconImage
+    }
+}
+
+extension NSWorkspace: WorkspaceFileIconProviding {}
+
+extension Bundle: BundleImageResourceQuerying {
+    func image(named name: String) -> NSImage? {
+        image(forResource: name)
+    }
+}
+
 enum AppIconResolver {
     @MainActor
     static func resolvedApplicationIcon(
-        bundle: Bundle = .main,
-        workspace: NSWorkspace = .shared
+        bundle: any BundleImageResourceQuerying = Bundle.main,
+        workspace: any WorkspaceFileIconProviding = NSWorkspace.shared,
+        application: any ApplicationIconImageProviding = NSApplication.shared
     ) -> NSImage? {
-        let application = NSApplication.shared
-
-        if let icon = application.applicationIconImage {
+        if let icon = application.resolvedApplicationIconImage, icon.isValid {
             return icon
         }
 
@@ -17,7 +45,7 @@ enum AppIconResolver {
             return workspaceIcon
         }
 
-        return bundle.image(forResource: "AppIcon")
+        return bundle.image(named: "AppIcon")
     }
 }
 
