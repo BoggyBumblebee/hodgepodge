@@ -3,6 +3,7 @@ import SwiftUI
 struct RootView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var catalogModel: CatalogViewModel
+    @ObservedObject var installedPackagesModel: InstalledPackagesViewModel
 
     var body: some View {
         NavigationSplitView {
@@ -26,7 +27,9 @@ struct RootView: View {
             OverviewView(model: model)
         case .catalog:
             CatalogView(viewModel: catalogModel)
-        case .installed, .outdated, .services, .taps, .brewfile, .maintenance, .commandCenter, .settings:
+        case .installed:
+            InstalledPackagesView(viewModel: installedPackagesModel)
+        case .outdated, .services, .taps, .brewfile, .maintenance, .commandCenter, .settings:
             PlaceholderFeatureView(section: model.selectedSection ?? .overview)
         }
     }

@@ -21,12 +21,34 @@ final class ViewRenderingTests: XCTestCase {
     func testRootViewRendersOverviewAndPlaceholderSections() {
         let model = makeModel()
         let catalogModel = makeCatalogModel()
+        let installedPackagesModel = makeInstalledPackagesModel()
 
         model.selectedSection = .overview
-        XCTAssertNotNil(render(RootView(model: model, catalogModel: catalogModel)))
+        XCTAssertNotNil(render(
+            RootView(
+                model: model,
+                catalogModel: catalogModel,
+                installedPackagesModel: installedPackagesModel
+            )
+        ))
 
         model.selectedSection = .catalog
-        XCTAssertNotNil(render(RootView(model: model, catalogModel: catalogModel)))
+        XCTAssertNotNil(render(
+            RootView(
+                model: model,
+                catalogModel: catalogModel,
+                installedPackagesModel: installedPackagesModel
+            )
+        ))
+
+        model.selectedSection = .installed
+        XCTAssertNotNil(render(
+            RootView(
+                model: model,
+                catalogModel: catalogModel,
+                installedPackagesModel: installedPackagesModel
+            )
+        ))
     }
 
     func testPlaceholderFeatureViewRenders() {
@@ -114,6 +136,36 @@ final class ViewRenderingTests: XCTestCase {
         XCTAssertNotNil(render(CatalogView(viewModel: viewModel)))
     }
 
+    func testInstalledPackagesViewRendersLoadedState() {
+        let package = InstalledPackage(
+            kind: .formula,
+            slug: "wget",
+            title: "wget",
+            fullName: "homebrew/core/wget",
+            subtitle: "Internet file retriever",
+            version: "1.25.0",
+            homepage: URL(string: "https://example.com/wget"),
+            tap: "homebrew/core",
+            installedVersions: ["1.25.0"],
+            installedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            linkedVersion: "1.25.0",
+            isPinned: true,
+            isLinked: true,
+            isOutdated: false,
+            isInstalledOnRequest: true,
+            isInstalledAsDependency: false,
+            autoUpdates: false,
+            isDeprecated: false,
+            isDisabled: false,
+            runtimeDependencies: ["openssl@3"]
+        )
+        let viewModel = makeInstalledPackagesModel()
+        viewModel.packagesState = .loaded([package])
+        viewModel.selectedPackage = package
+
+        XCTAssertNotNil(render(InstalledPackagesView(viewModel: viewModel)))
+    }
+
     private func makeModel() -> AppModel {
         AppModel(
             brewLocator: ViewTestBrewLocator(),
@@ -127,6 +179,12 @@ final class ViewRenderingTests: XCTestCase {
         CatalogViewModel(
             apiClient: ViewTestCatalogAPIClient(),
             commandExecutor: ViewTestBrewCommandExecutor()
+        )
+    }
+
+    private func makeInstalledPackagesModel() -> InstalledPackagesViewModel {
+        InstalledPackagesViewModel(
+            provider: ViewTestInstalledPackagesProvider()
         )
     }
 
@@ -204,5 +262,11 @@ private struct ViewTestBrewCommandExecutor: BrewCommandExecuting, Sendable {
     ) async throws -> CommandResult {
         await onLog(.system, "$ /opt/homebrew/bin/brew \(command.arguments.joined(separator: " "))")
         return CommandResult(stdout: "", stderr: "", exitCode: 0)
+    }
+}
+
+private struct ViewTestInstalledPackagesProvider: InstalledPackagesProviding {
+    func fetchInstalledPackages() async throws -> [InstalledPackage] {
+        []
     }
 }
