@@ -114,7 +114,7 @@ Contributions are welcome. A good contribution path is:
 
 ## License
 
-Distributed under the MIT License. See [LICENSE.md](/Users/cmb/Workspace/github.com/boggybumblebee/hodgepodge/LICENSE.md).
+Distributed under the MIT License. See [LICENSE.md](LICENSE.md).
 
 ## Contact
 
