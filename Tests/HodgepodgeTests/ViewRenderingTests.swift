@@ -246,6 +246,20 @@ final class ViewRenderingTests: XCTestCase {
         let viewModel = makeOutdatedPackagesModel()
         viewModel.packagesState = .loaded([package])
         viewModel.selectedPackage = package
+        viewModel.actionState = .running(
+            OutdatedPackageActionProgress(
+                command: package.actionCommand(for: .upgrade),
+                startedAt: Date(timeIntervalSince1970: 1_000)
+            )
+        )
+        viewModel.actionLogs = [
+            CommandLogEntry(
+                id: 0,
+                kind: .stdout,
+                text: "Pouring...",
+                timestamp: Date(timeIntervalSince1970: 1_001)
+            )
+        ]
 
         XCTAssertNotNil(render(OutdatedPackagesView(viewModel: viewModel)))
     }
@@ -321,7 +335,8 @@ final class ViewRenderingTests: XCTestCase {
 
     private func makeOutdatedPackagesModel() -> OutdatedPackagesViewModel {
         OutdatedPackagesViewModel(
-            provider: ViewTestOutdatedPackagesProvider()
+            provider: ViewTestOutdatedPackagesProvider(),
+            commandExecutor: ViewTestOutdatedCommandExecutor()
         )
     }
 
@@ -441,6 +456,15 @@ private struct ViewTestInstalledPackagesProvider: InstalledPackagesProviding {
 private struct ViewTestOutdatedPackagesProvider: OutdatedPackagesProviding {
     func fetchOutdatedPackages() async throws -> [OutdatedPackage] {
         []
+    }
+}
+
+private struct ViewTestOutdatedCommandExecutor: BrewCommandExecuting {
+    func execute(
+        arguments: [String],
+        onLog: @escaping @MainActor @Sendable (CatalogPackageActionLogKind, String) -> Void
+    ) async throws -> CommandResult {
+        CommandResult(stdout: "", stderr: "", exitCode: 0)
     }
 }
 

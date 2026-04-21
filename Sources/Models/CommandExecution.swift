@@ -55,3 +55,73 @@ enum CommandExecutionState<Command: Equatable & Sendable>: Equatable, Sendable {
         return false
     }
 }
+
+struct CommandLogBuffer: Equatable, Sendable {
+    private(set) var entries: [CommandLogEntry] = []
+    private var nextIdentifier = 0
+    private var pendingText: [CommandLogKind: String] = [:]
+
+    mutating func reset() {
+        entries.removeAll()
+        nextIdentifier = 0
+        pendingText.removeAll()
+    }
+
+    mutating func append(
+        _ kind: CommandLogKind,
+        _ text: String,
+        timestamp: Date = Date()
+    ) {
+        switch kind {
+        case .system:
+            let line = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !line.isEmpty else {
+                return
+            }
+            appendLine(kind, line, timestamp: timestamp)
+        case .stdout, .stderr:
+            var buffered = pendingText[kind, default: ""]
+            buffered.append(text)
+
+            let lines = buffered.components(separatedBy: .newlines)
+            pendingText[kind] = lines.last ?? ""
+
+            for line in lines.dropLast() {
+                let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else {
+                    continue
+                }
+                appendLine(kind, trimmed, timestamp: timestamp)
+            }
+        }
+    }
+
+    mutating func flush(timestamp: Date = Date()) {
+        for kind in [CommandLogKind.stdout, .stderr] {
+            let line = pendingText[kind, default: ""].trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !line.isEmpty else {
+                continue
+            }
+
+            appendLine(kind, line, timestamp: timestamp)
+        }
+
+        pendingText.removeAll()
+    }
+
+    private mutating func appendLine(
+        _ kind: CommandLogKind,
+        _ line: String,
+        timestamp: Date
+    ) {
+        entries.append(
+            CommandLogEntry(
+                id: nextIdentifier,
+                kind: kind,
+                text: line,
+                timestamp: timestamp
+            )
+        )
+        nextIdentifier += 1
+    }
+}

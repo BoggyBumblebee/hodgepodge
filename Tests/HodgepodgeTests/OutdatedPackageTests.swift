@@ -40,6 +40,18 @@ final class OutdatedPackageTests: XCTestCase {
         )
     }
 
+    func testActionCommandAndUpgradeAvailabilityReflectPinnedState() {
+        let formula = OutdatedPackage.fixture(slug: "wget")
+        let cask = OutdatedPackage.fixture(kind: .cask, slug: "docker-desktop")
+        let pinned = OutdatedPackage.fixture(isPinned: true, pinnedVersion: "1.24.5")
+
+        XCTAssertEqual(formula.actionCommand(for: .upgrade).arguments, ["upgrade", "wget"])
+        XCTAssertEqual(cask.actionCommand(for: .upgrade).arguments, ["upgrade", "--cask", "docker-desktop"])
+        XCTAssertTrue(formula.isUpgradeAvailable)
+        XCTAssertFalse(pinned.isUpgradeAvailable)
+        XCTAssertEqual(pinned.upgradeBlockedReason, "Pinned at 1.24.5. Unpin before upgrading.")
+    }
+
     func testOutdatedPackageFilterAndSortTitlesAreStable() {
         XCTAssertEqual(OutdatedPackageFilterOption.pinned.title, "Pinned")
         XCTAssertEqual(OutdatedPackageSortOption.name.title, "Name")

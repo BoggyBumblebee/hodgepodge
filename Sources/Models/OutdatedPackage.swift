@@ -7,6 +7,42 @@ enum OutdatedPackagesLoadState: Equatable {
     case failed(String)
 }
 
+enum OutdatedPackageActionKind: String, CaseIterable, Equatable, Identifiable, Sendable {
+    case upgrade
+
+    var id: String { rawValue }
+
+    var title: String {
+        "Upgrade"
+    }
+
+    var requiresConfirmation: Bool {
+        true
+    }
+}
+
+struct OutdatedPackageActionCommand: Equatable, Sendable {
+    let kind: OutdatedPackageActionKind
+    let packageID: String
+    let packageTitle: String
+    let arguments: [String]
+
+    var command: String {
+        "brew \(arguments.joined(separator: " "))"
+    }
+
+    var confirmationTitle: String {
+        "\(kind.title) \(packageTitle)?"
+    }
+
+    var confirmationMessage: String {
+        "Hodgepodge will run `\(command)` using your local Homebrew installation."
+    }
+}
+
+typealias OutdatedPackageActionProgress = CommandExecutionProgress<OutdatedPackageActionCommand>
+typealias OutdatedPackageActionState = CommandExecutionState<OutdatedPackageActionCommand>
+
 enum OutdatedPackageFilterOption: String, CaseIterable, Identifiable, Hashable {
     case pinned
 
@@ -75,19 +111,45 @@ struct OutdatedPackage: Identifiable, Equatable, Hashable, Sendable {
         "brew upgrade \(kind.installCommandFlag)\(slug)"
     }
 
-    var upgradeReadinessDescription: String {
+    var isUpgradeAvailable: Bool {
+        !isPinned
+    }
+
+    var upgradeBlockedReason: String? {
+        guard !isUpgradeAvailable else {
+            return nil
+        }
+
         if let pinnedVersion, !pinnedVersion.isEmpty {
             return "Pinned at \(pinnedVersion). Unpin before upgrading."
         }
 
-        if isPinned {
-            return "Pinned. Unpin before upgrading."
-        }
+        return "Pinned. Unpin before upgrading."
+    }
 
-        return "Ready to upgrade to \(currentVersion)."
+    var upgradeReadinessDescription: String {
+        upgradeBlockedReason ?? "Ready to upgrade to \(currentVersion)."
     }
 
     var primaryInstalledVersion: String {
         installedVersions.first(where: { !$0.isEmpty }) ?? "Unknown"
+    }
+
+    func actionCommand(for kind: OutdatedPackageActionKind) -> OutdatedPackageActionCommand {
+        OutdatedPackageActionCommand(
+            kind: kind,
+            packageID: id,
+            packageTitle: title,
+            arguments: upgradeCommandArguments
+        )
+    }
+
+    private var upgradeCommandArguments: [String] {
+        var arguments = ["upgrade"]
+        if self.kind == .cask {
+            arguments.append("--cask")
+        }
+        arguments.append(slug)
+        return arguments
     }
 }

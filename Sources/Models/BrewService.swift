@@ -28,7 +28,11 @@ struct BrewService: Identifiable, Equatable, Hashable, Sendable {
     }
 
     var subtitle: String {
-        serviceName
+        if serviceName == name {
+            return file ?? serviceName
+        }
+
+        return serviceName
     }
 
     var statusTitle: String {

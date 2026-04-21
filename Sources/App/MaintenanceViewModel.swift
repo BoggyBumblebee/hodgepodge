@@ -10,8 +10,7 @@ final class MaintenanceViewModel: ObservableObject {
     private let provider: any BrewMaintenanceProviding
     private let commandExecutor: any BrewCommandExecuting
     private var actionTask: Task<Void, Never>?
-    private var nextLogIdentifier = 0
-    private var pendingLogText: [CommandLogKind: String] = [:]
+    private var logBuffer = CommandLogBuffer()
 
     init(
         provider: any BrewMaintenanceProviding,
@@ -132,56 +131,18 @@ final class MaintenanceViewModel: ObservableObject {
     }
 
     private func resetActionOutput() {
-        nextLogIdentifier = 0
-        pendingLogText = [:]
+        logBuffer.reset()
         actionLogs = []
     }
 
     private func appendLog(_ kind: CommandLogKind, _ text: String) {
-        guard !text.isEmpty else {
-            return
-        }
-
-        let combined = (pendingLogText[kind] ?? "") + text
-        let segments = combined.split(separator: "\n", omittingEmptySubsequences: false)
-
-        if combined.hasSuffix("\n") {
-            pendingLogText[kind] = nil
-            for segment in segments where !segment.isEmpty {
-                addLogEntry(kind: kind, text: String(segment))
-            }
-            return
-        }
-
-        pendingLogText[kind] = segments.last.map(String.init)
-        for segment in segments.dropLast() where !segment.isEmpty {
-            addLogEntry(kind: kind, text: String(segment))
-        }
+        logBuffer.append(kind, text)
+        actionLogs = logBuffer.entries
     }
 
     private func flushPendingLogs() {
-        let pending = pendingLogText
-        pendingLogText = [:]
-
-        for kind in CommandLogKind.allCases {
-            guard let text = pending[kind], !text.isEmpty else {
-                continue
-            }
-
-            addLogEntry(kind: kind, text: text)
-        }
-    }
-
-    private func addLogEntry(kind: CommandLogKind, text: String) {
-        actionLogs.append(
-            CommandLogEntry(
-                id: nextLogIdentifier,
-                kind: kind,
-                text: text,
-                timestamp: Date()
-            )
-        )
-        nextLogIdentifier += 1
+        logBuffer.flush()
+        actionLogs = logBuffer.entries
     }
 
     private func renderLogLine(_ entry: CommandLogEntry) -> String {

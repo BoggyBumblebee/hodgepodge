@@ -23,7 +23,8 @@ final class OutdatedPackagesViewModelTests: XCTestCase {
             )
         ]
         let viewModel = OutdatedPackagesViewModel(
-            provider: MockOutdatedPackagesProvider(result: .success(packages))
+            provider: MockOutdatedPackagesProvider(result: .success(packages)),
+            commandExecutor: MockOutdatedBrewCommandExecutor()
         )
 
         viewModel.loadIfNeeded()
@@ -63,7 +64,8 @@ final class OutdatedPackagesViewModelTests: XCTestCase {
             )
         ]
         let viewModel = OutdatedPackagesViewModel(
-            provider: MockOutdatedPackagesProvider(result: .success(packages))
+            provider: MockOutdatedPackagesProvider(result: .success(packages)),
+            commandExecutor: MockOutdatedBrewCommandExecutor()
         )
         viewModel.packagesState = .loaded(packages)
 
@@ -87,7 +89,8 @@ final class OutdatedPackagesViewModelTests: XCTestCase {
         let viewModel = OutdatedPackagesViewModel(
             provider: MockOutdatedPackagesProvider(
                 result: .failure(HomebrewAPIClientError.requestFailed(503))
-            )
+            ),
+            commandExecutor: MockOutdatedBrewCommandExecutor()
         )
 
         viewModel.refreshPackages()
@@ -104,7 +107,8 @@ final class OutdatedPackagesViewModelTests: XCTestCase {
 
     func testToggleAndClearFiltersUpdateState() {
         let viewModel = OutdatedPackagesViewModel(
-            provider: MockOutdatedPackagesProvider(result: .success([]))
+            provider: MockOutdatedPackagesProvider(result: .success([])),
+            commandExecutor: MockOutdatedBrewCommandExecutor()
         )
 
         XCTAssertFalse(viewModel.isFilterActive(.pinned))
@@ -119,7 +123,10 @@ final class OutdatedPackagesViewModelTests: XCTestCase {
 
     func testLoadIfNeededDoesNotRefreshWhenAlreadyLoaded() async {
         let provider = CountingOutdatedPackagesProvider(result: .success([.fixture()]))
-        let viewModel = OutdatedPackagesViewModel(provider: provider)
+        let viewModel = OutdatedPackagesViewModel(
+            provider: provider,
+            commandExecutor: MockOutdatedBrewCommandExecutor()
+        )
         viewModel.packagesState = .loaded([.fixture()])
 
         viewModel.loadIfNeeded()
@@ -144,7 +151,10 @@ final class OutdatedPackagesViewModelTests: XCTestCase {
             currentVersion: "1.25.1"
         )
         let provider = CyclingOutdatedPackagesProvider(results: [[original], [refreshed]])
-        let viewModel = OutdatedPackagesViewModel(provider: provider)
+        let viewModel = OutdatedPackagesViewModel(
+            provider: provider,
+            commandExecutor: MockOutdatedBrewCommandExecutor()
+        )
 
         viewModel.loadIfNeeded()
         await waitUntil {
@@ -157,6 +167,75 @@ final class OutdatedPackagesViewModelTests: XCTestCase {
         }
 
         XCTAssertEqual(viewModel.selectedPackage, refreshed)
+    }
+
+    func testRunActionStoresSuccessStateAndRetainsSelectionWhenPackageLeavesOutdatedList() async {
+        let original = OutdatedPackage.fixture(slug: "wget", currentVersion: "1.25.0")
+        let provider = CyclingOutdatedPackagesProvider(results: [[]])
+        let executor = MockOutdatedBrewCommandExecutor(
+            result: .success(CommandResult(stdout: "Upgraded\n", stderr: "", exitCode: 0)),
+            chunks: [.init(stream: .stdout, text: "Pouring...\n")]
+        )
+        let viewModel = OutdatedPackagesViewModel(
+            provider: provider,
+            commandExecutor: executor
+        )
+        viewModel.packagesState = .loaded([original])
+        viewModel.selectedPackage = original
+
+        viewModel.runAction(.upgrade, for: original)
+        await waitUntil {
+            if case .succeeded = viewModel.actionState {
+                return true
+            }
+            return false
+        }
+        await waitUntil {
+            if case .loaded(let packages) = viewModel.packagesState {
+                return packages.isEmpty
+            }
+            return false
+        }
+
+        XCTAssertEqual(executor.arguments, ["upgrade", "wget"])
+        XCTAssertEqual(viewModel.selectedPackage, original)
+        XCTAssertTrue(viewModel.actionLogs.contains(where: { $0.text == "Pouring..." }))
+        XCTAssertFalse(viewModel.isPackageInCurrentSnapshot(original))
+    }
+
+    func testRunActionStoresFailureState() async {
+        let package = OutdatedPackage.fixture(slug: "wget")
+        let viewModel = OutdatedPackagesViewModel(
+            provider: MockOutdatedPackagesProvider(result: .success([package])),
+            commandExecutor: MockOutdatedBrewCommandExecutor(
+                result: .failure(CommandRunnerError.nonZeroExitCode(
+                    CommandResult(stdout: "", stderr: "Already installed\n", exitCode: 1)
+                ))
+            )
+        )
+
+        viewModel.runAction(.upgrade, for: package)
+        await waitUntil {
+            if case .failed = viewModel.actionState {
+                return true
+            }
+            return false
+        }
+    }
+
+    func testPinnedPackageDoesNotStartUpgradeAction() async {
+        let package = OutdatedPackage.fixture(isPinned: true, pinnedVersion: "1.24.5")
+        let executor = MockOutdatedBrewCommandExecutor()
+        let viewModel = OutdatedPackagesViewModel(
+            provider: MockOutdatedPackagesProvider(result: .success([package])),
+            commandExecutor: executor
+        )
+
+        viewModel.runAction(.upgrade, for: package)
+        await Task.yield()
+
+        XCTAssertEqual(viewModel.actionState, .idle)
+        XCTAssertTrue(executor.arguments.isEmpty)
     }
 
     private func waitUntil(
@@ -181,6 +260,40 @@ private struct MockOutdatedPackagesProvider: OutdatedPackagesProviding {
 
     func fetchOutdatedPackages() async throws -> [OutdatedPackage] {
         try result.get()
+    }
+}
+
+@MainActor
+private final class MockOutdatedBrewCommandExecutor: BrewCommandExecuting, @unchecked Sendable {
+    let result: Result<CommandResult, Error>
+    let chunks: [CommandOutputChunk]
+    private(set) var arguments: [String] = []
+
+    init(
+        result: Result<CommandResult, Error> = .success(CommandResult(stdout: "", stderr: "", exitCode: 0)),
+        chunks: [CommandOutputChunk] = []
+    ) {
+        self.result = result
+        self.chunks = chunks
+    }
+
+    func execute(
+        arguments: [String],
+        onLog: @escaping @MainActor @Sendable (CatalogPackageActionLogKind, String) -> Void
+    ) async throws -> CommandResult {
+        self.arguments = arguments
+
+        for chunk in chunks {
+            let kind: CatalogPackageActionLogKind = switch chunk.stream {
+            case .stdout:
+                .stdout
+            case .stderr:
+                .stderr
+            }
+            onLog(kind, chunk.text)
+        }
+
+        return try result.get()
     }
 }
 

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct OutdatedPackagesView: View {
     @ObservedObject var viewModel: OutdatedPackagesViewModel
+    @State private var pendingAction: OutdatedPackageActionCommand?
 
     var body: some View {
         HSplitView {
@@ -15,6 +16,33 @@ struct OutdatedPackagesView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task {
             viewModel.loadIfNeeded()
+        }
+        .confirmationDialog(
+            pendingAction?.confirmationTitle ?? "Confirm Upgrade",
+            isPresented: Binding(
+                get: { pendingAction != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        pendingAction = nil
+                    }
+                }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let pendingAction,
+               let package = viewModel.selectedPackage,
+               package.id == pendingAction.packageID {
+                Button(pendingAction.kind.title) {
+                    viewModel.runAction(pendingAction.kind, for: package)
+                    self.pendingAction = nil
+                }
+            }
+
+            Button("Cancel", role: .cancel) {
+                pendingAction = nil
+            }
+        } message: {
+            Text(pendingAction?.confirmationMessage ?? "")
         }
     }
 
@@ -181,7 +209,15 @@ struct OutdatedPackagesView: View {
 
         case .loaded:
             if let package = viewModel.selectedPackage {
-                OutdatedPackageDetailView(package: package)
+                OutdatedPackageDetailView(
+                    package: package,
+                    isCurrentSnapshot: viewModel.isPackageInCurrentSnapshot(package),
+                    actionState: viewModel.actionState(for: package),
+                    actionLogs: viewModel.actionLogs(for: package),
+                    onRunAction: handleAction(_:for:),
+                    onCancelAction: viewModel.cancelAction,
+                    onClearOutput: viewModel.clearActionOutput
+                )
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             } else {
                 ContentUnavailableView(
@@ -191,6 +227,14 @@ struct OutdatedPackagesView: View {
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+        }
+    }
+
+    private func handleAction(_ action: OutdatedPackageActionKind, for package: OutdatedPackage) {
+        if action.requiresConfirmation {
+            pendingAction = package.actionCommand(for: action)
+        } else {
+            viewModel.runAction(action, for: package)
         }
     }
 
@@ -208,6 +252,12 @@ struct OutdatedPackagesView: View {
 
 private struct OutdatedPackageDetailView: View {
     let package: OutdatedPackage
+    let isCurrentSnapshot: Bool
+    let actionState: OutdatedPackageActionState
+    let actionLogs: [CommandLogEntry]
+    let onRunAction: (OutdatedPackageActionKind, OutdatedPackage) -> Void
+    let onCancelAction: () -> Void
+    let onClearOutput: () -> Void
 
     var body: some View {
         ScrollView {
@@ -215,6 +265,7 @@ private struct OutdatedPackageDetailView: View {
                 titleBlock
                 versionCard
                 upgradeCard
+                actionOutputCard
             }
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -254,6 +305,15 @@ private struct OutdatedPackageDetailView: View {
             if !package.statusBadges.isEmpty {
                 OutdatedPackageTagFlow(items: package.statusBadges)
             }
+
+            if !isCurrentSnapshot {
+                Label(
+                    "The latest refresh no longer reports this package as outdated. The detail pane is keeping the last selection visible so you can review the action output.",
+                    systemImage: "checkmark.circle"
+                )
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            }
         }
     }
 
@@ -284,9 +344,71 @@ private struct OutdatedPackageDetailView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
 
-                Text("Phase 3 keeps this view read-only. Upgrade execution will build on this inventory in a later slice.")
-                    .font(.callout)
-                    .foregroundStyle(.tertiary)
+                HStack(spacing: 12) {
+                    Button("Upgrade Now") {
+                        onRunAction(.upgrade, package)
+                    }
+                    .disabled(!package.isUpgradeAvailable || actionState.isRunning)
+                    .keyboardShortcut("u", modifiers: [.command, .option])
+
+                    if actionState.isRunning {
+                        Button("Cancel Upgrade") {
+                            onCancelAction()
+                        }
+                        .keyboardShortcut(.cancelAction)
+                    }
+                }
+
+                if let blockedReason = package.upgradeBlockedReason {
+                    Label(blockedReason, systemImage: "pin")
+                        .font(.callout)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+        }
+    }
+
+    private var actionOutputCard: some View {
+        OutdatedPackageCard(title: "Upgrade Output") {
+            VStack(alignment: .leading, spacing: 12) {
+                if let progress = actionState.progress {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text(statusTitle)
+                                .font(.headline)
+                            Spacer()
+                            Text("Elapsed \(progress.elapsedTime(), format: .number.precision(.fractionLength(1)))s")
+                                .font(.caption.monospaced())
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Text(progress.command.command)
+                            .font(.callout.monospaced())
+                            .textSelection(.enabled)
+                    }
+                } else {
+                    Text("Run an upgrade from this detail pane to stream Homebrew output here.")
+                        .foregroundStyle(.secondary)
+                }
+
+                ScrollView {
+                    Text(renderedLogs)
+                        .font(.system(.body, design: .monospaced))
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                        .textSelection(.enabled)
+                        .padding(.vertical, 4)
+                }
+                .frame(minHeight: 180, alignment: .topLeading)
+                .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+                HStack {
+                    Spacer()
+
+                    Button("Clear Output") {
+                        onClearOutput()
+                    }
+                    .disabled(actionLogs.isEmpty && actionState == .idle)
+                }
             }
         }
     }
@@ -298,6 +420,32 @@ private struct OutdatedPackageDetailView: View {
                 .foregroundStyle(.secondary)
             Text(value)
                 .textSelection(.enabled)
+        }
+    }
+
+    private var renderedLogs: String {
+        if actionLogs.isEmpty {
+            return "No command output yet."
+        }
+
+        return actionLogs.map { entry in
+            "[\(entry.timestamp.formatted(date: .omitted, time: .shortened))] \(entry.kind.rawValue.uppercased())  \(entry.text)"
+        }
+        .joined(separator: "\n")
+    }
+
+    private var statusTitle: String {
+        switch actionState {
+        case .idle:
+            "Idle"
+        case .running:
+            "Running"
+        case .succeeded:
+            "Completed"
+        case .failed:
+            "Failed"
+        case .cancelled:
+            "Cancelled"
         }
     }
 }

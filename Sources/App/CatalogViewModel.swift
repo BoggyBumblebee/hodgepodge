@@ -19,9 +19,8 @@ final class CatalogViewModel: ObservableObject {
     private let actionHistoryExporter: any CatalogActionHistoryExporting
     private var detailCache: [String: CatalogPackageDetail] = [:]
     private var actionTask: Task<Void, Never>?
-    private var nextLogIdentifier = 0
+    private var logBuffer = CommandLogBuffer()
     private var nextHistoryIdentifier = 0
-    private var pendingLogText: [CatalogPackageActionLogKind: String] = [:]
 
     init(
         apiClient: any HomebrewAPIClienting,
@@ -358,59 +357,18 @@ final class CatalogViewModel: ObservableObject {
     }
 
     private func appendLog(_ kind: CatalogPackageActionLogKind, _ text: String, timestamp: Date = Date()) {
-        switch kind {
-        case .system:
-            let line = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !line.isEmpty else {
-                return
-            }
-            appendLogLine(kind, line, timestamp: timestamp)
-        case .stdout, .stderr:
-            var buffered = pendingLogText[kind, default: ""]
-            buffered.append(text)
-
-            let lines = buffered.components(separatedBy: .newlines)
-            pendingLogText[kind] = lines.last ?? ""
-
-            for line in lines.dropLast() {
-                let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !trimmed.isEmpty else {
-                    continue
-                }
-                appendLogLine(kind, trimmed, timestamp: timestamp)
-            }
-        }
-    }
-
-    private func appendLogLine(_ kind: CatalogPackageActionLogKind, _ line: String, timestamp: Date = Date()) {
-        actionLogs.append(
-            CatalogPackageActionLogEntry(
-                id: nextLogIdentifier,
-                kind: kind,
-                text: line,
-                timestamp: timestamp
-            )
-        )
-        nextLogIdentifier += 1
+        logBuffer.append(kind, text, timestamp: timestamp)
+        actionLogs = logBuffer.entries
     }
 
     private func flushPendingLogs() {
-        for kind in [CatalogPackageActionLogKind.stdout, .stderr] {
-            let line = pendingLogText[kind, default: ""].trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !line.isEmpty else {
-                continue
-            }
-
-            appendLogLine(kind, line)
-        }
-
-        pendingLogText.removeAll()
+        logBuffer.flush()
+        actionLogs = logBuffer.entries
     }
 
     private func resetActionOutput() {
-        actionLogs.removeAll()
-        nextLogIdentifier = 0
-        pendingLogText.removeAll()
+        logBuffer.reset()
+        actionLogs = []
     }
 
     private func appendHistoryEntry(
