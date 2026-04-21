@@ -589,11 +589,11 @@ private struct MockBrewCommandExecutor: BrewCommandExecuting, Sendable {
     var events: [(CatalogPackageActionLogKind, String)] = []
 
     func execute(
-        command: CatalogPackageActionCommand,
+        arguments: [String],
         onLog: @escaping @MainActor @Sendable (CatalogPackageActionLogKind, String) -> Void
     ) async throws -> CommandResult {
         await onLog(.system, "Using Homebrew at /opt/homebrew/bin/brew")
-        await onLog(.system, "$ /opt/homebrew/bin/brew \(command.arguments.joined(separator: " "))")
+        await onLog(.system, "$ /opt/homebrew/bin/brew \(arguments.joined(separator: " "))")
 
         for (kind, text) in events {
             await onLog(kind, text)
@@ -605,11 +605,11 @@ private struct MockBrewCommandExecutor: BrewCommandExecuting, Sendable {
 
 private struct SuspendingBrewCommandExecutor: BrewCommandExecuting, Sendable {
     func execute(
-        command: CatalogPackageActionCommand,
+        arguments: [String],
         onLog: @escaping @MainActor @Sendable (CatalogPackageActionLogKind, String) -> Void
     ) async throws -> CommandResult {
         await onLog(.system, "Using Homebrew at /opt/homebrew/bin/brew")
-        await onLog(.system, "$ /opt/homebrew/bin/brew \(command.arguments.joined(separator: " "))")
+        await onLog(.system, "$ /opt/homebrew/bin/brew \(arguments.joined(separator: " "))")
         try await Task.sleep(for: .seconds(60))
         return CommandResult(stdout: "", stderr: "", exitCode: 0)
     }

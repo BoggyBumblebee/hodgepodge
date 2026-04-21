@@ -23,6 +23,7 @@ final class ViewRenderingTests: XCTestCase {
         let catalogModel = makeCatalogModel()
         let installedPackagesModel = makeInstalledPackagesModel()
         let outdatedPackagesModel = makeOutdatedPackagesModel()
+        let servicesModel = makeServicesModel()
 
         model.selectedSection = .overview
         XCTAssertNotNil(render(
@@ -30,7 +31,8 @@ final class ViewRenderingTests: XCTestCase {
                 model: model,
                 catalogModel: catalogModel,
                 installedPackagesModel: installedPackagesModel,
-                outdatedPackagesModel: outdatedPackagesModel
+                outdatedPackagesModel: outdatedPackagesModel,
+                servicesModel: servicesModel
             )
         ))
 
@@ -40,7 +42,8 @@ final class ViewRenderingTests: XCTestCase {
                 model: model,
                 catalogModel: catalogModel,
                 installedPackagesModel: installedPackagesModel,
-                outdatedPackagesModel: outdatedPackagesModel
+                outdatedPackagesModel: outdatedPackagesModel,
+                servicesModel: servicesModel
             )
         ))
 
@@ -50,7 +53,8 @@ final class ViewRenderingTests: XCTestCase {
                 model: model,
                 catalogModel: catalogModel,
                 installedPackagesModel: installedPackagesModel,
-                outdatedPackagesModel: outdatedPackagesModel
+                outdatedPackagesModel: outdatedPackagesModel,
+                servicesModel: servicesModel
             )
         ))
 
@@ -60,7 +64,19 @@ final class ViewRenderingTests: XCTestCase {
                 model: model,
                 catalogModel: catalogModel,
                 installedPackagesModel: installedPackagesModel,
-                outdatedPackagesModel: outdatedPackagesModel
+                outdatedPackagesModel: outdatedPackagesModel,
+                servicesModel: servicesModel
+            )
+        ))
+
+        model.selectedSection = .services
+        XCTAssertNotNil(render(
+            RootView(
+                model: model,
+                catalogModel: catalogModel,
+                installedPackagesModel: installedPackagesModel,
+                outdatedPackagesModel: outdatedPackagesModel,
+                servicesModel: servicesModel
             )
         ))
     }
@@ -216,6 +232,29 @@ final class ViewRenderingTests: XCTestCase {
         XCTAssertNotNil(render(OutdatedPackagesView(viewModel: viewModel)))
     }
 
+    func testServicesViewRendersLoadedState() {
+        let service = BrewService.fixture()
+        let viewModel = makeServicesModel()
+        viewModel.servicesState = .loaded([service])
+        viewModel.selectedService = service
+        viewModel.actionState = .running(
+            BrewServiceActionProgress(
+                command: service.command(for: .restart),
+                startedAt: Date(timeIntervalSince1970: 1_000)
+            )
+        )
+        viewModel.actionLogs = [
+            CommandLogEntry(
+                id: 0,
+                kind: .stdout,
+                text: "Restarting...",
+                timestamp: Date(timeIntervalSince1970: 1_001)
+            )
+        ]
+
+        XCTAssertNotNil(render(ServicesView(viewModel: viewModel)))
+    }
+
     private func makeModel() -> AppModel {
         AppModel(
             brewLocator: ViewTestBrewLocator(),
@@ -243,6 +282,13 @@ final class ViewRenderingTests: XCTestCase {
     private func makeOutdatedPackagesModel() -> OutdatedPackagesViewModel {
         OutdatedPackagesViewModel(
             provider: ViewTestOutdatedPackagesProvider()
+        )
+    }
+
+    private func makeServicesModel() -> ServicesViewModel {
+        ServicesViewModel(
+            provider: ViewTestBrewServicesProvider(),
+            commandExecutor: ViewTestServicesCommandExecutor()
         )
     }
 
@@ -315,10 +361,10 @@ private struct ViewTestCatalogAPIClient: HomebrewAPIClienting, Sendable {
 
 private struct ViewTestBrewCommandExecutor: BrewCommandExecuting, Sendable {
     func execute(
-        command: CatalogPackageActionCommand,
+        arguments: [String],
         onLog: @escaping @MainActor @Sendable (CatalogPackageActionLogKind, String) -> Void
     ) async throws -> CommandResult {
-        await onLog(.system, "$ /opt/homebrew/bin/brew \(command.arguments.joined(separator: " "))")
+        await onLog(.system, "$ /opt/homebrew/bin/brew \(arguments.joined(separator: " "))")
         return CommandResult(stdout: "", stderr: "", exitCode: 0)
     }
 }
@@ -348,5 +394,20 @@ private struct ViewTestInstalledPackagesProvider: InstalledPackagesProviding {
 private struct ViewTestOutdatedPackagesProvider: OutdatedPackagesProviding {
     func fetchOutdatedPackages() async throws -> [OutdatedPackage] {
         []
+    }
+}
+
+private struct ViewTestBrewServicesProvider: BrewServicesProviding {
+    func fetchServices() async throws -> [BrewService] {
+        []
+    }
+}
+
+private struct ViewTestServicesCommandExecutor: BrewCommandExecuting {
+    func execute(
+        arguments: [String],
+        onLog: @escaping @MainActor @Sendable (CatalogPackageActionLogKind, String) -> Void
+    ) async throws -> CommandResult {
+        CommandResult(stdout: "", stderr: "", exitCode: 0)
     }
 }

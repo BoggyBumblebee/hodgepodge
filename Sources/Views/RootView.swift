@@ -5,6 +5,7 @@ struct RootView: View {
     @ObservedObject var catalogModel: CatalogViewModel
     @ObservedObject var installedPackagesModel: InstalledPackagesViewModel
     @ObservedObject var outdatedPackagesModel: OutdatedPackagesViewModel
+    @ObservedObject var servicesModel: ServicesViewModel
 
     var body: some View {
         NavigationSplitView {
@@ -32,7 +33,9 @@ struct RootView: View {
             InstalledPackagesView(viewModel: installedPackagesModel)
         case .outdated:
             OutdatedPackagesView(viewModel: outdatedPackagesModel)
-        case .services, .taps, .brewfile, .maintenance, .commandCenter, .settings:
+        case .services:
+            ServicesView(viewModel: servicesModel)
+        case .taps, .brewfile, .maintenance, .commandCenter, .settings:
             PlaceholderFeatureView(section: model.selectedSection ?? .overview)
         }
     }

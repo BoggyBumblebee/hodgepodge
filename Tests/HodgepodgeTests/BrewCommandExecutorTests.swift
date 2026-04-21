@@ -14,10 +14,9 @@ final class BrewCommandExecutorTests: XCTestCase {
             brewLocator: FixedBrewLocator(),
             runner: runner
         )
-        let command = CatalogPackageDetail.fixture().actionCommand(for: .fetch)
         var logs: [(CatalogPackageActionLogKind, String)] = []
 
-        let result = try await executor.execute(command: command) { kind, text in
+        let result = try await executor.execute(arguments: ["fetch", "wget"]) { kind, text in
             logs.append((kind, text))
         }
 

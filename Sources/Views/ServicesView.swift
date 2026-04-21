@@ -1,0 +1,516 @@
+import SwiftUI
+
+struct ServicesView: View {
+    @ObservedObject var viewModel: ServicesViewModel
+    @State private var pendingAction: BrewServiceActionCommand?
+
+    var body: some View {
+        HSplitView {
+            sidebar
+                .frame(minWidth: 400, idealWidth: 480, maxWidth: 540)
+
+            detail
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .layoutPriority(1)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .task {
+            viewModel.loadIfNeeded()
+        }
+        .confirmationDialog(
+            pendingAction?.confirmationTitle ?? "Confirm Service Action",
+            isPresented: Binding(
+                get: { pendingAction != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        pendingAction = nil
+                    }
+                }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let pendingAction,
+               let service = viewModel.selectedService,
+               service.id == pendingAction.serviceID {
+                Button(pendingAction.kind.title, role: pendingAction.kind == .stop ? .destructive : nil) {
+                    viewModel.runAction(pendingAction.kind, for: service)
+                    self.pendingAction = nil
+                }
+            }
+
+            Button("Cancel", role: .cancel) {
+                pendingAction = nil
+            }
+        } message: {
+            Text(pendingAction?.confirmationMessage ?? "")
+        }
+    }
+
+    private var sidebar: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            header
+
+            switch viewModel.servicesState {
+            case .idle, .loading:
+                ProgressView("Loading services...")
+                    .controlSize(.large)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            case .failed(let message):
+                ContentUnavailableView(
+                    "Services Unavailable",
+                    systemImage: "bolt.horizontal.circle",
+                    description: Text(message)
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            case .loaded:
+                List(viewModel.filteredServices, selection: $viewModel.selectedService) { service in
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(alignment: .top) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(service.title)
+                                    .font(.headline)
+
+                                Text(service.subtitle)
+                                    .font(.subheadline.monospaced())
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+
+                            Spacer()
+
+                            Text(service.statusTitle)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        HStack {
+                            Text(service.user ?? "System")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+
+                            Spacer()
+
+                            Text(service.pid.map { "PID \($0)" } ?? "Not Running")
+                                .font(.caption.monospaced())
+                                .foregroundStyle(.tertiary)
+                        }
+
+                        if !service.statusBadges.isEmpty {
+                            BrewServiceBadgeFlow(items: service.statusBadges)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                    .tag(service)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(
+                        "\(service.title), status \(service.statusTitle), \(service.pid.map { "pid \($0)" } ?? "not running")"
+                    )
+                }
+                .listStyle(.sidebar)
+                .overlay {
+                    if viewModel.filteredServices.isEmpty {
+                        if viewModel.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            ContentUnavailableView(
+                                "No Services Found",
+                                systemImage: "bolt.horizontal.circle",
+                                description: Text("Homebrew is not currently reporting any managed services.")
+                            )
+                        } else {
+                            ContentUnavailableView.search(text: viewModel.searchText)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(20)
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Services")
+                .font(.largeTitle)
+                .bold()
+
+            Text("Inspect and manage Homebrew background services on this Mac.")
+                .foregroundStyle(.secondary)
+
+            TextField("Search services", text: $viewModel.searchText)
+                .textFieldStyle(.roundedBorder)
+                .accessibilityLabel("Search services")
+
+            if !viewModel.stateCounts.isEmpty {
+                BrewServiceStateSummary(counts: viewModel.stateCounts)
+            }
+
+            HStack(spacing: 12) {
+                Menu {
+                    ForEach(BrewServiceFilterOption.allCases) { filter in
+                        Toggle(isOn: filterBinding(filter)) {
+                            Text(filter.title)
+                        }
+                    }
+
+                    Divider()
+
+                    Button("Clear Filters") {
+                        viewModel.clearFilters()
+                    }
+                    .disabled(viewModel.activeFilters.isEmpty)
+                } label: {
+                    Label(
+                        viewModel.activeFilterCount == 0 ? "Filters" : "Filters (\(viewModel.activeFilterCount))",
+                        systemImage: "line.3.horizontal.decrease.circle"
+                    )
+                }
+
+                Picker("Sort Services", selection: $viewModel.sortOption) {
+                    ForEach(BrewServiceSortOption.allCases) { option in
+                        Text(option.title).tag(option)
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(maxWidth: 170)
+
+                Button("Refresh Services") {
+                    viewModel.refreshServices()
+                }
+                .keyboardShortcut("r", modifiers: [.command, .control])
+
+                if case .loaded(let services) = viewModel.servicesState {
+                    Text("\(services.count) services")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var detail: some View {
+        switch viewModel.servicesState {
+        case .idle, .loading:
+            ProgressView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+        case .failed:
+            ContentUnavailableView(
+                "Service Details Unavailable",
+                systemImage: "exclamationmark.triangle",
+                description: Text("Refresh the Homebrew service list to try again.")
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+        case .loaded:
+            if let service = viewModel.selectedService {
+                BrewServiceDetailView(
+                    service: service,
+                    actionState: viewModel.actionState(for: service),
+                    actionLogs: viewModel.actionLogs(for: service),
+                    onRunAction: handleAction(_:for:),
+                    onCancelAction: viewModel.cancelAction,
+                    onClearOutput: viewModel.clearActionOutput
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            } else {
+                ContentUnavailableView(
+                    "Select a Service",
+                    systemImage: "bolt.horizontal.circle",
+                    description: Text("Choose a Homebrew service to inspect its status, logs, and available actions.")
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+    }
+
+    private func filterBinding(_ filter: BrewServiceFilterOption) -> Binding<Bool> {
+        Binding(
+            get: { viewModel.isFilterActive(filter) },
+            set: { isActive in
+                if isActive != viewModel.isFilterActive(filter) {
+                    viewModel.toggleFilter(filter)
+                }
+            }
+        )
+    }
+
+    private func handleAction(_ action: BrewServiceActionKind, for service: BrewService) {
+        if action.requiresConfirmation {
+            pendingAction = service.command(for: action)
+        } else {
+            viewModel.runAction(action, for: service)
+        }
+    }
+}
+
+private struct BrewServiceDetailView: View {
+    let service: BrewService
+    let actionState: BrewServiceActionState
+    let actionLogs: [CommandLogEntry]
+    let onRunAction: (BrewServiceActionKind, BrewService) -> Void
+    let onCancelAction: () -> Void
+    let onClearOutput: () -> Void
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                titleBlock
+                metadataCard
+                locationsCard
+                if let command = service.command {
+                    commandCard(command)
+                }
+                actionCard
+                if !actionLogs.isEmpty || actionState != .idle {
+                    actionLogCard
+                }
+            }
+            .padding(24)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private var titleBlock: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(service.title)
+                        .font(.largeTitle)
+                        .bold()
+
+                    Text(service.subtitle)
+                        .font(.headline.monospaced())
+                        .foregroundStyle(.tertiary)
+                        .textSelection(.enabled)
+                }
+
+                Spacer()
+
+                VStack(alignment: .trailing, spacing: 8) {
+                    Text(service.statusTitle)
+                        .font(.headline)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(.quaternary, in: Capsule())
+
+                    Text(service.pid.map { "PID \($0)" } ?? "Not Running")
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if !service.statusBadges.isEmpty {
+                BrewServiceTagFlow(items: service.statusBadges)
+            }
+        }
+    }
+
+    private var metadataCard: some View {
+        BrewServiceCard(title: "Status") {
+            BrewServiceDetailGrid(rows: service.summaryRows)
+        }
+    }
+
+    private var locationsCard: some View {
+        BrewServiceCard(title: "Locations") {
+            BrewServiceDetailGrid(rows: service.locationRows + service.scheduleRows)
+        }
+    }
+
+    private func commandCard(_ command: String) -> some View {
+        BrewServiceCard(title: "Command") {
+            Text(command)
+                .font(.body.monospaced())
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var actionCard: some View {
+        BrewServiceCard(title: "Actions") {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 10) {
+                    ForEach(service.availableActions) { action in
+                        Button(action.title) {
+                            onRunAction(action, service)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(actionState.isRunning)
+                    }
+
+                    if actionState.isRunning {
+                        Button("Cancel", role: .destructive) {
+                            onCancelAction()
+                        }
+                    }
+
+                    if !actionLogs.isEmpty || actionState != .idle {
+                        Button("Clear Output") {
+                            onClearOutput()
+                        }
+                        .disabled(actionState.isRunning)
+                    }
+                }
+
+                Text(actionSummary)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var actionLogCard: some View {
+        BrewServiceCard(title: "Live Output") {
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(actionLogs) { entry in
+                    HStack(alignment: .top, spacing: 10) {
+                        Text(entry.timestamp, format: .dateTime.hour().minute().second())
+                            .font(.caption.monospaced())
+                            .foregroundStyle(.tertiary)
+
+                        Text(entry.kind.rawValue.uppercased())
+                            .font(.caption.monospaced())
+                            .foregroundStyle(.secondary)
+                            .frame(width: 60, alignment: .leading)
+
+                        Text(entry.text)
+                            .font(.caption.monospaced())
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            }
+        }
+    }
+
+    private var actionSummary: String {
+        switch actionState {
+        case .idle:
+            "Use these controls to start, stop, or restart the selected Homebrew service."
+        case .running(let progress):
+            "\(progress.command.kind.title) is running. Elapsed \(progress.elapsedTime().formatted(.number.precision(.fractionLength(1))))s."
+        case .succeeded(let progress, let result):
+            "\(progress.command.kind.title) completed with exit code \(result.exitCode)."
+        case .failed(_, let message):
+            message
+        case .cancelled:
+            "The service action was cancelled."
+        }
+    }
+}
+
+private struct BrewServiceStateSummary: View {
+    let counts: [BrewServiceStateCount]
+
+    var body: some View {
+        HStack(spacing: 10) {
+            ForEach(counts) { count in
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(count.title)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Text("\(count.count)")
+                        .font(.headline)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(10)
+                .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 10))
+            }
+        }
+    }
+}
+
+private struct BrewServiceDetailGrid: View {
+    let rows: [BrewServiceDetailRow]
+
+    var body: some View {
+        LazyVGrid(
+            columns: [
+                GridItem(.adaptive(minimum: 240), alignment: .topLeading)
+            ],
+            alignment: .leading,
+            spacing: 12
+        ) {
+            ForEach(rows) { row in
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(row.title)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Text(row.value)
+                        .font(.body.monospaced())
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+}
+
+private struct BrewServiceCard<Content: View>: View {
+    let title: String
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.title3)
+                .bold()
+
+            content
+        }
+        .padding(18)
+        .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 16))
+    }
+}
+
+private struct BrewServiceBadgeFlow: View {
+    let items: [String]
+
+    var body: some View {
+        BrewServiceTagFlow(items: items)
+    }
+}
+
+private struct BrewServiceTagFlow: View {
+    let items: [String]
+
+    var body: some View {
+        FlowLayout(items, spacing: 8) { item in
+            Text(item)
+                .font(.caption.weight(.medium))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(.quaternary, in: Capsule())
+        }
+    }
+}
+
+private struct FlowLayout<Data: RandomAccessCollection, Content: View>: View where Data.Element: Hashable {
+    let items: Data
+    let spacing: CGFloat
+    let content: (Data.Element) -> Content
+
+    init(_ items: Data, spacing: CGFloat, @ViewBuilder content: @escaping (Data.Element) -> Content) {
+        self.items = items
+        self.spacing = spacing
+        self.content = content
+    }
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: spacing) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 90), spacing: spacing, alignment: .leading)], alignment: .leading, spacing: spacing) {
+                    ForEach(Array(items), id: \.self) { item in
+                        content(item)
+                    }
+                }
+            }
+            Spacer(minLength: 0)
+        }
+    }
+}

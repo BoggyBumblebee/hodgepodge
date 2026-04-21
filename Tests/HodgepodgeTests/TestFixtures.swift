@@ -127,3 +127,49 @@ extension OutdatedPackage {
         )
     }
 }
+
+extension BrewService {
+    static func fixture(
+        name: String = "postgresql@17",
+        serviceName: String = "homebrew.mxcl.postgresql@17",
+        status: String = "started",
+        isRunning: Bool = true,
+        isLoaded: Bool = true,
+        isSchedulable: Bool = false,
+        pid: Int? = 2043,
+        exitCode: Int? = nil,
+        user: String? = "cmb",
+        file: String? = "/Users/cmb/Library/LaunchAgents/homebrew.mxcl.postgresql@17.plist",
+        isRegistered: Bool = true,
+        loadedFile: String? = "/Users/cmb/Library/LaunchAgents/homebrew.mxcl.postgresql@17.plist",
+        command: String? = "/opt/homebrew/opt/postgresql@17/bin/postgres -D /opt/homebrew/var/postgresql@17",
+        workingDirectory: String? = "/opt/homebrew",
+        rootDirectory: String? = nil,
+        logPath: String? = "/opt/homebrew/var/log/postgresql@17.log",
+        errorLogPath: String? = "/opt/homebrew/var/log/postgresql@17.log",
+        interval: String? = nil,
+        cron: String? = nil
+    ) -> BrewService {
+        BrewService(
+            name: name,
+            serviceName: serviceName,
+            status: status,
+            isRunning: isRunning,
+            isLoaded: isLoaded,
+            isSchedulable: isSchedulable,
+            pid: pid,
+            exitCode: exitCode,
+            user: user,
+            file: file,
+            isRegistered: isRegistered,
+            loadedFile: loadedFile,
+            command: command,
+            workingDirectory: workingDirectory,
+            rootDirectory: rootDirectory,
+            logPath: logPath,
+            errorLogPath: errorLogPath,
+            interval: interval,
+            cron: cron
+        )
+    }
+}

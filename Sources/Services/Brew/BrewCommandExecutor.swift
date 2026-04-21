@@ -2,9 +2,18 @@ import Foundation
 
 protocol BrewCommandExecuting: Sendable {
     func execute(
-        command: CatalogPackageActionCommand,
+        arguments: [String],
         onLog: @escaping @MainActor @Sendable (CatalogPackageActionLogKind, String) -> Void
     ) async throws -> CommandResult
+}
+
+extension BrewCommandExecuting {
+    func execute(
+        command: CatalogPackageActionCommand,
+        onLog: @escaping @MainActor @Sendable (CatalogPackageActionLogKind, String) -> Void
+    ) async throws -> CommandResult {
+        try await execute(arguments: command.arguments, onLog: onLog)
+    }
 }
 
 struct BrewCommandExecutor: BrewCommandExecuting, @unchecked Sendable {
@@ -20,16 +29,16 @@ struct BrewCommandExecutor: BrewCommandExecuting, @unchecked Sendable {
     }
 
     func execute(
-        command: CatalogPackageActionCommand,
+        arguments: [String],
         onLog: @escaping @MainActor @Sendable (CatalogPackageActionLogKind, String) -> Void
     ) async throws -> CommandResult {
         let installation = try await brewLocator.locate()
         await onLog(.system, "Using Homebrew at \(installation.brewPath)")
-        await onLog(.system, "$ \(installation.brewPath) \(command.arguments.joined(separator: " "))")
+        await onLog(.system, "$ \(installation.brewPath) \(arguments.joined(separator: " "))")
 
         return try await runner.run(
             executable: installation.brewPath,
-            arguments: command.arguments,
+            arguments: arguments,
             onOutput: { chunk in
                 let logKind: CatalogPackageActionLogKind = switch chunk.stream {
                 case .stdout:

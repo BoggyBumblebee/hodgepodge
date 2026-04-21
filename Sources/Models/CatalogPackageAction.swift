@@ -36,18 +36,21 @@ struct CatalogPackageActionCommand: Codable, Equatable, Sendable {
     }
 }
 
-enum CatalogPackageActionLogKind: String, CaseIterable, Equatable, Hashable, Sendable {
+enum CommandLogKind: String, CaseIterable, Equatable, Hashable, Sendable {
     case system
     case stdout
     case stderr
 }
 
-struct CatalogPackageActionLogEntry: Identifiable, Equatable, Sendable {
+struct CommandLogEntry: Identifiable, Equatable, Sendable {
     let id: Int
-    let kind: CatalogPackageActionLogKind
+    let kind: CommandLogKind
     let text: String
     let timestamp: Date
 }
+
+typealias CatalogPackageActionLogKind = CommandLogKind
+typealias CatalogPackageActionLogEntry = CommandLogEntry
 
 enum CatalogPackageActionHistoryOutcome: Codable, Equatable, Sendable {
     case succeeded(Int32)
