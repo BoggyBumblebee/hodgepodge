@@ -1,0 +1,72 @@
+:root {
+  color-scheme: light dark;
+  --bg: #f6f4ef;
+  --fg: #17211a;
+  --accent: #1b7a3d;
+  --muted: #5a655c;
+  --card: rgba(255, 255, 255, 0.7);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #18201a;
+    --fg: #edf4ee;
+    --accent: #7ddf9c;
+    --muted: #b8c6ba;
+    --card: rgba(24, 32, 26, 0.8);
+  }
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+  background:
+    radial-gradient(circle at top right, rgba(27, 122, 61, 0.14), transparent 30%),
+    linear-gradient(180deg, var(--bg), color-mix(in srgb, var(--bg) 70%, black 8%));
+  color: var(--fg);
+}
+
+.page {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 48px 24px 72px;
+}
+
+.hero,
+section {
+  background: var(--card);
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  border-radius: 20px;
+  padding: 24px;
+  backdrop-filter: blur(8px);
+}
+
+.hero {
+  margin-bottom: 20px;
+}
+
+section + section {
+  margin-top: 20px;
+}
+
+.eyebrow {
+  margin: 0 0 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+h1,
+h2 {
+  margin-top: 0;
+}
+
+.lede,
+li,
+ul,
+ol {
+  color: var(--muted);
+  line-height: 1.6;
+}

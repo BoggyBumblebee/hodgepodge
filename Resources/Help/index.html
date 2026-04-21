@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Hodgepodge Help</title>
+    <link rel="stylesheet" href="help.css">
+  </head>
+  <body>
+    <main class="page">
+      <header class="hero" id="top">
+        <p class="eyebrow">Hodgepodge Help</p>
+        <h1>Manage Homebrew with confidence.</h1>
+        <p class="lede">
+          Hodgepodge is a native macOS app for browsing Homebrew packages, checking local state, and running
+          common maintenance tasks without losing the transparency of the underlying `brew` commands.
+        </p>
+      </header>
+
+      <section id="quick-start">
+        <h2>Quick Start</h2>
+        <ol>
+          <li>Open the Overview screen to confirm Hodgepodge detected your Homebrew installation correctly.</li>
+          <li>Use Refresh Homebrew to reload the executable path, version, prefix, cellar, repository, and tap count.</li>
+          <li>Open other sections from the sidebar as they become available in later phases.</li>
+        </ol>
+      </section>
+
+      <section id="troubleshooting">
+        <h2>Troubleshooting</h2>
+        <ul>
+          <li>If Homebrew is not detected, install it first or make sure `brew` exists at `/opt/homebrew/bin/brew` or `/usr/local/bin/brew`.</li>
+          <li>If Help does not open, confirm the bundle contains `Help/index.html` and `help.css`.</li>
+          <li>If the app icon looks wrong, rebuild the app and confirm `Assets.car` is present in the final bundle.</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>

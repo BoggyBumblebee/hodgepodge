@@ -1,0 +1,53 @@
+name: Hodgepodge
+options:
+  createIntermediateGroups: true
+  minimumXcodeGenVersion: 2.45.0
+settings:
+  base:
+    SWIFT_VERSION: 6.0
+    MACOSX_DEPLOYMENT_TARGET: 14.0
+    DEVELOPMENT_TEAM: ""
+    PRODUCT_NAME: Hodgepodge
+targets:
+  Hodgepodge:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: Sources
+      - path: Resources/Assets.xcassets
+        buildPhase: resources
+      - path: Resources/Help
+        buildPhase: resources
+      - path: Resources/Assets
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.boggybumblebee.hodgepodge
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Hodgepodge
+        INFOPLIST_KEY_NSHumanReadableCopyright: Copyright (c) 2026 BoggyBumblebee
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CURRENT_PROJECT_VERSION: 1
+        MARKETING_VERSION: 0.1.0
+        ENABLE_APP_SANDBOX: NO
+        CODE_SIGN_STYLE: Automatic
+        SWIFT_EMIT_LOC_STRINGS: YES
+    scheme:
+      gatherCoverageData: true
+      testTargets:
+        - HodgepodgeTests
+  HodgepodgeTests:
+    type: bundle.unit-test
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: Tests/HodgepodgeTests
+    dependencies:
+      - target: Hodgepodge
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.boggybumblebee.hodgepodge.tests
+        PRODUCT_NAME: HodgepodgeTests
+        PRODUCT_MODULE_NAME: HodgepodgeTests

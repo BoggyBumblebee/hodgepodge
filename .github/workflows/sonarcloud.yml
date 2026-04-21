@@ -1,0 +1,42 @@
+name: SonarCloud
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  sonarcloud:
+    runs-on: macos-15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install XcodeGen
+        run: brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Run tests with coverage
+        run: |
+          mkdir -p BuildArtifacts
+          xcodebuild \
+            -project Hodgepodge.xcodeproj \
+            -scheme Hodgepodge \
+            -destination 'platform=macOS' \
+            -derivedDataPath .build/DerivedData \
+            -resultBundlePath BuildArtifacts/Hodgepodge.xcresult \
+            test CODE_SIGNING_ALLOWED=NO
+
+      - name: Convert coverage for SonarCloud
+        run: Scripts/xccov-to-sonar-generic.sh BuildArtifacts/Hodgepodge.xcresult BuildArtifacts/sonar-generic-coverage.xml
+
+      - name: SonarCloud scan
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
