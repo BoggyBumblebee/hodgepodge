@@ -17,16 +17,32 @@ final class CatalogViewModelTests: XCTestCase {
             kind: .formula,
             slug: "wget",
             title: "wget",
+            fullName: "wget",
             aliases: [],
+            oldNames: [],
             description: "Internet file retriever",
             homepage: package.homepage,
             version: "1.25.0",
             tap: "homebrew/core",
             license: "GPL-3.0-or-later",
+            downloadURL: nil,
+            checksum: nil,
+            autoUpdates: nil,
+            versionDetails: [
+                CatalogDetailMetric(title: "Current", value: "1.25.0"),
+                CatalogDetailMetric(title: "Stable", value: "1.25.0")
+            ],
             dependencies: ["openssl@3"],
+            dependencySections: [
+                CatalogDetailSection(title: "Runtime Dependencies", items: ["openssl@3"], style: .tags)
+            ],
             conflicts: [],
+            lifecycleSections: [],
+            platformSections: [],
             caveats: nil,
-            artifacts: []
+            artifacts: [],
+            artifactSections: [],
+            analytics: []
         )
         let apiClient = MockCatalogAPIClient(packages: .success([package]), details: [package.id: .success(detail)])
         let viewModel = CatalogViewModel(apiClient: apiClient)
@@ -90,16 +106,30 @@ final class CatalogViewModelTests: XCTestCase {
             kind: .cask,
             slug: "docker-desktop",
             title: "Docker Desktop",
+            fullName: "docker-desktop",
             aliases: [],
+            oldNames: [],
             description: "Container desktop app",
             homepage: nil,
             version: "4.68.0",
             tap: "homebrew/cask",
             license: nil,
+            downloadURL: nil,
+            checksum: nil,
+            autoUpdates: true,
+            versionDetails: [
+                CatalogDetailMetric(title: "Current", value: "4.68.0"),
+                CatalogDetailMetric(title: "Stable", value: "4.68.0")
+            ],
             dependencies: [],
+            dependencySections: [],
             conflicts: [],
+            lifecycleSections: [],
+            platformSections: [],
             caveats: nil,
-            artifacts: []
+            artifacts: [],
+            artifactSections: [],
+            analytics: []
         )
         let apiClient = MockCatalogAPIClient(
             packages: .success([first, second]),

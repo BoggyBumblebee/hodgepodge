@@ -54,16 +54,38 @@ final class ViewRenderingTests: XCTestCase {
             kind: .formula,
             slug: "wget",
             title: "wget",
+            fullName: "homebrew/core/wget",
             aliases: ["wget2"],
+            oldNames: ["gnu-wget"],
             description: "Internet file retriever",
             homepage: URL(string: "https://example.com/wget"),
             version: "1.25.0",
             tap: "homebrew/core",
             license: "GPL-3.0-or-later",
+            downloadURL: URL(string: "https://example.com/wget.tar.gz"),
+            checksum: "abc123",
+            autoUpdates: nil,
+            versionDetails: [
+                CatalogDetailMetric(title: "Current", value: "1.25.0"),
+                CatalogDetailMetric(title: "Stable", value: "1.25.0"),
+                CatalogDetailMetric(title: "Head", value: "HEAD")
+            ],
             dependencies: ["openssl@3"],
+            dependencySections: [
+                CatalogDetailSection(title: "Runtime Dependencies", items: ["openssl@3"], style: .tags),
+                CatalogDetailSection(title: "Build Dependencies", items: ["pkgconf"], style: .tags)
+            ],
             conflicts: [],
+            lifecycleSections: [],
+            platformSections: [
+                CatalogDetailSection(title: "Bottle Platforms", items: ["arm64_sonoma", "sonoma"], style: .tags)
+            ],
             caveats: "IPv6 support is optional.",
-            artifacts: []
+            artifacts: [],
+            artifactSections: [],
+            analytics: [
+                CatalogDetailMetric(title: "Installs (30d)", value: "26,952")
+            ]
         )
         let viewModel = makeCatalogModel()
         viewModel.packagesState = .loaded([package])
@@ -126,16 +148,29 @@ private struct ViewTestCatalogAPIClient: HomebrewAPIClienting, Sendable {
             kind: package.kind,
             slug: package.slug,
             title: package.title,
+            fullName: package.slug,
             aliases: [],
+            oldNames: [],
             description: package.subtitle,
             homepage: package.homepage,
             version: package.version,
             tap: "homebrew/core",
             license: nil,
+            downloadURL: nil,
+            checksum: nil,
+            autoUpdates: nil,
+            versionDetails: [
+                CatalogDetailMetric(title: "Current", value: package.version)
+            ],
             dependencies: [],
+            dependencySections: [],
             conflicts: [],
+            lifecycleSections: [],
+            platformSections: [],
             caveats: nil,
-            artifacts: []
+            artifacts: [],
+            artifactSections: [],
+            analytics: []
         )
     }
 }

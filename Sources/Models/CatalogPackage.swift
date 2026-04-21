@@ -72,23 +72,81 @@ struct CatalogPackageSummary: Identifiable, Equatable, Hashable, Sendable {
     }
 }
 
+enum CatalogDetailSectionStyle: String, Equatable, Sendable {
+    case tags
+    case list
+}
+
+struct CatalogDetailSection: Identifiable, Equatable, Sendable {
+    let title: String
+    let items: [String]
+    let style: CatalogDetailSectionStyle
+
+    var id: String {
+        title
+    }
+}
+
+struct CatalogDetailMetric: Identifiable, Equatable, Sendable {
+    let title: String
+    let value: String
+
+    var id: String {
+        title
+    }
+}
+
 struct CatalogPackageDetail: Equatable, Sendable {
     let kind: CatalogPackageKind
     let slug: String
     let title: String
+    let fullName: String
     let aliases: [String]
+    let oldNames: [String]
     let description: String
     let homepage: URL?
     let version: String
     let tap: String
     let license: String?
+    let downloadURL: URL?
+    let checksum: String?
+    let autoUpdates: Bool?
+    let versionDetails: [CatalogDetailMetric]
     let dependencies: [String]
+    let dependencySections: [CatalogDetailSection]
     let conflicts: [String]
+    let lifecycleSections: [CatalogDetailSection]
+    let platformSections: [CatalogDetailSection]
     let caveats: String?
     let artifacts: [String]
+    let artifactSections: [CatalogDetailSection]
+    let analytics: [CatalogDetailMetric]
 
     var installCommand: String {
         "brew install \(kind.installCommandFlag)\(slug)"
+    }
+
+    var fetchCommand: String {
+        "brew fetch \(kind.installCommandFlag)\(slug)"
+    }
+
+    var metadataDetails: [CatalogDetailMetric] {
+        var metrics = [
+            CatalogDetailMetric(title: "Full Name", value: fullName),
+            CatalogDetailMetric(title: "Slug", value: slug),
+            CatalogDetailMetric(title: "Tap", value: tap),
+            CatalogDetailMetric(title: "License", value: license ?? "Not specified")
+        ]
+
+        if let checksum, !checksum.isEmpty {
+            metrics.append(CatalogDetailMetric(title: "Checksum", value: checksum))
+        }
+
+        if let autoUpdates {
+            metrics.append(CatalogDetailMetric(title: "Auto Updates", value: autoUpdates ? "Yes" : "No"))
+        }
+
+        return metrics
     }
 }
 
@@ -164,6 +222,21 @@ enum JSONValue: Decodable, Equatable, Sendable {
                 .joined(separator: ", ")
         case .null:
             ""
+        }
+    }
+
+    var flattenedItems: [String] {
+        switch self {
+        case .string, .number, .bool:
+            let description = flattenedDescription
+            return description.isEmpty ? [] : [description]
+        case .array(let values):
+            return values.flatMap(\.flattenedItems)
+        case .object:
+            let description = flattenedDescription
+            return description.isEmpty ? [] : [description]
+        case .null:
+            return []
         }
     }
 }

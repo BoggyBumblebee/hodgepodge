@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct CatalogView: View {
@@ -156,38 +157,38 @@ private struct CatalogDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 titleBlock
+                metricsSection("Versions", metrics: detail.versionDetails)
                 metadataGrid
 
-                if !detail.aliases.isEmpty {
-                    tagSection("Aliases", items: detail.aliases)
-                }
+                if !detail.aliases.isEmpty || !detail.oldNames.isEmpty {
+                    DetailCard {
+                        VStack(alignment: .leading, spacing: 16) {
+                            if !detail.aliases.isEmpty {
+                                sectionContentTitle("Aliases")
+                                tagFlow(items: detail.aliases)
+                            }
 
-                if !detail.dependencies.isEmpty {
-                    tagSection("Dependencies", items: detail.dependencies)
-                }
-
-                if !detail.conflicts.isEmpty {
-                    tagSection("Conflicts", items: detail.conflicts)
-                }
-
-                if !detail.artifacts.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        sectionTitle("Artifacts")
-                        ForEach(detail.artifacts, id: \.self) { artifact in
-                            Text(artifact)
-                                .font(.body.monospaced())
-                                .textSelection(.enabled)
+                            if !detail.oldNames.isEmpty {
+                                sectionContentTitle("Old Names")
+                                tagFlow(items: detail.oldNames)
+                            }
                         }
                     }
                 }
 
+                detailSections(detail.dependencySections)
+                detailSections(detail.lifecycleSections)
+                detailSections(detail.platformSections)
+
                 if let caveats = detail.caveats, !caveats.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        sectionTitle("Caveats")
+                    DetailCard(title: "Caveats") {
                         Text(caveats)
                             .textSelection(.enabled)
                     }
                 }
+
+                detailSections(detail.artifactSections)
+                metricsSection("Analytics", metrics: detail.analytics)
             }
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -203,6 +204,13 @@ private struct CatalogDetailView: View {
                         .font(.largeTitle)
                         .bold()
 
+                    if detail.fullName != detail.title {
+                        Text(detail.fullName)
+                            .font(.headline.monospaced())
+                            .foregroundStyle(.tertiary)
+                            .textSelection(.enabled)
+                    }
+
                     Text(detail.description)
                         .font(.title3)
                         .foregroundStyle(.secondary)
@@ -210,43 +218,66 @@ private struct CatalogDetailView: View {
 
                 Spacer()
 
-                Text(detail.kind.title.dropLast())
-                    .font(.headline)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(.quaternary, in: Capsule())
+                VStack(alignment: .trailing, spacing: 8) {
+                    Text(detail.kind.title.dropLast())
+                        .font(.headline)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(.quaternary, in: Capsule())
+
+                    Text(detail.version)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                }
             }
 
+            actionBlock
+        }
+    }
+
+    private var actionBlock: some View {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
                 if let homepage = detail.homepage {
                     Link("Open Homepage", destination: homepage)
+                        .accessibilityLabel("Open package homepage")
                 }
 
-                Button("Refresh Detail", action: refreshAction)
+                if let downloadURL = detail.downloadURL {
+                    Link("Open Download", destination: downloadURL)
+                        .accessibilityLabel("Open package download URL")
+                }
 
-                Text(detail.installCommand)
-                    .font(.caption.monospaced())
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .textSelection(.enabled)
+                Button("Copy Install Command") {
+                    copyToPasteboard(detail.installCommand)
+                }
+                .accessibilityLabel("Copy install command")
+
+                Button("Copy Fetch Command") {
+                    copyToPasteboard(detail.fetchCommand)
+                }
+                .accessibilityLabel("Copy fetch command")
+
+                Button("Refresh Detail", action: refreshAction)
+                    .accessibilityLabel("Refresh package details")
+            }
+
+            commandBlock(title: "Install", command: detail.installCommand)
+
+            if detail.kind == .formula {
+                commandBlock(title: "Fetch", command: detail.fetchCommand)
             }
         }
     }
 
     private var metadataGrid: some View {
-        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 16, verticalSpacing: 12) {
-            metadataRow("Slug", detail.slug)
-            metadataRow("Version", detail.version)
-            metadataRow("Tap", detail.tap)
-            metadataRow("License", detail.license ?? "Not specified")
+        DetailCard(title: "Metadata") {
+            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 16, verticalSpacing: 12) {
+                ForEach(detail.metadataDetails) { metric in
+                    metadataRow(metric.title, metric.value)
+                }
+            }
         }
-        .padding(20)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color(nsColor: .windowBackgroundColor))
-                .shadow(color: .black.opacity(0.06), radius: 10, y: 2)
-        )
     }
 
     private func metadataRow(_ title: String, _ value: String) -> some View {
@@ -259,18 +290,75 @@ private struct CatalogDetailView: View {
         }
     }
 
-    private func tagSection(_ title: String, items: [String]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            sectionTitle(title)
+    @ViewBuilder
+    private func metricsSection(_ title: String, metrics: [CatalogDetailMetric]) -> some View {
+        if !metrics.isEmpty {
+            DetailCard(title: title) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), alignment: .leading)], alignment: .leading, spacing: 12) {
+                    ForEach(metrics) { metric in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(metric.title)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
 
-            FlowLayout(items: items) { item in
-                Text(item)
-                    .font(.caption.monospaced())
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Color(nsColor: .controlBackgroundColor), in: Capsule())
-                    .textSelection(.enabled)
+                            Text(metric.value)
+                                .font(.headline.monospaced())
+                                .textSelection(.enabled)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(14)
+                        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func detailSections(_ sections: [CatalogDetailSection]) -> some View {
+        ForEach(sections) { section in
+            DetailCard(title: section.title) {
+                switch section.style {
+                case .tags:
+                    tagFlow(items: section.items)
+                case .list:
+                    VStack(alignment: .leading, spacing: 10) {
+                        ForEach(section.items, id: \.self) { item in
+                            Text(item)
+                                .font(.body.monospaced())
+                                .textSelection(.enabled)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func tagFlow(items: [String]) -> some View {
+        FlowLayout(items: items) { item in
+            Text(item)
+                .font(.caption.monospaced())
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Color(nsColor: .controlBackgroundColor), in: Capsule())
+                .textSelection(.enabled)
+        }
+    }
+
+    private func commandBlock(title: String, command: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Text(command)
+                .font(.caption.monospaced())
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .textSelection(.enabled)
         }
     }
 
@@ -278,6 +366,47 @@ private struct CatalogDetailView: View {
         Text(title)
             .font(.title3)
             .bold()
+    }
+
+    private func sectionContentTitle(_ title: String) -> some View {
+        Text(title)
+            .font(.headline)
+            .foregroundStyle(.secondary)
+    }
+
+    private func copyToPasteboard(_ string: String) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(string, forType: .string)
+    }
+}
+
+private struct DetailCard<Content: View>: View {
+    let title: String?
+    let content: Content
+
+    init(title: String? = nil, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if let title {
+                Text(title)
+                    .font(.title3)
+                    .bold()
+            }
+
+            content
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(nsColor: .windowBackgroundColor))
+                .shadow(color: .black.opacity(0.06), radius: 10, y: 2)
+        )
     }
 }
 
