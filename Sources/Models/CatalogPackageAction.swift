@@ -1,6 +1,6 @@
 import Foundation
 
-enum CatalogPackageActionKind: String, CaseIterable, Equatable, Identifiable, Sendable {
+enum CatalogPackageActionKind: String, CaseIterable, Codable, Equatable, Identifiable, Sendable {
     case install
     case fetch
 
@@ -20,7 +20,7 @@ enum CatalogPackageActionKind: String, CaseIterable, Equatable, Identifiable, Se
     }
 }
 
-struct CatalogPackageActionCommand: Equatable, Sendable {
+struct CatalogPackageActionCommand: Codable, Equatable, Sendable {
     let kind: CatalogPackageActionKind
     let packageID: String
     let packageTitle: String
@@ -49,7 +49,7 @@ struct CatalogPackageActionLogEntry: Identifiable, Equatable, Sendable {
     let timestamp: Date
 }
 
-enum CatalogPackageActionHistoryOutcome: Equatable, Sendable {
+enum CatalogPackageActionHistoryOutcome: Codable, Equatable, Sendable {
     case succeeded(Int32)
     case failed(String)
     case cancelled
@@ -75,9 +75,47 @@ enum CatalogPackageActionHistoryOutcome: Equatable, Sendable {
             "Stopped before completion"
         }
     }
+
+    private enum CodingKeys: String, CodingKey {
+        case status
+        case exitCode
+        case message
+    }
+
+    private enum Status: String, Codable {
+        case succeeded
+        case failed
+        case cancelled
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        switch try container.decode(Status.self, forKey: .status) {
+        case .succeeded:
+            self = .succeeded(try container.decode(Int32.self, forKey: .exitCode))
+        case .failed:
+            self = .failed(try container.decode(String.self, forKey: .message))
+        case .cancelled:
+            self = .cancelled
+        }
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .succeeded(let exitCode):
+            try container.encode(Status.succeeded, forKey: .status)
+            try container.encode(exitCode, forKey: .exitCode)
+        case .failed(let message):
+            try container.encode(Status.failed, forKey: .status)
+            try container.encode(message, forKey: .message)
+        case .cancelled:
+            try container.encode(Status.cancelled, forKey: .status)
+        }
+    }
 }
 
-struct CatalogPackageActionHistoryEntry: Identifiable, Equatable, Sendable {
+struct CatalogPackageActionHistoryEntry: Codable, Identifiable, Equatable, Sendable {
     let id: Int
     let command: CatalogPackageActionCommand
     let startedAt: Date

@@ -15,6 +15,7 @@ final class CatalogViewModel: ObservableObject {
 
     private let apiClient: any HomebrewAPIClienting
     private let commandExecutor: any BrewCommandExecuting
+    private let actionHistoryStore: any CatalogActionHistoryStoring
     private var detailCache: [String: CatalogPackageDetail] = [:]
     private var actionTask: Task<Void, Never>?
     private var nextLogIdentifier = 0
@@ -23,10 +24,15 @@ final class CatalogViewModel: ObservableObject {
 
     init(
         apiClient: any HomebrewAPIClienting,
-        commandExecutor: any BrewCommandExecuting
+        commandExecutor: any BrewCommandExecuting,
+        actionHistoryStore: any CatalogActionHistoryStoring
     ) {
         self.apiClient = apiClient
         self.commandExecutor = commandExecutor
+        self.actionHistoryStore = actionHistoryStore
+        let restoredHistory = actionHistoryStore.loadHistory()
+        actionHistory = restoredHistory
+        nextHistoryIdentifier = (restoredHistory.map { $0.id }.max() ?? -1) + 1
     }
 
     deinit {
@@ -384,6 +390,8 @@ final class CatalogViewModel: ObservableObject {
         if actionHistory.count > 50 {
             actionHistory.removeLast(actionHistory.count - 50)
         }
+
+        actionHistoryStore.saveHistory(actionHistory)
     }
 }
 
@@ -397,7 +405,8 @@ extension CatalogViewModel {
             commandExecutor: BrewCommandExecutor(
                 brewLocator: brewLocator,
                 runner: runner
-            )
+            ),
+            actionHistoryStore: CatalogActionHistoryStore()
         )
     }
 }

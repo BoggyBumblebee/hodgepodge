@@ -228,7 +228,8 @@ final class ViewRenderingTests: XCTestCase {
     private func makeCatalogModel() -> CatalogViewModel {
         CatalogViewModel(
             apiClient: ViewTestCatalogAPIClient(),
-            commandExecutor: ViewTestBrewCommandExecutor()
+            commandExecutor: ViewTestBrewCommandExecutor(),
+            actionHistoryStore: ViewTestCatalogActionHistoryStore()
         )
     }
 
@@ -319,6 +320,14 @@ private struct ViewTestBrewCommandExecutor: BrewCommandExecuting, Sendable {
         await onLog(.system, "$ /opt/homebrew/bin/brew \(command.arguments.joined(separator: " "))")
         return CommandResult(stdout: "", stderr: "", exitCode: 0)
     }
+}
+
+private struct ViewTestCatalogActionHistoryStore: CatalogActionHistoryStoring {
+    func loadHistory() -> [CatalogPackageActionHistoryEntry] {
+        []
+    }
+
+    func saveHistory(_ entries: [CatalogPackageActionHistoryEntry]) {}
 }
 
 private struct ViewTestInstalledPackagesProvider: InstalledPackagesProviding {

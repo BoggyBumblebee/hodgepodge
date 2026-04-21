@@ -264,7 +264,8 @@ final class CatalogViewModelTests: XCTestCase {
                 (.stdout, "Fetched\n")
             ]
         )
-        let viewModel = makeViewModel(commandExecutor: executor)
+        let historyStore = MockCatalogActionHistoryStore()
+        let viewModel = makeViewModel(commandExecutor: executor, historyStore: historyStore)
 
         viewModel.runAction(.fetch, for: detail)
         await waitUntil {
@@ -300,6 +301,7 @@ final class CatalogViewModelTests: XCTestCase {
             ]
         )
         XCTAssertTrue(viewModel.actionLogs.allSatisfy { $0.timestamp <= Date() })
+        XCTAssertEqual(historyStore.savedEntries.last, viewModel.actionHistory(for: detail))
     }
 
     func testRunActionStoresFailureState() async {
@@ -391,13 +393,32 @@ final class CatalogViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.actionHistory(for: detail).count, 1)
     }
 
+    func testInitLoadsPersistedActionHistory() {
+        let detail = CatalogPackageDetail.fixture()
+        let persistedEntry = CatalogPackageActionHistoryEntry(
+            id: 4,
+            command: detail.actionCommand(for: .fetch),
+            startedAt: Date(timeIntervalSince1970: 500),
+            finishedAt: Date(timeIntervalSince1970: 530),
+            outcome: .succeeded(0),
+            outputLineCount: 3
+        )
+        let historyStore = MockCatalogActionHistoryStore(initialEntries: [persistedEntry])
+
+        let viewModel = makeViewModel(historyStore: historyStore)
+
+        XCTAssertEqual(viewModel.actionHistory(for: detail), [persistedEntry])
+    }
+
     private func makeViewModel(
         apiClient: any HomebrewAPIClienting = MockCatalogAPIClient(packages: .success([]), details: [:]),
-        commandExecutor: any BrewCommandExecuting = MockBrewCommandExecutor(result: .success(CommandResult(stdout: "", stderr: "", exitCode: 0)))
+        commandExecutor: any BrewCommandExecuting = MockBrewCommandExecutor(result: .success(CommandResult(stdout: "", stderr: "", exitCode: 0))),
+        historyStore: any CatalogActionHistoryStoring = MockCatalogActionHistoryStore()
     ) -> CatalogViewModel {
         CatalogViewModel(
             apiClient: apiClient,
-            commandExecutor: commandExecutor
+            commandExecutor: commandExecutor,
+            actionHistoryStore: historyStore
         )
     }
 
@@ -488,6 +509,23 @@ private struct SuspendingBrewCommandExecutor: BrewCommandExecuting, Sendable {
         await onLog(.system, "$ /opt/homebrew/bin/brew \(command.arguments.joined(separator: " "))")
         try await Task.sleep(for: .seconds(60))
         return CommandResult(stdout: "", stderr: "", exitCode: 0)
+    }
+}
+
+private final class MockCatalogActionHistoryStore: CatalogActionHistoryStoring, @unchecked Sendable {
+    private let initialEntries: [CatalogPackageActionHistoryEntry]
+    private(set) var savedEntries: [[CatalogPackageActionHistoryEntry]] = []
+
+    init(initialEntries: [CatalogPackageActionHistoryEntry] = []) {
+        self.initialEntries = initialEntries
+    }
+
+    func loadHistory() -> [CatalogPackageActionHistoryEntry] {
+        initialEntries
+    }
+
+    func saveHistory(_ entries: [CatalogPackageActionHistoryEntry]) {
+        savedEntries.append(entries)
     }
 }
 
