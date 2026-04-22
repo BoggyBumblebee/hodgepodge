@@ -837,6 +837,52 @@ final class ViewRenderingTests: XCTestCase {
         XCTAssertNotNil(render(ServicesView(viewModel: viewModel)))
     }
 
+    func testServicesViewRendersIdleLoadedStateWithoutActionOutput() {
+        let service = BrewService.fixture(
+            status: "none",
+            isRunning: false,
+            isLoaded: false,
+            pid: nil,
+            command: nil
+        )
+        let viewModel = makeServicesModel()
+        viewModel.servicesState = .loaded([service])
+        viewModel.selectedService = service
+        viewModel.actionState = .idle
+        viewModel.actionLogs = []
+
+        XCTAssertNotNil(render(ServicesView(viewModel: viewModel)))
+    }
+
+    func testServicesViewRendersSucceededActionState() {
+        let service = BrewService.fixture()
+        let viewModel = makeServicesModel()
+        viewModel.servicesState = .loaded([service])
+        viewModel.selectedService = service
+        let progress = BrewServiceActionProgress(
+            command: service.command(for: .restart),
+            startedAt: Date(timeIntervalSince1970: 1_000)
+        )
+        viewModel.actionState = .succeeded(
+            progress,
+            CommandResult(
+                stdout: "Restarted successfully.",
+                stderr: "",
+                exitCode: 0
+            )
+        )
+        viewModel.actionLogs = [
+            CommandLogEntry(
+                id: 0,
+                kind: .stdout,
+                text: "Restarted successfully.",
+                timestamp: Date(timeIntervalSince1970: 1_006)
+            )
+        ]
+
+        XCTAssertNotNil(render(ServicesView(viewModel: viewModel)))
+    }
+
     func testMaintenanceViewRendersLoadedState() {
         let viewModel = makeMaintenanceModel()
         viewModel.dashboardState = .loaded(.fixture())

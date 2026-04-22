@@ -357,11 +357,54 @@ private struct BrewfileLoadedDetailView: View {
                 .font(.caption.monospaced())
                 .foregroundStyle(.tertiary)
                 .textSelection(.enabled)
+
+            actionBlock
+        }
+    }
+
+    private var actionBlock: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                Button(checkCommand?.kind.actionLabel ?? "Run Check") {
+                    onRunAction(.check)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(checkCommand == nil || actionState.isRunning)
+
+                Button(installCommand?.kind.actionLabel ?? "Install") {
+                    onRunAction(.install)
+                }
+                .disabled(installCommand == nil || actionState.isRunning)
+
+                Button(BrewfileActionKind.dump.actionLabel) {
+                    onRunAction(.dump)
+                }
+                .disabled(actionState.isRunning)
+
+                Button(BrewfileActionKind.add.actionLabel) {
+                    onPresentAddEntry()
+                }
+                .disabled(actionState.isRunning)
+
+                Button(BrewfileActionKind.remove.actionLabel) {
+                    onConfirmRemoveSelectedEntry()
+                }
+                .disabled(removeCommand == nil || actionState.isRunning)
+
+                if actionState.isRunning {
+                    Button("Cancel", action: onCancelAction)
+                        .keyboardShortcut(.cancelAction)
+                }
+            }
+
+            if actionState != .idle {
+                BrewfileActionStatusView(actionState: actionState)
+            }
         }
     }
 
     private var actionCard: some View {
-        BrewfileCard(title: "Bundle Actions") {
+        BrewfileCard(title: "Bundle Commands") {
             VStack(alignment: .leading, spacing: 12) {
                 if let checkCommand {
                     CommandPreviewField(
@@ -388,42 +431,6 @@ private struct BrewfileLoadedDetailView: View {
                     copyAccessibilityLabel: "Copy Brewfile dump command"
                 )
 
-                BrewfileActionStatusView(actionState: actionState)
-
-                HStack(spacing: 12) {
-                    Button(checkCommand?.kind.actionLabel ?? "Run Check") {
-                        onRunAction(.check)
-                    }
-                    .disabled(checkCommand == nil || actionState.isRunning)
-
-                    Button(installCommand?.kind.actionLabel ?? "Install") {
-                        onRunAction(.install)
-                    }
-                    .disabled(installCommand == nil || actionState.isRunning)
-
-                    Button(BrewfileActionKind.dump.actionLabel) {
-                        onRunAction(.dump)
-                    }
-                    .disabled(actionState.isRunning)
-
-                    Button(BrewfileActionKind.add.actionLabel) {
-                        onPresentAddEntry()
-                    }
-                    .disabled(actionState.isRunning)
-
-                    Button(BrewfileActionKind.remove.actionLabel) {
-                        onConfirmRemoveSelectedEntry()
-                    }
-                    .disabled(removeCommand == nil || actionState.isRunning)
-
-                    if actionState.isRunning {
-                        Button("Cancel", action: onCancelAction)
-                    } else {
-                        Button("Clear Output", action: onClearOutput)
-                            .disabled(actionState == .idle && actionLogs.isEmpty)
-                    }
-                }
-
                 if actionState != .idle || !actionLogs.isEmpty {
                     CommandOutputDisclosure(
                         entries: actionLogs,
@@ -441,6 +448,9 @@ private struct BrewfileLoadedDetailView: View {
                         copyAccessibilityLabel: "Copy bundle remove command"
                     )
                 }
+
+                Button("Clear Output", action: onClearOutput)
+                    .disabled(actionState == .idle && actionLogs.isEmpty)
             }
         }
     }

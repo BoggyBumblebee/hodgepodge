@@ -137,6 +137,11 @@ The current project state already includes:
   - quieter Installed action headers so explanatory copy above and below the action buttons is removed unless there is meaningful action state to show
   - quieter Outdated upgrade actions so the primary upgrade controls live in the header flow like Catalog and Installed, with guidance retained as a lower supporting panel
   - action controls in Outdated, Services, and Taps moved up near the section header so operational controls consistently appear before supporting metadata
+  - Services actions now match the Catalog and Installed pattern more closely, with the primary controls integrated into the header flow instead of a dedicated action card
+  - lighter Services detail headers so status lozenges are removed when the service state is already shown more clearly in the structured detail cards
+  - lighter Tap detail headers so duplicate status lozenges are removed when the list and detail cards already communicate that state more clearly
+  - Tap actions now match the Catalog and Installed pattern more closely, with the primary untap controls integrated into the header flow, the force toggle inline beside the action, and guidance retained as a lower supporting panel
+  - Brewfile actions now match the Catalog and Installed pattern more closely, with the primary bundle controls integrated into the header flow and command details retained as lower supporting content
 - normalize the macOS UI toward Apple's platform conventions, with cleaner layouts, clearer hierarchy, and more consistent controls
 - identify which preferences belong in Settings versus transient per-screen UI state
 - harden Homebrew command and JSON compatibility so Hodgepodge continues working across supported Homebrew releases starting from today's versions

@@ -338,7 +338,6 @@ private struct BrewServiceDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 titleBlock
-                actionCard
                 metadataCard
                 locationsCard
                 if let command = service.command {
@@ -356,36 +355,18 @@ private struct BrewServiceDetailView: View {
 
     private var titleBlock: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(service.title)
-                        .font(.largeTitle)
-                        .bold()
+            VStack(alignment: .leading, spacing: 6) {
+                Text(service.title)
+                    .font(.largeTitle)
+                    .bold()
 
-                    Text(service.subtitle)
-                        .font(.headline.monospaced())
-                        .foregroundStyle(.tertiary)
-                        .textSelection(.enabled)
-                }
-
-                Spacer()
-
-                VStack(alignment: .trailing, spacing: 8) {
-                    Text(service.statusTitle)
-                        .font(.headline)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(.quaternary, in: Capsule())
-
-                    Text(service.pid.map { "PID \($0)" } ?? "Not Running")
-                        .font(.caption.monospaced())
-                        .foregroundStyle(.secondary)
-                }
+                Text(service.subtitle)
+                    .font(.headline.monospaced())
+                    .foregroundStyle(.tertiary)
+                    .textSelection(.enabled)
             }
 
-            if !service.statusBadges.isEmpty {
-                BrewServiceTagFlow(items: service.statusBadges)
-            }
+            actionBlock
         }
     }
 
@@ -410,64 +391,94 @@ private struct BrewServiceDetailView: View {
         }
     }
 
-    private var actionCard: some View {
-        BrewServiceCard(title: "Actions") {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 10) {
-                    ForEach(service.availableActions) { action in
-                        Button(action.title) {
-                            onRunAction(action, service)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(hasRunningAction)
+    private var actionBlock: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                ForEach(service.availableActions) { action in
+                    Button(action.title) {
+                        onRunAction(action, service)
                     }
-
-                    if actionState.isRunning {
-                        Button("Cancel", role: .destructive) {
-                            onCancelAction()
-                        }
-                    }
-
-                    if !actionLogs.isEmpty || actionState != .idle {
-                        Button("Clear Output") {
-                            onClearOutput()
-                        }
-                        .disabled(actionState.isRunning)
-                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(hasRunningAction)
                 }
 
-                Text(actionSummary)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                if actionState.isRunning {
+                    Button("Cancel", role: .destructive) {
+                        onCancelAction()
+                    }
+                    .keyboardShortcut(.cancelAction)
+                }
+            }
+
+            if actionState != .idle {
+                BrewServiceActionStatusView(actionState: actionState)
             }
         }
     }
 
     private var actionLogCard: some View {
         BrewServiceCard(title: "Action Details") {
-            CommandOutputDisclosure(
-                entries: actionLogs,
-                isRunning: actionState.isRunning,
-                emptyMessage: "Service details will appear here if you choose to inspect Homebrew output."
-            )
+            VStack(alignment: .leading, spacing: 12) {
+                if let progress = actionState.progress {
+                    CommandPreviewField(
+                        title: "Executed Command",
+                        command: progress.command.command,
+                        copyAccessibilityLabel: "Copy executed service command"
+                    )
+                }
+
+                CommandOutputDisclosure(
+                    entries: actionLogs,
+                    isRunning: actionState.isRunning,
+                    emptyMessage: "Service details will appear here if you choose to inspect Homebrew output."
+                )
+
+                if !actionState.isRunning {
+                    Button("Clear Output") {
+                        onClearOutput()
+                    }
+                    .accessibilityLabel("Clear service output")
+                }
+            }
         }
     }
+}
 
-    private var actionSummary: String {
+private struct BrewServiceActionStatusView: View {
+    let actionState: BrewServiceActionState
+
+    var body: some View {
         switch actionState {
         case .idle:
-            "Use these controls to start, stop, or restart the selected Homebrew service."
+            EmptyView()
         case .running(let progress):
-            "\(progress.command.kind.title) is running. Elapsed \(progress.elapsedTime().formatted(.number.precision(.fractionLength(1))))s."
-        case .succeeded(let progress, _):
-            "\(progress.command.kind.title) completed successfully."
-        case .failed(_, let message):
-            CommandPresentation.friendlyFailureDescription(
-                message,
-                fallback: "The service action couldn't complete."
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("\(progress.command.kind.title) started at \(progress.startedAt.formatted(date: .omitted, time: .standard))")
+                    .foregroundStyle(.secondary)
+            }
+        case .succeeded:
+            Label(
+                "The service action completed successfully.",
+                systemImage: "checkmark.circle.fill"
             )
+            .foregroundStyle(.green)
+        case .failed(_, let message):
+            Label(
+                CommandPresentation.friendlyFailureDescription(
+                    message,
+                    fallback: "The service action couldn't complete."
+                ),
+                systemImage: "exclamationmark.triangle.fill"
+            )
+            .foregroundStyle(.orange)
         case .cancelled:
-            "The service action was cancelled."
+            Label(
+                "The service action was cancelled.",
+                systemImage: "xmark.circle.fill"
+            )
+            .foregroundStyle(.secondary)
         }
     }
 }
@@ -540,14 +551,6 @@ private struct BrewServiceCard<Content: View>: View {
 }
 
 private struct BrewServiceBadgeFlow: View {
-    let items: [String]
-
-    var body: some View {
-        BrewServiceTagFlow(items: items)
-    }
-}
-
-private struct BrewServiceTagFlow: View {
     let items: [String]
 
     var body: some View {

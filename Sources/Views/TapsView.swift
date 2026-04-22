@@ -259,11 +259,13 @@ private struct TapDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 titleBlock
-                actionCard
                 metricsCard
                 metadataCard
                 packagePreviewCard
-                outputCard
+                if actionState != .idle || !actionLogs.isEmpty {
+                    outputCard
+                }
+                guidanceCard
             }
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -294,10 +296,6 @@ private struct TapDetailView: View {
                     .background(.quaternary, in: Capsule())
             }
 
-            if !tap.statusBadges.isEmpty {
-                TapTagFlow(items: tap.statusBadges)
-            }
-
             if !isCurrentSnapshot {
                 Label(
                     "This tap is no longer in the latest snapshot. The detail pane is keeping the last selection visible so you can review the action output.",
@@ -306,6 +304,8 @@ private struct TapDetailView: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
             }
+
+            actionBlock
         }
     }
 
@@ -354,28 +354,34 @@ private struct TapDetailView: View {
         }
     }
 
-    private var actionCard: some View {
-        TapCard(title: "Actions") {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Untap removes this repository from your local Homebrew installation. Use force only if packages from this tap are still installed.")
-                    .foregroundStyle(.secondary)
+    private var actionBlock: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                Button("Untap") {
+                    onUntap()
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(actionState.isRunning)
 
                 Toggle("Force untap", isOn: $forceUntap)
+                    .toggleStyle(.checkbox)
 
-                HStack(spacing: 12) {
-                    Button("Untap") {
-                        onUntap()
-                    }
-                    .disabled(actionState.isRunning)
-
-                    if actionState.isRunning {
-                        Button("Cancel Action") {
-                            onCancelAction()
-                        }
+                if actionState.isRunning {
+                    Button("Cancel", action: onCancelAction)
                         .keyboardShortcut(.cancelAction)
-                    }
                 }
             }
+
+            if actionState != .idle {
+                TapActionStatusView(actionState: actionState)
+            }
+        }
+    }
+
+    private var guidanceCard: some View {
+        TapCard(title: "Untap Guidance") {
+            Text("Untap removes this repository from your local Homebrew installation. Use force only if packages from this tap are still installed.")
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -383,25 +389,11 @@ private struct TapDetailView: View {
         TapCard(title: "Action Output") {
             VStack(alignment: .leading, spacing: 12) {
                 if let progress = actionState.progress {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text(statusTitle)
-                                .font(.headline)
-                            Spacer()
-                            Text("Elapsed \(progress.elapsedTime(), format: .number.precision(.fractionLength(1)))s")
-                                .font(.caption.monospaced())
-                                .foregroundStyle(.secondary)
-                        }
-
-                        CommandPreviewField(
-                            title: "Executed Command",
-                            command: progress.command.command,
-                            copyAccessibilityLabel: "Copy executed tap command"
-                        )
-                    }
-                } else {
-                    Text("Add or untap a repository to stream Homebrew output here.")
-                        .foregroundStyle(.secondary)
+                    CommandPreviewField(
+                        title: "Executed Command",
+                        command: progress.command.command,
+                        copyAccessibilityLabel: "Copy executed tap command"
+                    )
                 }
 
                 CommandOutputDisclosure(
@@ -442,18 +434,43 @@ private struct TapDetailView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var statusTitle: String {
+}
+
+private struct TapActionStatusView: View {
+    let actionState: BrewTapActionState
+
+    var body: some View {
         switch actionState {
         case .idle:
-            "Idle"
-        case .running:
-            "Running"
+            EmptyView()
+        case .running(let progress):
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("\(progress.command.kind.title) started at \(progress.startedAt.formatted(date: .omitted, time: .standard))")
+                    .foregroundStyle(.secondary)
+            }
         case .succeeded:
-            "Completed"
-        case .failed:
-            "Failed"
+            Label(
+                "The tap action completed successfully.",
+                systemImage: "checkmark.circle.fill"
+            )
+            .foregroundStyle(.green)
+        case .failed(_, let message):
+            Label(
+                CommandPresentation.friendlyFailureDescription(
+                    message,
+                    fallback: "Homebrew couldn't complete this tap action."
+                ),
+                systemImage: "exclamationmark.triangle.fill"
+            )
+            .foregroundStyle(.orange)
         case .cancelled:
-            "Cancelled"
+            Label(
+                "The tap action was cancelled.",
+                systemImage: "xmark.circle.fill"
+            )
+            .foregroundStyle(.secondary)
         }
     }
 }
@@ -482,23 +499,6 @@ private struct TapCard<Content: View>: View {
                 .fill(Color(nsColor: .windowBackgroundColor))
                 .shadow(color: .black.opacity(0.06), radius: 10, y: 2)
         )
-    }
-}
-
-private struct TapTagFlow: View {
-    let items: [String]
-
-    var body: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), alignment: .leading)], alignment: .leading, spacing: 10) {
-            ForEach(items, id: \.self) { item in
-                Text(item)
-                    .font(.caption.monospaced())
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Color(nsColor: .controlBackgroundColor), in: Capsule())
-                    .textSelection(.enabled)
-            }
-        }
     }
 }
 
