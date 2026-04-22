@@ -43,7 +43,7 @@ struct HodgepodgeApp: App {
     }
 
     var body: some Scene {
-        WindowGroup {
+        Window("Hodgepodge", id: "main") {
             RootView(
                 model: model,
                 catalogModel: catalogModel,

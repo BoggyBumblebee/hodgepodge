@@ -8,6 +8,8 @@
 
 Hodgepodge is a native macOS SwiftUI application for working with Homebrew in a way that stays transparent to the underlying `brew` tool. The goal is to provide a serious desktop console for package discovery, installed-state inspection, upgrades, services, taps, Brewfiles, and maintenance workflows without relying on Homebrew's private Ruby internals.
 
+It is designed as a single-window macOS utility with a separate Settings window, rather than a multi-document app.
+
 The project is intentionally being built in phases so each milestone is useful, testable, and safe to iterate on.
 
 ## Built With
@@ -128,6 +130,7 @@ The current project state already includes:
   - cross-section UI normalization for toolbars, headers, action placement, command copy, and cleaner detail layouts
   - progressive-disclosure command output with compact status-first action feedback
   - final layout cleanup across About Brew, Catalog Analytics, and Maintenance to better match native macOS hierarchy
+  - single-window main application scene with a separate Settings window
   - settings extraction audit defining what belongs in Settings vs transient per-screen state
   - first settings-extraction slice for notification scope and Brewfile export defaults
   - second settings-extraction slice for notification categories and catalog command-history retention
