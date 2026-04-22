@@ -303,6 +303,71 @@ final class HomebrewAPIClientTests: XCTestCase {
         XCTAssertEqual(usesFromMacOSSection.items, ["python: test", "bzip2", "xz"])
     }
 
+    func testFetchFormulaDetailAllowsGroupedHeadDependencies() async throws {
+        let client = makeClient { request in
+            switch request.url?.path {
+            case "/api/formula/adplug.json":
+                return .ok(
+                    """
+                    {
+                      "name": "adplug",
+                      "full_name": "adplug",
+                      "aliases": [],
+                      "oldnames": [],
+                      "desc": "AdLib sound player library",
+                      "homepage": "https://example.com/adplug",
+                      "versions": { "stable": "2.4", "head": "HEAD", "bottle": true },
+                      "tap": "homebrew/core",
+                      "license": "GPL-2.0-or-later",
+                      "dependencies": ["libbinio"],
+                      "build_dependencies": ["pkgconf", "texinfo"],
+                      "test_dependencies": [],
+                      "recommended_dependencies": [],
+                      "optional_dependencies": [],
+                      "head_dependencies": {
+                        "build_dependencies": ["autoconf", "automake", "libtool", "pkgconf", "texinfo"],
+                        "dependencies": ["libbinio"],
+                        "test_dependencies": [],
+                        "recommended_dependencies": [],
+                        "optional_dependencies": [],
+                        "uses_from_macos": [],
+                        "uses_from_macos_bounds": []
+                      },
+                      "uses_from_macos": [],
+                      "requirements": [],
+                      "conflicts_with": [],
+                      "caveats": null,
+                      "bottle": null,
+                      "variations": {},
+                      "deprecated": false,
+                      "disabled": false
+                    }
+                    """
+                )
+            default:
+                return .notFound
+            }
+        }
+
+        let detail = try await client.fetchDetail(
+            for: CatalogPackageSummary.fixture(
+                slug: "adplug",
+                title: "adplug",
+                subtitle: "AdLib sound player library",
+                version: "2.4",
+                homepage: URL(string: "https://example.com/adplug")
+            )
+        )
+
+        let headDependenciesSection = try XCTUnwrap(
+            detail.dependencySections.first(where: { $0.title == "Head Dependencies" })
+        )
+        XCTAssertEqual(
+            headDependenciesSection.items,
+            ["autoconf", "automake", "libtool", "pkgconf", "texinfo", "libbinio"]
+        )
+    }
+
     func testFetchCaskDetailFlattensArtifacts() async throws {
         let client = makeClient { request in
             switch request.url?.path {

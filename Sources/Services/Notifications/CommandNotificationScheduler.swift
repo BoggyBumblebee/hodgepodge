@@ -20,14 +20,30 @@ protocol UserNotificationCentering: Sendable {
     func add(_ request: UNNotificationRequest) async throws
 }
 
-extension UNUserNotificationCenter: UserNotificationCentering {
+private struct UserNotificationCenterAdapter: UserNotificationCentering, @unchecked Sendable {
+    private let center: UNUserNotificationCenter
+
+    init(center: UNUserNotificationCenter) {
+        self.center = center
+    }
+
     func authorizationStatus() async -> UNAuthorizationStatus {
-        await notificationSettings().authorizationStatus
+        await center.notificationSettings().authorizationStatus
+    }
+
+    func requestAuthorization(options: UNAuthorizationOptions) async throws -> Bool {
+        try await center.requestAuthorization(options: options)
+    }
+
+    func add(_ request: UNNotificationRequest) async throws {
+        try await center.add(request)
     }
 }
 
 actor CommandNotificationScheduler: CommandNotificationScheduling {
-    static let shared = CommandNotificationScheduler(center: UNUserNotificationCenter.current())
+    static let shared = CommandNotificationScheduler(
+        center: UserNotificationCenterAdapter(center: UNUserNotificationCenter.current())
+    )
 
     private let center: any UserNotificationCentering
     private var authorizationChecked = false

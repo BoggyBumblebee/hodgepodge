@@ -287,7 +287,7 @@ private struct FormulaDetailResponse: Decodable {
         testDependencies = try container.decodeIfPresent([String].self, forKey: .testDependencies) ?? []
         recommendedDependencies = try container.decodeIfPresent([String].self, forKey: .recommendedDependencies) ?? []
         optionalDependencies = try container.decodeIfPresent([String].self, forKey: .optionalDependencies) ?? []
-        headDependencies = try container.decodeIfPresent([String].self, forKey: .headDependencies) ?? []
+        headDependencies = try Self.decodeDependencyList(forKey: .headDependencies, from: container)
         usesFromMacOS = try container.decodeIfPresent([JSONValue].self, forKey: .usesFromMacOS)?
             .flatMap(\.flattenedItems) ?? []
         requirements = try container.decodeIfPresent([JSONValue].self, forKey: .requirements) ?? []
@@ -306,6 +306,42 @@ private struct FormulaDetailResponse: Decodable {
         disableReplacementFormula = try container.decodeIfPresent(String.self, forKey: .disableReplacementFormula)
         disableReplacementCask = try container.decodeIfPresent(String.self, forKey: .disableReplacementCask)
         analytics = try container.decodeIfPresent(AnalyticsResponse.self, forKey: .analytics)
+    }
+
+    private static func decodeDependencyList(
+        forKey key: CodingKeys,
+        from container: KeyedDecodingContainer<CodingKeys>
+    ) throws -> [String] {
+        if let values = try? container.decode([String].self, forKey: key) {
+            return values
+        }
+
+        guard let value = try container.decodeIfPresent(JSONValue.self, forKey: key) else {
+            return []
+        }
+
+        return flattenDependencyValues(from: value)
+    }
+
+    private static func flattenDependencyValues(from value: JSONValue) -> [String] {
+        switch value {
+        case .string, .number, .bool:
+            return value.flattenedItems
+        case .array(let values):
+            return values.flatMap(flattenDependencyValues)
+        case .object(let values):
+            return values
+                .keys
+                .sorted()
+                .flatMap { key -> [String] in
+                    guard let nestedValue = values[key] else {
+                        return []
+                    }
+                    return flattenDependencyValues(from: nestedValue)
+                }
+        case .null:
+            return []
+        }
     }
 }
 
