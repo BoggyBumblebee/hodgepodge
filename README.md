@@ -61,6 +61,7 @@ The current project state already includes:
 - completion notifications for long-running Homebrew actions
 - a dedicated Settings window for launch, notification, Brewfile, and history preferences
 - comprehensive bundled help documentation and app icon resources
+- a refreshed macOS app icon built around a pint-of-beer motif
 
 ## Roadmap
 
@@ -139,6 +140,7 @@ The current project state already includes:
   - defensive decoding and regression coverage around mixed or partial Homebrew JSON shapes
   - final macOS UI normalization pass for cleaner layouts, clearer hierarchy, and more consistent controls
   - continued Settings extraction to move app-wide preferences out of section state while keeping transient UI state local
+  - refreshed macOS app icon artwork and reproducible icon-generation script
 
 ## Contributing
 
