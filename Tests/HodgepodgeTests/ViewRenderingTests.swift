@@ -400,6 +400,21 @@ final class ViewRenderingTests: XCTestCase {
                 timestamp: Date(timeIntervalSince1970: 1_001)
             )
         ]
+        viewModel.clearActionOutput()
+        viewModel.actionState = .running(
+            BrewServiceActionProgress(
+                command: .cleanupAll(),
+                startedAt: Date(timeIntervalSince1970: 1_010)
+            )
+        )
+        viewModel.actionLogs = [
+            CommandLogEntry(
+                id: 0,
+                kind: .stdout,
+                text: "Cleaning up unused services...",
+                timestamp: Date(timeIntervalSince1970: 1_011)
+            )
+        ]
 
         XCTAssertNotNil(render(ServicesView(viewModel: viewModel)))
     }

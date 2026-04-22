@@ -100,7 +100,7 @@ struct BrewService: Identifiable, Equatable, Hashable, Sendable {
 
     var availableActions: [BrewServiceActionKind] {
         if isRunning {
-            return [.restart, .stop]
+            return [.restart, .stop, .kill]
         }
         return [.start]
     }
@@ -111,6 +111,7 @@ struct BrewService: Identifiable, Equatable, Hashable, Sendable {
             serviceID: id,
             serviceName: name,
             displayName: title,
+            isGlobalAction: false,
             arguments: ["services", action.rawValue, name]
         )
     }
@@ -186,6 +187,8 @@ enum BrewServiceActionKind: String, CaseIterable, Equatable, Identifiable, Senda
     case start
     case stop
     case restart
+    case kill
+    case cleanup
 
     var id: String { rawValue }
 
@@ -197,7 +200,7 @@ enum BrewServiceActionKind: String, CaseIterable, Equatable, Identifiable, Senda
         switch self {
         case .start:
             false
-        case .stop, .restart:
+        case .stop, .restart, .kill, .cleanup:
             true
         }
     }
@@ -208,6 +211,7 @@ struct BrewServiceActionCommand: Equatable, Sendable {
     let serviceID: String
     let serviceName: String
     let displayName: String
+    let isGlobalAction: Bool
     let arguments: [String]
 
     var command: String {
@@ -215,11 +219,33 @@ struct BrewServiceActionCommand: Equatable, Sendable {
     }
 
     var confirmationTitle: String {
-        "\(kind.title) \(displayName)?"
+        if isGlobalAction {
+            return "\(kind.title) Services?"
+        }
+
+        return "\(kind.title) \(displayName)?"
     }
 
     var confirmationMessage: String {
-        "Hodgepodge will run `\(command)` using your local Homebrew installation."
+        switch kind {
+        case .kill:
+            return "Hodgepodge will run `\(command)` using your local Homebrew installation. This stops the service immediately but keeps it registered to launch again later."
+        case .cleanup:
+            return "Hodgepodge will run `\(command)` using your local Homebrew installation. This removes unused Homebrew service registrations."
+        case .start, .stop, .restart:
+            return "Hodgepodge will run `\(command)` using your local Homebrew installation."
+        }
+    }
+
+    static func cleanupAll() -> BrewServiceActionCommand {
+        BrewServiceActionCommand(
+            kind: .cleanup,
+            serviceID: "__services_cleanup__",
+            serviceName: "cleanup",
+            displayName: "Unused Services",
+            isGlobalAction: true,
+            arguments: ["services", "cleanup"]
+        )
     }
 }
 

@@ -80,6 +80,30 @@ final class ServicesViewModel: ObservableObject {
         actionState.isRunning
     }
 
+    var cleanupCommand: BrewServiceActionCommand {
+        .cleanupAll()
+    }
+
+    var cleanupState: BrewServiceActionState {
+        guard actionState.command?.isGlobalAction == true else {
+            return .idle
+        }
+
+        return actionState
+    }
+
+    var cleanupLogs: [CommandLogEntry] {
+        guard actionState.command?.isGlobalAction == true else {
+            return []
+        }
+
+        return actionLogs
+    }
+
+    var cleanupDescription: String {
+        "Remove unused Homebrew service registrations that are no longer needed on this Mac."
+    }
+
     func loadIfNeeded() {
         guard case .idle = servicesState else {
             return
@@ -110,14 +134,37 @@ final class ServicesViewModel: ObservableObject {
     }
 
     func runAction(_ actionKind: BrewServiceActionKind, for service: BrewService) {
-        let command = service.command(for: actionKind)
-        let progress = BrewServiceActionProgress(command: command, startedAt: Date())
+        runAction(service.command(for: actionKind), preservingSelectionID: service.id)
+    }
 
+    func runCleanup() {
+        runAction(cleanupCommand, preservingSelectionID: selectedService?.id)
+    }
+
+    func runActionCommand(_ command: BrewServiceActionCommand) {
+        if command.isGlobalAction {
+            runCleanup()
+            return
+        }
+
+        guard case .loaded(let services) = servicesState,
+              let service = services.first(where: { $0.id == command.serviceID }) else {
+            return
+        }
+
+        runAction(service.command(for: command.kind), preservingSelectionID: service.id)
+    }
+
+    private func runAction(
+        _ command: BrewServiceActionCommand,
+        preservingSelectionID: String?
+    ) {
+        let progress = BrewServiceActionProgress(command: command, startedAt: Date())
         actionTask?.cancel()
         actionTask = nil
         resetActionOutput()
         actionState = .running(progress)
-        appendLog(.system, "Preparing \(actionKind.title.lowercased()) for \(service.title).")
+        appendPreparationLog(for: command)
 
         actionTask = Task { @MainActor [commandExecutor] in
             do {
@@ -125,13 +172,12 @@ final class ServicesViewModel: ObservableObject {
                     self?.appendLog(kind, text)
                 }
                 flushPendingLogs()
-                appendLog(.system, "\(actionKind.title) finished with exit code \(result.exitCode).")
                 let completedProgress = progress.finished(at: Date())
                 actionState = .succeeded(completedProgress, result)
-                reloadServicesAfterAction(preservingSelectionID: service.id)
+                reloadServicesAfterAction(preservingSelectionID: preservingSelectionID)
             } catch is CancellationError {
                 flushPendingLogs()
-                appendLog(.system, "\(actionKind.title) cancelled.")
+                appendLog(.system, "\(command.kind.title) cancelled.")
                 actionState = .cancelled(progress.finished(at: Date()))
             } catch {
                 flushPendingLogs()
@@ -155,7 +201,8 @@ final class ServicesViewModel: ObservableObject {
     }
 
     func actionState(for service: BrewService) -> BrewServiceActionState {
-        guard actionState.command?.serviceID == service.id else {
+        guard actionState.command?.serviceID == service.id,
+              actionState.command?.isGlobalAction == false else {
             return .idle
         }
 
@@ -163,7 +210,8 @@ final class ServicesViewModel: ObservableObject {
     }
 
     func actionLogs(for service: BrewService) -> [CommandLogEntry] {
-        guard actionState.command?.serviceID == service.id else {
+        guard actionState.command?.serviceID == service.id,
+              actionState.command?.isGlobalAction == false else {
             return []
         }
 
@@ -186,7 +234,7 @@ final class ServicesViewModel: ObservableObject {
         }
     }
 
-    private func reloadServicesAfterAction(preservingSelectionID: String) {
+    private func reloadServicesAfterAction(preservingSelectionID: String?) {
         Task { @MainActor [provider] in
             do {
                 let services = try await provider.fetchServices()
@@ -198,6 +246,14 @@ final class ServicesViewModel: ObservableObject {
             } catch {
                 appendLog(.system, error.localizedDescription)
             }
+        }
+    }
+
+    private func appendPreparationLog(for command: BrewServiceActionCommand) {
+        if command.isGlobalAction {
+            appendLog(.system, "Preparing \(command.kind.title.lowercased()) for Homebrew services.")
+        } else {
+            appendLog(.system, "Preparing \(command.kind.title.lowercased()) for \(command.displayName).")
         }
     }
 

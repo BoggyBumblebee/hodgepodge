@@ -82,22 +82,17 @@ The current project state already includes:
 - package-to-package jump navigation in dependency trees
 - Brewfile generation from currently installed packages
 
-### Phase 4: Core Actions - In Progress
+### Phase 4: Core Actions - Completed
 
-- completed:
-  - install and fetch flows from catalog detail
-  - single-package and bulk upgrade flows from the Outdated screen
-  - live logs, cancellation, confirmation, and state refresh after mutations
-- still to do:
-  - uninstall, reinstall, link, unlink, pin, and unpin
+- install and fetch flows from catalog detail
+- single-package and bulk upgrade flows from the Outdated screen
+- uninstall, reinstall, link, unlink, pin, and unpin
+- live logs, cancellation, confirmation, and state refresh after mutations
 
-### Phase 5: Services - In Progress
+### Phase 5: Services - Completed
 
-- completed:
-  - `brew services` list and detail integration
-  - start, stop, and restart flows
-- still to do:
-  - kill and cleanup flows
+- `brew services` list and detail integration
+- start, stop, restart, kill, and cleanup flows
 
 ### Phase 6: Maintenance and Diagnostics - Completed
 

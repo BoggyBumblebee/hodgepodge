@@ -29,11 +29,12 @@ struct ServicesView: View {
             ),
             titleVisibility: .visible
         ) {
-            if let pendingAction,
-               let service = viewModel.selectedService,
-               service.id == pendingAction.serviceID {
-                Button(pendingAction.kind.title, role: pendingAction.kind == .stop ? .destructive : nil) {
-                    viewModel.runAction(pendingAction.kind, for: service)
+            if let pendingAction {
+                Button(
+                    pendingAction.kind.title,
+                    role: pendingAction.kind == .stop || pendingAction.kind == .kill ? .destructive : nil
+                ) {
+                    viewModel.runActionCommand(pendingAction)
                     self.pendingAction = nil
                 }
             }
@@ -49,6 +50,7 @@ struct ServicesView: View {
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 16) {
             header
+            cleanupCard
 
             switch viewModel.servicesState {
             case .idle, .loading:
@@ -187,6 +189,64 @@ struct ServicesView: View {
         }
     }
 
+    private var cleanupCard: some View {
+        GroupBox("Cleanup") {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(viewModel.cleanupDescription)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+
+                Text(viewModel.cleanupCommand.command)
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+
+                BrewServiceCleanupStatusView(actionState: viewModel.cleanupState)
+
+                HStack(spacing: 12) {
+                    Button("Run Cleanup") {
+                        pendingAction = viewModel.cleanupCommand
+                    }
+                    .disabled(viewModel.hasRunningAction)
+
+                    if viewModel.cleanupState.isRunning {
+                        Button("Cancel", action: viewModel.cancelAction)
+                    } else {
+                        Button("Clear Output", action: viewModel.clearActionOutput)
+                            .disabled(viewModel.cleanupState == .idle && viewModel.cleanupLogs.isEmpty)
+                    }
+                }
+
+                if !viewModel.cleanupLogs.isEmpty {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(viewModel.cleanupLogs) { entry in
+                                HStack(alignment: .top, spacing: 10) {
+                                    Text(entry.timestamp, format: .dateTime.hour().minute().second())
+                                        .font(.caption2.monospaced())
+                                        .foregroundStyle(.tertiary)
+
+                                    Text(entry.kind.rawValue.uppercased())
+                                        .font(.caption2.weight(.semibold).monospaced())
+                                        .foregroundStyle(.secondary)
+
+                                    Text(entry.text)
+                                        .font(.caption.monospaced())
+                                        .textSelection(.enabled)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(minHeight: 120, maxHeight: 220)
+                    .padding(12)
+                    .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+            }
+        }
+    }
+
     @ViewBuilder
     private var detail: some View {
         switch viewModel.servicesState {
@@ -206,6 +266,7 @@ struct ServicesView: View {
             if let service = viewModel.selectedService {
                 BrewServiceDetailView(
                     service: service,
+                    hasRunningAction: viewModel.hasRunningAction,
                     actionState: viewModel.actionState(for: service),
                     actionLogs: viewModel.actionLogs(for: service),
                     onRunAction: handleAction(_:for:),
@@ -244,8 +305,48 @@ struct ServicesView: View {
     }
 }
 
+private struct BrewServiceCleanupStatusView: View {
+    let actionState: BrewServiceActionState
+
+    var body: some View {
+        switch actionState {
+        case .idle:
+            Text("Remove stale Homebrew service registrations that are no longer in use.")
+                .foregroundStyle(.secondary)
+        case .running(let progress):
+            Label(
+                "\(progress.command.kind.title) started at \(progress.startedAt.formatted(date: .omitted, time: .standard))",
+                systemImage: "hourglass"
+            )
+            .foregroundStyle(.secondary)
+        case .succeeded:
+            Label(
+                "Service cleanup completed successfully.",
+                systemImage: "checkmark.circle.fill"
+            )
+            .foregroundStyle(.green)
+        case .failed(_, let message):
+            Label(
+                CommandPresentation.friendlyFailureDescription(
+                    message,
+                    fallback: "Homebrew couldn't complete services cleanup."
+                ),
+                systemImage: "exclamationmark.triangle.fill"
+            )
+            .foregroundStyle(.orange)
+        case .cancelled:
+            Label(
+                "Services cleanup was cancelled.",
+                systemImage: "xmark.circle.fill"
+            )
+            .foregroundStyle(.secondary)
+        }
+    }
+}
+
 private struct BrewServiceDetailView: View {
     let service: BrewService
+    let hasRunningAction: Bool
     let actionState: BrewServiceActionState
     let actionLogs: [CommandLogEntry]
     let onRunAction: (BrewServiceActionKind, BrewService) -> Void
@@ -337,7 +438,7 @@ private struct BrewServiceDetailView: View {
                             onRunAction(action, service)
                         }
                         .buttonStyle(.borderedProminent)
-                        .disabled(actionState.isRunning)
+                        .disabled(hasRunningAction)
                     }
 
                     if actionState.isRunning {

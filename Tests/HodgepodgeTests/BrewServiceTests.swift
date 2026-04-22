@@ -9,7 +9,7 @@ final class BrewServiceTests: XCTestCase {
             running.statusBadges,
             ["Started", "Running", "Loaded", "Registered"]
         )
-        XCTAssertEqual(running.availableActions, [.restart, .stop])
+        XCTAssertEqual(running.availableActions, [.restart, .stop, .kill])
 
         let stopped = BrewService.fixture(
             status: "none",
@@ -44,5 +44,16 @@ final class BrewServiceTests: XCTestCase {
         XCTAssertEqual(command.confirmationTitle, "Restart grafana?")
         XCTAssertTrue(BrewServiceActionKind.restart.requiresConfirmation)
         XCTAssertFalse(BrewServiceActionKind.start.requiresConfirmation)
+        XCTAssertTrue(BrewServiceActionKind.kill.requiresConfirmation)
+        XCTAssertTrue(BrewServiceActionKind.cleanup.requiresConfirmation)
+
+        let killCommand = service.command(for: .kill)
+        XCTAssertEqual(killCommand.arguments, ["services", "kill", "grafana"])
+        XCTAssertTrue(killCommand.confirmationMessage.contains("keeps it registered"))
+
+        let cleanupCommand = BrewServiceActionCommand.cleanupAll()
+        XCTAssertEqual(cleanupCommand.arguments, ["services", "cleanup"])
+        XCTAssertEqual(cleanupCommand.confirmationTitle, "Cleanup Services?")
+        XCTAssertTrue(cleanupCommand.isGlobalAction)
     }
 }

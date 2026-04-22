@@ -132,6 +132,36 @@ final class ServicesViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.actionLogs.contains(where: { $0.text == "Stopping..." }))
     }
 
+    func testRunCleanupStoresSuccessStateAndPreservesSelection() async {
+        let service = BrewService.fixture(name: "postgresql@17")
+        let refreshed = BrewService.fixture(name: "postgresql@17", status: "started")
+        let provider = CyclingBrewServicesProvider(results: [[refreshed]])
+        let executor = MockBrewCommandExecutor(
+            result: .success(CommandResult(stdout: "cleaned\n", stderr: "", exitCode: 0)),
+            chunks: [.init(stream: .stdout, text: "Cleaning up unused services...\n")]
+        )
+        let viewModel = ServicesViewModel(
+            provider: provider,
+            commandExecutor: executor
+        )
+        viewModel.servicesState = .loaded([service])
+        viewModel.selectedService = service
+
+        viewModel.runCleanup()
+        await waitUntil {
+            if case .succeeded = viewModel.cleanupState {
+                return true
+            }
+            return false
+        }
+        await waitUntil {
+            viewModel.selectedService == refreshed
+        }
+
+        XCTAssertEqual(executor.arguments, ["services", "cleanup"])
+        XCTAssertEqual(viewModel.cleanupLogs.map(\.text), ["Preparing cleanup for Homebrew services.", "Cleaning up unused services..."])
+    }
+
     func testToggleAndClearFiltersUpdateState() {
         let viewModel = ServicesViewModel(
             provider: MockBrewServicesProvider(result: .success([])),
