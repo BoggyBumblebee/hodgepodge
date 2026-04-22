@@ -56,6 +56,7 @@ The current project state already includes:
 - tap management
 - Brewfile inspection, check, install, export, and entry add/remove flows
 - command history for catalog actions
+- completion notifications for long-running Homebrew actions
 - bundled help documentation and app icon resources
 
 ## Roadmap
@@ -109,15 +110,14 @@ The current project state already includes:
 - Brewfile export and dump flows
 - Brewfile entry add and remove flows
 
-### Phase 8: Advanced UX - In Progress
+### Phase 8: Advanced UX - Completed
 
 - completed:
   - command history for catalog actions
   - a dedicated Catalog Analytics screen powered by the public Homebrew API
   - shared favorites across catalog and installed packages
   - saved searches for the catalog
-- still to do:
-  - notifications
+  - notifications for long-running Homebrew actions
 
 ## Contributing
 

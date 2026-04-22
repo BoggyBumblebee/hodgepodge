@@ -162,6 +162,87 @@ final class ServicesViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.cleanupLogs.map(\.text), ["Preparing cleanup for Homebrew services.", "Cleaning up unused services..."])
     }
 
+    func testRunActionStoresFailureState() async {
+        let service = BrewService.fixture(name: "postgresql@17")
+        let failure = CommandRunnerError.nonZeroExitCode(
+            CommandResult(stdout: "", stderr: "Service failed\n", exitCode: 1)
+        )
+        let viewModel = ServicesViewModel(
+            provider: MockBrewServicesProvider(result: .success([service])),
+            commandExecutor: MockBrewCommandExecutor(
+                result: .failure(failure),
+                chunks: [.init(stream: .stderr, text: "Service failed\n")]
+            )
+        )
+        viewModel.servicesState = .loaded([service])
+
+        viewModel.runAction(.restart, for: service)
+        await waitUntil {
+            if case .failed(_, "Service failed") = viewModel.actionState {
+                return true
+            }
+            return false
+        }
+
+        XCTAssertEqual(viewModel.actionLogs.last?.text, "Service failed")
+    }
+
+    func testCancelActionStoresCancelledState() async {
+        let service = BrewService.fixture(name: "postgresql@17")
+        let executor = SuspendingBrewCommandExecutor()
+        let viewModel = ServicesViewModel(
+            provider: MockBrewServicesProvider(result: .success([service])),
+            commandExecutor: executor
+        )
+        viewModel.servicesState = .loaded([service])
+
+        viewModel.runAction(.restart, for: service)
+        await waitUntil {
+            viewModel.actionState.command == service.command(for: .restart) &&
+                viewModel.actionState.isRunning
+        }
+
+        viewModel.cancelAction()
+        await waitUntil {
+            if case .cancelled = viewModel.actionState {
+                return true
+            }
+            return false
+        }
+
+        XCTAssertEqual(viewModel.actionLogs.last?.text, "Restart cancelled.")
+    }
+
+    func testRunActionCommandRoutesServiceAndGlobalCommands() async {
+        let service = BrewService.fixture(name: "postgresql@17")
+        let provider = CyclingBrewServicesProvider(results: [[service], [service], [service]])
+        let executor = MockBrewCommandExecutor(
+            result: .success(CommandResult(stdout: "done\n", stderr: "", exitCode: 0))
+        )
+        let viewModel = ServicesViewModel(
+            provider: provider,
+            commandExecutor: executor
+        )
+        viewModel.servicesState = .loaded([service])
+        viewModel.selectedService = service
+
+        viewModel.runActionCommand(service.command(for: .restart))
+        await waitUntil {
+            if case .succeeded = viewModel.actionState {
+                return executor.arguments == ["services", "restart", "postgresql@17"]
+            }
+            return false
+        }
+
+        viewModel.runActionCommand(.cleanupAll())
+        await waitUntil {
+            if case .succeeded = viewModel.cleanupState {
+                return executor.arguments == ["services", "cleanup"]
+            }
+            return false
+        }
+    }
+
     func testToggleAndClearFiltersUpdateState() {
         let viewModel = ServicesViewModel(
             provider: MockBrewServicesProvider(result: .success([])),
@@ -248,5 +329,28 @@ private final class MockBrewCommandExecutor: BrewCommandExecuting, @unchecked Se
         }
 
         return try result.get()
+    }
+}
+
+@MainActor
+private final class SuspendingBrewCommandExecutor: BrewCommandExecuting, @unchecked Sendable {
+    private var continuation: CheckedContinuation<CommandResult, Error>?
+
+    func execute(
+        arguments: [String],
+        onLog: @escaping @MainActor @Sendable (CatalogPackageActionLogKind, String) -> Void
+    ) async throws -> CommandResult {
+        onLog(.system, "Command started")
+
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                self.continuation = continuation
+            }
+        } onCancel: {
+            Task { @MainActor [weak self] in
+                self?.continuation?.resume(throwing: CancellationError())
+                self?.continuation = nil
+            }
+        }
     }
 }

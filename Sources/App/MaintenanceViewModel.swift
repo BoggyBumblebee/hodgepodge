@@ -9,15 +9,18 @@ final class MaintenanceViewModel: ObservableObject {
 
     private let provider: any BrewMaintenanceProviding
     private let commandExecutor: any BrewCommandExecuting
+    private let notificationScheduler: any CommandNotificationScheduling
     private var actionTask: Task<Void, Never>?
     private var logBuffer = CommandLogBuffer()
 
     init(
         provider: any BrewMaintenanceProviding,
-        commandExecutor: any BrewCommandExecuting
+        commandExecutor: any BrewCommandExecuting,
+        notificationScheduler: any CommandNotificationScheduling = NullCommandNotificationScheduler()
     ) {
         self.provider = provider
         self.commandExecutor = commandExecutor
+        self.notificationScheduler = notificationScheduler
     }
 
     deinit {
@@ -71,15 +74,18 @@ final class MaintenanceViewModel: ObservableObject {
                 flushPendingLogs()
                 appendLog(.system, "\(task.title) finished with exit code \(result.exitCode).")
                 actionState = .succeeded(progress.finished(at: Date()), result)
+                await notifyActionSucceeded(task: task)
                 reloadDashboardAfterAction()
             } catch is CancellationError {
                 flushPendingLogs()
                 appendLog(.system, "\(task.title) cancelled.")
                 actionState = .cancelled(progress.finished(at: Date()))
+                await notifyActionCancelled(task: task)
             } catch {
                 flushPendingLogs()
                 appendLog(.system, error.localizedDescription)
                 actionState = .failed(progress.finished(at: Date()), error.localizedDescription)
+                await notifyActionFailed(task: task, error: error)
             }
 
             actionTask = nil
@@ -150,6 +156,39 @@ final class MaintenanceViewModel: ObservableObject {
         formatter.dateFormat = "HH:mm:ss"
         return "[\(formatter.string(from: entry.timestamp))] \(entry.kind.rawValue.uppercased())  \(entry.text)"
     }
+
+    private func notifyActionSucceeded(task: BrewMaintenanceTask) async {
+        await notificationScheduler.schedule(
+            CommandNotification(
+                title: "\(task.title) Complete",
+                body: "\(task.title) completed successfully."
+            )
+        )
+    }
+
+    private func notifyActionCancelled(task: BrewMaintenanceTask) async {
+        await notificationScheduler.schedule(
+            CommandNotification(
+                title: "\(task.title) Cancelled",
+                body: "\(task.title) was cancelled before it finished."
+            )
+        )
+    }
+
+    private func notifyActionFailed(
+        task: BrewMaintenanceTask,
+        error: Error
+    ) async {
+        await notificationScheduler.schedule(
+            CommandNotification(
+                title: "\(task.title) Failed",
+                body: CommandPresentation.friendlyFailureDescription(
+                    error.localizedDescription,
+                    fallback: "\(task.title) couldn’t be completed."
+                )
+            )
+        )
+    }
 }
 
 extension MaintenanceViewModel {
@@ -165,7 +204,8 @@ extension MaintenanceViewModel {
             commandExecutor: BrewCommandExecutor(
                 brewLocator: brewLocator,
                 runner: runner
-            )
+            ),
+            notificationScheduler: CommandNotificationScheduler.shared
         )
     }
 }

@@ -55,57 +55,66 @@ struct CatalogView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             case .loaded:
-                List(viewModel.filteredPackages, selection: selectionBinding) { package in
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text(package.title)
-                                .font(.headline)
+                ScrollViewReader { proxy in
+                    List(viewModel.filteredPackages, selection: selectionBinding) { package in
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text(package.title)
+                                    .font(.headline)
 
-                            if viewModel.isFavorite(package) {
-                                Image(systemName: "star.fill")
+                                if viewModel.isFavorite(package) {
+                                    Image(systemName: "star.fill")
+                                        .font(.caption)
+                                        .foregroundStyle(.yellow)
+                                }
+
+                                Spacer()
+                                Text(package.kind.title.dropLast())
                                     .font(.caption)
-                                    .foregroundStyle(.yellow)
+                                    .foregroundStyle(.secondary)
                             }
 
-                            Spacer()
-                            Text(package.kind.title.dropLast())
-                                .font(.caption)
+                            Text(package.subtitle)
+                                .font(.subheadline)
                                 .foregroundStyle(.secondary)
+                                .lineLimit(2)
+
+                            Text(package.version)
+                                .font(.caption.monospaced())
+                                .foregroundStyle(.tertiary)
+
+                            HStack(spacing: 6) {
+                                if package.hasCaveats {
+                                    summaryBadge("Caveats", color: .orange)
+                                }
+                                if package.isDeprecated {
+                                    summaryBadge("Deprecated", color: .yellow)
+                                }
+                                if package.isDisabled {
+                                    summaryBadge("Disabled", color: .red)
+                                }
+                                if package.autoUpdates {
+                                    summaryBadge("Auto Updates", color: .blue)
+                                }
+                            }
                         }
-
-                        Text(package.subtitle)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
-
-                        Text(package.version)
-                            .font(.caption.monospaced())
-                            .foregroundStyle(.tertiary)
-
-                        HStack(spacing: 6) {
-                            if package.hasCaveats {
-                                summaryBadge("Caveats", color: .orange)
-                            }
-                            if package.isDeprecated {
-                                summaryBadge("Deprecated", color: .yellow)
-                            }
-                            if package.isDisabled {
-                                summaryBadge("Disabled", color: .red)
-                            }
-                            if package.autoUpdates {
-                                summaryBadge("Auto Updates", color: .blue)
-                            }
+                        .padding(.vertical, 4)
+                        .tag(package)
+                        .id(package.id)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("\(package.title), \(package.kind.title.dropLast()), version \(package.version)")
+                    }
+                    .listStyle(.sidebar)
+                    .overlay {
+                        if viewModel.filteredPackages.isEmpty {
+                            ContentUnavailableView.search(text: viewModel.searchText)
                         }
                     }
-                    .padding(.vertical, 4)
-                    .tag(package)
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel("\(package.title), \(package.kind.title.dropLast()), version \(package.version)")
-                }
-                .listStyle(.sidebar)
-                .overlay {
-                    if viewModel.filteredPackages.isEmpty {
-                        ContentUnavailableView.search(text: viewModel.searchText)
+                    .task(id: viewModel.selectedPackage?.id) {
+                        scrollSelectionIntoView(using: proxy)
+                    }
+                    .task(id: viewModel.filteredPackages.map(\.id)) {
+                        scrollSelectionIntoView(using: proxy)
                     }
                 }
             }
@@ -310,6 +319,17 @@ struct CatalogView: View {
             .padding(.vertical, 3)
             .background(color.opacity(0.14), in: Capsule())
             .foregroundStyle(color)
+    }
+
+    private func scrollSelectionIntoView(using proxy: ScrollViewProxy) {
+        guard let selectedID = viewModel.selectedPackage?.id,
+              viewModel.filteredPackages.contains(where: { $0.id == selectedID }) else {
+            return
+        }
+
+        Task { @MainActor in
+            proxy.scrollTo(selectedID, anchor: .center)
+        }
     }
 }
 

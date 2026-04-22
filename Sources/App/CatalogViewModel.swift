@@ -22,6 +22,7 @@ final class CatalogViewModel: ObservableObject {
     private let actionHistoryStore: any CatalogActionHistoryStoring
     private let actionHistoryExporter: any CatalogActionHistoryExporting
     private let preferencesStore: any CatalogPreferencesStoring
+    private let notificationScheduler: any CommandNotificationScheduling
     private var detailCache: [String: CatalogPackageDetail] = [:]
     private var analyticsCache: [CatalogAnalyticsPeriod: CatalogAnalyticsSnapshot] = [:]
     private var analyticsTask: Task<Void, Never>?
@@ -36,6 +37,7 @@ final class CatalogViewModel: ObservableObject {
         actionHistoryStore: any CatalogActionHistoryStoring,
         actionHistoryExporter: any CatalogActionHistoryExporting,
         preferencesStore: any CatalogPreferencesStoring,
+        notificationScheduler: any CommandNotificationScheduling = NullCommandNotificationScheduler(),
         notificationCenter: NotificationCenter = .default
     ) {
         self.apiClient = apiClient
@@ -43,6 +45,7 @@ final class CatalogViewModel: ObservableObject {
         self.actionHistoryStore = actionHistoryStore
         self.actionHistoryExporter = actionHistoryExporter
         self.preferencesStore = preferencesStore
+        self.notificationScheduler = notificationScheduler
         let restoredHistory = actionHistoryStore.loadHistory()
         actionHistory = restoredHistory
         nextHistoryIdentifier = (restoredHistory.map { $0.id }.max() ?? -1) + 1
@@ -183,9 +186,7 @@ final class CatalogViewModel: ObservableObject {
     }
 
     func openAnalyticsItemInCatalog(_ analyticsItem: CatalogAnalyticsItem) {
-        searchText = analyticsItem.slug
-        scope = analyticsItem.kind == .formula ? .formula : .cask
-        activeFilters.removeAll()
+        clearNavigationFilters()
 
         if let package = packageSummary(for: analyticsItem) {
             selectPackage(package)
@@ -193,6 +194,12 @@ final class CatalogViewModel: ObservableObject {
         }
 
         refreshCatalog(selecting: analyticsItem)
+    }
+
+    private func clearNavigationFilters() {
+        searchText = ""
+        scope = .all
+        activeFilters.removeAll()
     }
 
     private func refreshCatalog(selecting analyticsItem: CatalogAnalyticsItem?) {
@@ -366,6 +373,7 @@ final class CatalogViewModel: ObservableObject {
                     progress: completedProgress,
                     outcome: .succeeded(result.exitCode)
                 )
+                await notifyActionSucceeded(actionKind: actionKind, detail: detail)
             } catch is CancellationError {
                 flushPendingLogs()
                 appendLog(.system, "\(actionKind.title) cancelled.")
@@ -376,6 +384,7 @@ final class CatalogViewModel: ObservableObject {
                     progress: completedProgress,
                     outcome: .cancelled
                 )
+                await notifyActionCancelled(actionKind: actionKind, detail: detail)
             } catch {
                 flushPendingLogs()
                 appendLog(.system, error.localizedDescription)
@@ -386,6 +395,7 @@ final class CatalogViewModel: ObservableObject {
                     progress: completedProgress,
                     outcome: .failed(error.localizedDescription)
                 )
+                await notifyActionFailed(actionKind: actionKind, detail: detail, error: error)
             }
 
             actionTask = nil
@@ -610,6 +620,46 @@ final class CatalogViewModel: ObservableObject {
 
         actionHistoryStore.saveHistory(actionHistory)
     }
+
+    private func notifyActionSucceeded(
+        actionKind: CatalogPackageActionKind,
+        detail: CatalogPackageDetail
+    ) async {
+        await notificationScheduler.schedule(
+            CommandNotification(
+                title: "\(actionKind.title) Complete",
+                body: "\(detail.title) completed successfully."
+            )
+        )
+    }
+
+    private func notifyActionCancelled(
+        actionKind: CatalogPackageActionKind,
+        detail: CatalogPackageDetail
+    ) async {
+        await notificationScheduler.schedule(
+            CommandNotification(
+                title: "\(actionKind.title) Cancelled",
+                body: "\(detail.title) was cancelled before it finished."
+            )
+        )
+    }
+
+    private func notifyActionFailed(
+        actionKind: CatalogPackageActionKind,
+        detail: CatalogPackageDetail,
+        error: Error
+    ) async {
+        await notificationScheduler.schedule(
+            CommandNotification(
+                title: "\(actionKind.title) Failed",
+                body: CommandPresentation.friendlyFailureDescription(
+                    error.localizedDescription,
+                    fallback: "\(detail.title) couldn’t be completed."
+                )
+            )
+        )
+    }
 }
 
 extension CatalogViewModel {
@@ -626,6 +676,7 @@ extension CatalogViewModel {
             actionHistoryStore: CatalogActionHistoryStore(),
             actionHistoryExporter: CatalogActionHistoryExporter(),
             preferencesStore: CatalogPreferencesStore(),
+            notificationScheduler: CommandNotificationScheduler.shared,
             notificationCenter: .default
         )
     }

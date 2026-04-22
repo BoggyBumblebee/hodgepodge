@@ -375,8 +375,8 @@ final class CatalogViewModelTests: XCTestCase {
 
         XCTAssertEqual(viewModel.selectedPackage, package)
         XCTAssertEqual(viewModel.detailState, .loaded(detail))
-        XCTAssertEqual(viewModel.searchText, package.slug)
-        XCTAssertEqual(viewModel.scope, .formula)
+        XCTAssertEqual(viewModel.searchText, "")
+        XCTAssertEqual(viewModel.scope, .all)
         XCTAssertTrue(viewModel.activeFilters.isEmpty)
     }
 
@@ -407,8 +407,8 @@ final class CatalogViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.packagesState, .loaded([package]))
         XCTAssertEqual(viewModel.selectedPackage, package)
         XCTAssertEqual(viewModel.detailState, .loaded(detail))
-        XCTAssertEqual(viewModel.searchText, package.slug)
-        XCTAssertEqual(viewModel.scope, .formula)
+        XCTAssertEqual(viewModel.searchText, "")
+        XCTAssertEqual(viewModel.scope, .all)
         XCTAssertTrue(viewModel.activeFilters.isEmpty)
         XCTAssertEqual(apiClient.fetchCatalogCallCount, 1)
     }

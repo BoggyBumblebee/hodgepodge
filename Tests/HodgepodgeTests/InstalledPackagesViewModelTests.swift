@@ -335,8 +335,8 @@ final class InstalledPackagesViewModelTests: XCTestCase {
         viewModel.openAnalyticsItem(analyticsItem)
 
         XCTAssertEqual(viewModel.selectedPackage, package)
-        XCTAssertEqual(viewModel.searchText, "wget")
-        XCTAssertEqual(viewModel.scope, .formula)
+        XCTAssertEqual(viewModel.searchText, "")
+        XCTAssertEqual(viewModel.scope, .all)
         XCTAssertTrue(viewModel.activeFilters.isEmpty)
         XCTAssertTrue(viewModel.isInstalled(analyticsItem))
     }
@@ -372,8 +372,8 @@ final class InstalledPackagesViewModelTests: XCTestCase {
         XCTAssertEqual(provider.fetchCallCount, 1)
         XCTAssertEqual(viewModel.packagesState, .loaded([package]))
         XCTAssertEqual(viewModel.selectedPackage, package)
-        XCTAssertEqual(viewModel.searchText, "docker-desktop")
-        XCTAssertEqual(viewModel.scope, .cask)
+        XCTAssertEqual(viewModel.searchText, "")
+        XCTAssertEqual(viewModel.scope, .all)
         XCTAssertTrue(viewModel.activeFilters.isEmpty)
         XCTAssertTrue(viewModel.isInstalled(analyticsItem))
     }

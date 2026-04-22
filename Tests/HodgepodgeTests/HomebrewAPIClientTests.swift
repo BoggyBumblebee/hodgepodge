@@ -249,6 +249,60 @@ final class HomebrewAPIClientTests: XCTestCase {
         XCTAssertEqual(detail.dependencies, ["go"])
     }
 
+    func testFetchFormulaDetailAllowsMixedUsesFromMacOSValues() async throws {
+        let client = makeClient { request in
+            switch request.url?.path {
+            case "/api/formula/uv.json":
+                return .ok(
+                    """
+                    {
+                      "name": "uv",
+                      "full_name": "uv",
+                      "aliases": [],
+                      "oldnames": [],
+                      "desc": "Extremely fast Python package installer and resolver, written in Rust",
+                      "homepage": "https://docs.astral.sh/uv/",
+                      "versions": { "stable": "0.11.7", "head": "HEAD", "bottle": true },
+                      "tap": "homebrew/core",
+                      "license": "Apache-2.0 OR MIT",
+                      "dependencies": [],
+                      "build_dependencies": ["pkgconf", "rust"],
+                      "test_dependencies": [],
+                      "recommended_dependencies": [],
+                      "optional_dependencies": [],
+                      "head_dependencies": [],
+                      "uses_from_macos": [{ "python": "test" }, "bzip2", "xz"],
+                      "requirements": [],
+                      "conflicts_with": [],
+                      "caveats": null,
+                      "bottle": null,
+                      "variations": {},
+                      "deprecated": false,
+                      "disabled": false
+                    }
+                    """
+                )
+            default:
+                return .notFound
+            }
+        }
+
+        let detail = try await client.fetchDetail(
+            for: CatalogPackageSummary.fixture(
+                slug: "uv",
+                title: "uv",
+                subtitle: "Extremely fast Python package installer and resolver, written in Rust",
+                version: "0.11.7",
+                homepage: URL(string: "https://docs.astral.sh/uv/")
+            )
+        )
+
+        let usesFromMacOSSection = try XCTUnwrap(
+            detail.dependencySections.first(where: { $0.title == "Uses From macOS" })
+        )
+        XCTAssertEqual(usesFromMacOSSection.items, ["python: test", "bzip2", "xz"])
+    }
+
     func testFetchCaskDetailFlattensArtifacts() async throws {
         let client = makeClient { request in
             switch request.url?.path {

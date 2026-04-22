@@ -6,9 +6,12 @@ final class CommandRunningTests: XCTestCase {
     func testProcessCommandRunnerCapturesSuccessfulOutput() async throws {
         let runner = ProcessCommandRunner()
 
-        let result = try await runner.run(executable: "/bin/echo", arguments: ["hello"])
+        let result = try await runner.run(
+            executable: "/bin/sh",
+            arguments: ["-c", "printf 'hello'"]
+        )
 
-        XCTAssertEqual(result.stdout, "hello\n")
+        XCTAssertEqual(result.stdout, "hello")
         XCTAssertEqual(result.stderr, "")
         XCTAssertEqual(result.exitCode, 0)
     }

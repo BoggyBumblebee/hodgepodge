@@ -15,15 +15,18 @@ final class TapsViewModel: ObservableObject {
 
     private let provider: any BrewTapsProviding
     private let commandExecutor: any BrewCommandExecuting
+    private let notificationScheduler: any CommandNotificationScheduling
     private var actionTask: Task<Void, Never>?
     private var logBuffer = CommandLogBuffer()
 
     init(
         provider: any BrewTapsProviding,
-        commandExecutor: any BrewCommandExecuting
+        commandExecutor: any BrewCommandExecuting,
+        notificationScheduler: any CommandNotificationScheduling = NullCommandNotificationScheduler()
     ) {
         self.provider = provider
         self.commandExecutor = commandExecutor
+        self.notificationScheduler = notificationScheduler
     }
 
     deinit {
@@ -191,6 +194,7 @@ final class TapsViewModel: ObservableObject {
                 flushPendingLogs()
                 appendLog(.system, "\(command.kind.title) finished with exit code \(result.exitCode).")
                 actionState = .succeeded(progress.finished(at: Date()), result)
+                await notifyActionSucceeded(command: command)
                 reloadTapsAfterAction(
                     command: command,
                     preservingSelectionID: preservingSelectionID
@@ -199,10 +203,12 @@ final class TapsViewModel: ObservableObject {
                 flushPendingLogs()
                 appendLog(.system, "\(command.kind.title) cancelled.")
                 actionState = .cancelled(progress.finished(at: Date()))
+                await notifyActionCancelled(command: command)
             } catch {
                 flushPendingLogs()
                 appendLog(.system, error.localizedDescription)
                 actionState = .failed(progress.finished(at: Date()), error.localizedDescription)
+                await notifyActionFailed(command: command, error: error)
             }
 
             actionTask = nil
@@ -304,6 +310,39 @@ final class TapsViewModel: ObservableObject {
         logBuffer.flush()
         actionLogs = logBuffer.entries
     }
+
+    private func notifyActionSucceeded(command: BrewTapActionCommand) async {
+        await notificationScheduler.schedule(
+            CommandNotification(
+                title: "\(command.kind.title) Complete",
+                body: "\(command.tapName) completed successfully."
+            )
+        )
+    }
+
+    private func notifyActionCancelled(command: BrewTapActionCommand) async {
+        await notificationScheduler.schedule(
+            CommandNotification(
+                title: "\(command.kind.title) Cancelled",
+                body: "\(command.tapName) was cancelled before it finished."
+            )
+        )
+    }
+
+    private func notifyActionFailed(
+        command: BrewTapActionCommand,
+        error: Error
+    ) async {
+        await notificationScheduler.schedule(
+            CommandNotification(
+                title: "\(command.kind.title) Failed",
+                body: CommandPresentation.friendlyFailureDescription(
+                    error.localizedDescription,
+                    fallback: "\(command.tapName) couldn’t be completed."
+                )
+            )
+        )
+    }
 }
 
 extension TapsViewModel {
@@ -320,7 +359,8 @@ extension TapsViewModel {
                 brewLocator: brewLocator,
                 runner: runner
             ),
-            commandExecutor: commandExecutor
+            commandExecutor: commandExecutor,
+            notificationScheduler: CommandNotificationScheduler.shared
         )
     }
 }

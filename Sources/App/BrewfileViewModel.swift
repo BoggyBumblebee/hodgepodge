@@ -16,6 +16,7 @@ final class BrewfileViewModel: ObservableObject {
     private let picker: any BrewfilePicking
     private let dumpDestinationPicker: any BrewfileDumpDestinationPicking
     private let commandExecutor: any BrewCommandExecuting
+    private let notificationScheduler: any CommandNotificationScheduling
     private let fileManager: FileManager
     private var actionTask: Task<Void, Never>?
     private var logBuffer = CommandLogBuffer()
@@ -26,6 +27,7 @@ final class BrewfileViewModel: ObservableObject {
         picker: any BrewfilePicking,
         dumpDestinationPicker: any BrewfileDumpDestinationPicking,
         commandExecutor: any BrewCommandExecuting,
+        notificationScheduler: any CommandNotificationScheduling = NullCommandNotificationScheduler(),
         fileManager: FileManager = .default
     ) {
         self.loader = loader
@@ -33,6 +35,7 @@ final class BrewfileViewModel: ObservableObject {
         self.picker = picker
         self.dumpDestinationPicker = dumpDestinationPicker
         self.commandExecutor = commandExecutor
+        self.notificationScheduler = notificationScheduler
         self.fileManager = fileManager
     }
 
@@ -332,6 +335,7 @@ final class BrewfileViewModel: ObservableObject {
                 flushPendingLogs()
                 appendLog(.system, "\(command.kind.title) finished with exit code \(result.exitCode).")
                 actionState = .succeeded(progress.finished(at: Date()), result)
+                await notifyActionSucceeded(command: command)
 
                 if shouldReloadAfterSuccess {
                     reloadDocumentAfterSuccessfulAction(fileURL: documentURLForReload)
@@ -340,10 +344,12 @@ final class BrewfileViewModel: ObservableObject {
                 flushPendingLogs()
                 appendLog(.system, "\(command.kind.title) cancelled.")
                 actionState = .cancelled(progress.finished(at: Date()))
+                await notifyActionCancelled(command: command)
             } catch {
                 flushPendingLogs()
                 appendLog(.system, error.localizedDescription)
                 actionState = .failed(progress.finished(at: Date()), error.localizedDescription)
+                await notifyActionFailed(command: command, error: error)
             }
 
             actionTask = nil
@@ -435,6 +441,39 @@ final class BrewfileViewModel: ObservableObject {
         logBuffer.flush()
         actionLogs = logBuffer.entries
     }
+
+    private func notifyActionSucceeded(command: BrewfileActionCommand) async {
+        await notificationScheduler.schedule(
+            CommandNotification(
+                title: "\(command.kind.title) Complete",
+                body: "\(command.fileURL.lastPathComponent) completed successfully."
+            )
+        )
+    }
+
+    private func notifyActionCancelled(command: BrewfileActionCommand) async {
+        await notificationScheduler.schedule(
+            CommandNotification(
+                title: "\(command.kind.title) Cancelled",
+                body: "\(command.fileURL.lastPathComponent) was cancelled before it finished."
+            )
+        )
+    }
+
+    private func notifyActionFailed(
+        command: BrewfileActionCommand,
+        error: Error
+    ) async {
+        await notificationScheduler.schedule(
+            CommandNotification(
+                title: "\(command.kind.title) Failed",
+                body: CommandPresentation.friendlyFailureDescription(
+                    error.localizedDescription,
+                    fallback: "\(command.fileURL.lastPathComponent) couldn’t be completed."
+                )
+            )
+        )
+    }
 }
 
 extension BrewfileViewModel {
@@ -450,7 +489,8 @@ extension BrewfileViewModel {
             commandExecutor: BrewCommandExecutor(
                 brewLocator: brewLocator,
                 runner: runner
-            )
+            ),
+            notificationScheduler: CommandNotificationScheduler.shared
         )
     }
 }

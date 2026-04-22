@@ -18,6 +18,7 @@ final class InstalledPackagesViewModel: ObservableObject {
     private let commandExecutor: any BrewCommandExecuting
     private let destinationPicker: any BrewfileDumpDestinationPicking
     private let favoritesStore: any FavoritePackageStoring
+    private let notificationScheduler: any CommandNotificationScheduling
     private let fileManager: FileManager
     private var actionTask: Task<Void, Never>?
     private var exportTask: Task<Void, Never>?
@@ -30,6 +31,7 @@ final class InstalledPackagesViewModel: ObservableObject {
         commandExecutor: any BrewCommandExecuting,
         destinationPicker: any BrewfileDumpDestinationPicking,
         favoritesStore: any FavoritePackageStoring = CatalogPreferencesStore(),
+        notificationScheduler: any CommandNotificationScheduling = NullCommandNotificationScheduler(),
         notificationCenter: NotificationCenter = .default,
         fileManager: FileManager = .default
     ) {
@@ -37,6 +39,7 @@ final class InstalledPackagesViewModel: ObservableObject {
         self.commandExecutor = commandExecutor
         self.destinationPicker = destinationPicker
         self.favoritesStore = favoritesStore
+        self.notificationScheduler = notificationScheduler
         self.fileManager = fileManager
         favoritePackageIDs = Set(favoritesStore.loadFavoritePackageIDs())
         favoritesObserver = FavoritePackageIDsObserver(notificationCenter: notificationCenter) { [weak self] ids in
@@ -158,9 +161,7 @@ final class InstalledPackagesViewModel: ObservableObject {
     }
 
     func openAnalyticsItem(_ analyticsItem: CatalogAnalyticsItem) {
-        searchText = analyticsItem.slug
-        scope = analyticsItem.kind == .formula ? .formula : .cask
-        activeFilters.removeAll()
+        clearNavigationFilters()
 
         if let package = installedPackage(for: analyticsItem) {
             selectedPackage = package
@@ -247,14 +248,35 @@ final class InstalledPackagesViewModel: ObservableObject {
                 flushPendingExportLogs()
                 appendExportLog(.system, "Generated Brewfile at \(destinationURL.path).")
                 exportState = .succeeded(progress.finished(at: Date()), result)
+                await notificationScheduler.schedule(
+                    CommandNotification(
+                        title: "Brewfile Export Complete",
+                        body: "\(destinationURL.lastPathComponent) was generated successfully."
+                    )
+                )
             } catch is CancellationError {
                 flushPendingExportLogs()
                 appendExportLog(.system, "Brewfile export cancelled.")
                 exportState = .cancelled(progress.finished(at: Date()))
+                await notificationScheduler.schedule(
+                    CommandNotification(
+                        title: "Brewfile Export Cancelled",
+                        body: "The Brewfile export was cancelled before it finished."
+                    )
+                )
             } catch {
                 flushPendingExportLogs()
                 appendExportLog(.system, error.localizedDescription)
                 exportState = .failed(progress.finished(at: Date()), error.localizedDescription)
+                await notificationScheduler.schedule(
+                    CommandNotification(
+                        title: "Brewfile Export Failed",
+                        body: CommandPresentation.friendlyFailureDescription(
+                            error.localizedDescription,
+                            fallback: "The Brewfile export couldn’t be completed."
+                        )
+                    )
+                )
             }
 
             exportTask = nil
@@ -282,6 +304,7 @@ final class InstalledPackagesViewModel: ObservableObject {
                 }
                 flushPendingActionLogs()
                 actionState = .succeeded(progress.finished(at: Date()), result)
+                await notifyActionSucceeded(actionKind: actionKind, package: package)
                 reloadPackagesAfterAction(
                     preservingSelectionID: package.id,
                     fallbackSelection: actionKind == .uninstall ? package : nil
@@ -290,10 +313,12 @@ final class InstalledPackagesViewModel: ObservableObject {
                 flushPendingActionLogs()
                 appendActionLog(.system, "\(actionKind.title) cancelled.")
                 actionState = .cancelled(progress.finished(at: Date()))
+                await notifyActionCancelled(actionKind: actionKind, package: package)
             } catch {
                 flushPendingActionLogs()
                 appendActionLog(.system, error.localizedDescription)
                 actionState = .failed(progress.finished(at: Date()), error.localizedDescription)
+                await notifyActionFailed(actionKind: actionKind, package: package, error: error)
             }
 
             actionTask = nil
@@ -469,6 +494,52 @@ final class InstalledPackagesViewModel: ObservableObject {
         )
     }
 
+    private func clearNavigationFilters() {
+        searchText = ""
+        scope = .all
+        activeFilters.removeAll()
+    }
+
+    private func notifyActionSucceeded(
+        actionKind: InstalledPackageActionKind,
+        package: InstalledPackage
+    ) async {
+        await notificationScheduler.schedule(
+            CommandNotification(
+                title: "\(actionKind.title) Complete",
+                body: "\(package.title) completed successfully."
+            )
+        )
+    }
+
+    private func notifyActionCancelled(
+        actionKind: InstalledPackageActionKind,
+        package: InstalledPackage
+    ) async {
+        await notificationScheduler.schedule(
+            CommandNotification(
+                title: "\(actionKind.title) Cancelled",
+                body: "\(package.title) was cancelled before it finished."
+            )
+        )
+    }
+
+    private func notifyActionFailed(
+        actionKind: InstalledPackageActionKind,
+        package: InstalledPackage,
+        error: Error
+    ) async {
+        await notificationScheduler.schedule(
+            CommandNotification(
+                title: "\(actionKind.title) Failed",
+                body: CommandPresentation.friendlyFailureDescription(
+                    error.localizedDescription,
+                    fallback: "\(package.title) couldn’t be completed."
+                )
+            )
+        )
+    }
+
     private func resetExportOutput() {
         exportLogBuffer.reset()
         exportLogs = []
@@ -517,6 +588,7 @@ extension InstalledPackagesViewModel {
             commandExecutor: commandExecutor,
             destinationPicker: BrewfileDumpDestinationPicker(),
             favoritesStore: CatalogPreferencesStore(),
+            notificationScheduler: CommandNotificationScheduler.shared,
             notificationCenter: .default
         )
     }

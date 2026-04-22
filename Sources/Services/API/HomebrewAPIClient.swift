@@ -288,7 +288,8 @@ private struct FormulaDetailResponse: Decodable {
         recommendedDependencies = try container.decodeIfPresent([String].self, forKey: .recommendedDependencies) ?? []
         optionalDependencies = try container.decodeIfPresent([String].self, forKey: .optionalDependencies) ?? []
         headDependencies = try container.decodeIfPresent([String].self, forKey: .headDependencies) ?? []
-        usesFromMacOS = try container.decodeIfPresent([String].self, forKey: .usesFromMacOS) ?? []
+        usesFromMacOS = try container.decodeIfPresent([JSONValue].self, forKey: .usesFromMacOS)?
+            .flatMap(\.flattenedItems) ?? []
         requirements = try container.decodeIfPresent([JSONValue].self, forKey: .requirements) ?? []
         conflictsWith = try container.decodeIfPresent([String].self, forKey: .conflictsWith) ?? []
         caveats = try container.decodeIfPresent(String.self, forKey: .caveats)

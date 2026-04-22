@@ -70,61 +70,70 @@ struct InstalledPackagesView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             case .loaded:
-                List(viewModel.filteredPackages, selection: $viewModel.selectedPackage) { package in
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack(alignment: .top) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack(spacing: 6) {
-                                    Text(package.title)
-                                        .font(.headline)
+                ScrollViewReader { proxy in
+                    List(viewModel.filteredPackages, selection: $viewModel.selectedPackage) { package in
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(alignment: .top) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    HStack(spacing: 6) {
+                                        Text(package.title)
+                                            .font(.headline)
 
-                                    if viewModel.isFavorite(package) {
-                                        Image(systemName: "star.fill")
-                                            .font(.caption)
-                                            .foregroundStyle(.yellow)
+                                        if viewModel.isFavorite(package) {
+                                            Image(systemName: "star.fill")
+                                                .font(.caption)
+                                                .foregroundStyle(.yellow)
+                                        }
                                     }
+
+                                    Text(package.subtitle)
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(2)
                                 }
 
-                                Text(package.subtitle)
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(2)
-                            }
+                                Spacer()
 
-                            Spacer()
-
-                            Text(package.kind.title.dropLast())
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        HStack {
-                            Text(package.version)
-                                .font(.caption.monospaced())
-                                .foregroundStyle(.tertiary)
-
-                            Spacer()
-
-                            if let installedAt = package.installedAt {
-                                Text(installedAt, format: .relative(presentation: .numeric))
+                                Text(package.kind.title.dropLast())
                                     .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            HStack {
+                                Text(package.version)
+                                    .font(.caption.monospaced())
                                     .foregroundStyle(.tertiary)
+
+                                Spacer()
+
+                                if let installedAt = package.installedAt {
+                                    Text(installedAt, format: .relative(presentation: .numeric))
+                                        .font(.caption)
+                                        .foregroundStyle(.tertiary)
+                                }
+                            }
+
+                            if !package.statusBadges.isEmpty {
+                                InstalledPackageBadgeFlow(items: package.statusBadges)
                             }
                         }
-
-                        if !package.statusBadges.isEmpty {
-                            InstalledPackageBadgeFlow(items: package.statusBadges)
+                        .padding(.vertical, 4)
+                        .tag(package)
+                        .id(package.id)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("\(package.title), \(package.kind.title.dropLast()), version \(package.version)")
+                    }
+                    .listStyle(.sidebar)
+                    .overlay {
+                        if viewModel.filteredPackages.isEmpty {
+                            ContentUnavailableView.search(text: viewModel.searchText)
                         }
                     }
-                    .padding(.vertical, 4)
-                    .tag(package)
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel("\(package.title), \(package.kind.title.dropLast()), version \(package.version)")
-                }
-                .listStyle(.sidebar)
-                .overlay {
-                    if viewModel.filteredPackages.isEmpty {
-                        ContentUnavailableView.search(text: viewModel.searchText)
+                    .task(id: viewModel.selectedPackage?.id) {
+                        scrollSelectionIntoView(using: proxy)
+                    }
+                    .task(id: viewModel.filteredPackages.map(\.id)) {
+                        scrollSelectionIntoView(using: proxy)
                     }
                 }
             }
@@ -345,6 +354,17 @@ struct InstalledPackagesView: View {
             .green
         case .stderr:
             .orange
+        }
+    }
+
+    private func scrollSelectionIntoView(using proxy: ScrollViewProxy) {
+        guard let selectedID = viewModel.selectedPackage?.id,
+              viewModel.filteredPackages.contains(where: { $0.id == selectedID }) else {
+            return
+        }
+
+        Task { @MainActor in
+            proxy.scrollTo(selectedID, anchor: .center)
         }
     }
 }

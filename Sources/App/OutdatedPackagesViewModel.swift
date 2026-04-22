@@ -13,15 +13,18 @@ final class OutdatedPackagesViewModel: ObservableObject {
 
     private let provider: any OutdatedPackagesProviding
     private let commandExecutor: any BrewCommandExecuting
+    private let notificationScheduler: any CommandNotificationScheduling
     private var actionTask: Task<Void, Never>?
     private var logBuffer = CommandLogBuffer()
 
     init(
         provider: any OutdatedPackagesProviding,
-        commandExecutor: any BrewCommandExecuting
+        commandExecutor: any BrewCommandExecuting,
+        notificationScheduler: any CommandNotificationScheduling = NullCommandNotificationScheduler()
     ) {
         self.provider = provider
         self.commandExecutor = commandExecutor
+        self.notificationScheduler = notificationScheduler
     }
 
     deinit {
@@ -288,6 +291,7 @@ final class OutdatedPackagesViewModel: ObservableObject {
                 flushPendingLogs()
                 appendLog(.system, "\(command.kind.title) finished with exit code \(result.exitCode).")
                 actionState = .succeeded(progress.finished(at: Date()), result)
+                await notifyActionSucceeded(command: command)
                 reloadPackagesAfterAction(
                     preservingSelectionID: fallbackSelection?.id,
                     fallbackSelection: fallbackSelection
@@ -296,10 +300,12 @@ final class OutdatedPackagesViewModel: ObservableObject {
                 flushPendingLogs()
                 appendLog(.system, "\(command.kind.title) cancelled.")
                 actionState = .cancelled(progress.finished(at: Date()))
+                await notifyActionCancelled(command: command)
             } catch {
                 flushPendingLogs()
                 appendLog(.system, error.localizedDescription)
                 actionState = .failed(progress.finished(at: Date()), error.localizedDescription)
+                await notifyActionFailed(command: command, error: error)
             }
 
             actionTask = nil
@@ -328,6 +334,63 @@ final class OutdatedPackagesViewModel: ObservableObject {
         }
         return fallback
     }
+
+    private func notifyActionSucceeded(command: OutdatedPackageActionCommand) async {
+        await notificationScheduler.schedule(
+            CommandNotification(
+                title: "\(command.kind.title) Complete",
+                body: successBody(for: command)
+            )
+        )
+    }
+
+    private func notifyActionCancelled(command: OutdatedPackageActionCommand) async {
+        await notificationScheduler.schedule(
+            CommandNotification(
+                title: "\(command.kind.title) Cancelled",
+                body: cancellationBody(for: command)
+            )
+        )
+    }
+
+    private func notifyActionFailed(
+        command: OutdatedPackageActionCommand,
+        error: Error
+    ) async {
+        await notificationScheduler.schedule(
+            CommandNotification(
+                title: "\(command.kind.title) Failed",
+                body: CommandPresentation.friendlyFailureDescription(
+                    error.localizedDescription,
+                    fallback: failureFallback(for: command)
+                )
+            )
+        )
+    }
+
+    private func successBody(for command: OutdatedPackageActionCommand) -> String {
+        if command.isBulkAction {
+            return "\(command.packageCount) package\(command.packageCount == 1 ? "" : "s") completed successfully."
+        }
+
+        return "\(command.packageTitle) completed successfully."
+    }
+
+    private func cancellationBody(for command: OutdatedPackageActionCommand) -> String {
+        if command.isBulkAction {
+            return "The bulk upgrade was cancelled before it finished."
+        }
+
+        return "\(command.packageTitle) was cancelled before it finished."
+    }
+
+    private func failureFallback(for command: OutdatedPackageActionCommand) -> String {
+        if command.isBulkAction {
+            return "The bulk upgrade couldn’t be completed."
+        }
+
+        return "\(command.packageTitle) couldn’t be completed."
+    }
 }
 
 extension OutdatedPackagesViewModel {
@@ -344,7 +407,8 @@ extension OutdatedPackagesViewModel {
                 brewLocator: brewLocator,
                 runner: runner
             ),
-            commandExecutor: commandExecutor
+            commandExecutor: commandExecutor,
+            notificationScheduler: CommandNotificationScheduler.shared
         )
     }
 }
