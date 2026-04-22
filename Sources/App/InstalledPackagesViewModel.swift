@@ -19,10 +19,13 @@ final class InstalledPackagesViewModel: ObservableObject {
     private let destinationPicker: any BrewfileDumpDestinationPicking
     private let favoritesStore: any FavoritePackageStoring
     private let notificationScheduler: any CommandNotificationScheduling
+    private let homebrewStateNotifier: HomebrewStateNotifier
     private let fileManager: FileManager
+    private let homebrewStateSourceID = UUID().uuidString
     private var actionTask: Task<Void, Never>?
     private var exportTask: Task<Void, Never>?
     private var favoritesObserver: FavoritePackageIDsObserver?
+    private var homebrewStateObserver: HomebrewStateObserver?
     private var logBuffer = CommandLogBuffer()
     private var exportLogBuffer = CommandLogBuffer()
 
@@ -40,10 +43,17 @@ final class InstalledPackagesViewModel: ObservableObject {
         self.destinationPicker = destinationPicker
         self.favoritesStore = favoritesStore
         self.notificationScheduler = notificationScheduler
+        self.homebrewStateNotifier = HomebrewStateNotifier(notificationCenter: notificationCenter)
         self.fileManager = fileManager
         favoritePackageIDs = Set(favoritesStore.loadFavoritePackageIDs())
         favoritesObserver = FavoritePackageIDsObserver(notificationCenter: notificationCenter) { [weak self] ids in
             self?.favoritePackageIDs = Set(ids)
+        }
+        homebrewStateObserver = HomebrewStateObserver(notificationCenter: notificationCenter) { [weak self] sourceID in
+            guard let self, sourceID != self.homebrewStateSourceID else {
+                return
+            }
+            self.handleHomebrewStateChange()
         }
     }
 
@@ -158,6 +168,26 @@ final class InstalledPackagesViewModel: ObservableObject {
 
     func isInstalled(_ analyticsItem: CatalogAnalyticsItem) -> Bool {
         installedPackage(for: analyticsItem) != nil
+    }
+
+    func isInstalled(_ package: CatalogPackageSummary) -> Bool {
+        guard case .loaded(let packages) = packagesState else {
+            return false
+        }
+
+        return packages.contains { installedPackage in
+            installedPackage.kind == package.kind && installedPackage.slug == package.slug
+        }
+    }
+
+    func isInstalled(_ detail: CatalogPackageDetail) -> Bool {
+        guard case .loaded(let packages) = packagesState else {
+            return false
+        }
+
+        return packages.contains { installedPackage in
+            installedPackage.kind == detail.kind && installedPackage.slug == detail.slug
+        }
     }
 
     func openAnalyticsItem(_ analyticsItem: CatalogAnalyticsItem) {
@@ -304,6 +334,9 @@ final class InstalledPackagesViewModel: ObservableObject {
                 }
                 flushPendingActionLogs()
                 actionState = .succeeded(progress.finished(at: Date()), result)
+                if actionKind.affectsHomebrewState {
+                    homebrewStateNotifier.notifyDidChange(sourceID: homebrewStateSourceID)
+                }
                 await notifyActionSucceeded(actionKind: actionKind, package: package)
                 reloadPackagesAfterAction(
                     preservingSelectionID: package.id,
@@ -568,6 +601,19 @@ final class InstalledPackagesViewModel: ObservableObject {
     private func flushPendingActionLogs() {
         logBuffer.flush()
         actionLogs = logBuffer.entries
+    }
+
+    private func handleHomebrewStateChange() {
+        guard !hasRunningAction, !hasRunningExport else {
+            return
+        }
+
+        switch packagesState {
+        case .idle, .loading:
+            return
+        case .loaded, .failed:
+            refreshPackages()
+        }
     }
 }
 

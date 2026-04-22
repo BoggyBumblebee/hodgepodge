@@ -18,6 +18,15 @@ enum CatalogPackageActionKind: String, CaseIterable, Codable, Equatable, Identif
     var requiresConfirmation: Bool {
         self == .install
     }
+
+    var affectsHomebrewState: Bool {
+        switch self {
+        case .install:
+            true
+        case .fetch:
+            false
+        }
+    }
 }
 
 struct CatalogPackageActionCommand: Codable, Equatable, Sendable {

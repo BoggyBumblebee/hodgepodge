@@ -597,6 +597,38 @@ final class CatalogViewModelTests: XCTestCase {
         XCTAssertEqual(historyStore.savedEntries.last, viewModel.actionHistory(for: detail))
     }
 
+    func testSuccessfulInstallPostsHomebrewStateChangeNotification() async {
+        let detail = CatalogPackageDetail.fixture()
+        let notificationCenter = NotificationCenter()
+        let viewModel = makeViewModel(
+            commandExecutor: MockBrewCommandExecutor(
+                result: .success(CommandResult(stdout: "Installed\n", stderr: "", exitCode: 0))
+            ),
+            notificationCenter: notificationCenter
+        )
+        var notificationCount = 0
+        let observer = notificationCenter.addObserver(
+            forName: .homebrewStateDidChange,
+            object: nil,
+            queue: .main
+        ) { _ in
+            notificationCount += 1
+        }
+        defer {
+            notificationCenter.removeObserver(observer)
+        }
+
+        viewModel.runAction(.install, for: detail)
+        await waitUntil {
+            if case .succeeded = viewModel.actionState {
+                return true
+            }
+            return false
+        }
+
+        XCTAssertEqual(notificationCount, 1)
+    }
+
     func testRunActionStoresFailureState() async {
         let detail = CatalogPackageDetail.fixture(kind: .cask, slug: "docker-desktop", title: "Docker Desktop")
         let failure = CommandRunnerError.nonZeroExitCode(

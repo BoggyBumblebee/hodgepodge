@@ -35,6 +35,10 @@ enum InstalledPackageActionKind: String, CaseIterable, Equatable, Identifiable, 
             false
         }
     }
+
+    var affectsHomebrewState: Bool {
+        true
+    }
 }
 
 struct InstalledPackageActionCommand: Equatable, Sendable {

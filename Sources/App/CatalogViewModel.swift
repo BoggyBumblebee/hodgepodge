@@ -23,6 +23,7 @@ final class CatalogViewModel: ObservableObject {
     private let actionHistoryExporter: any CatalogActionHistoryExporting
     private let preferencesStore: any CatalogPreferencesStoring
     private let notificationScheduler: any CommandNotificationScheduling
+    private let homebrewStateNotifier: HomebrewStateNotifier
     private var detailCache: [String: CatalogPackageDetail] = [:]
     private var analyticsCache: [CatalogAnalyticsPeriod: CatalogAnalyticsSnapshot] = [:]
     private var analyticsTask: Task<Void, Never>?
@@ -46,6 +47,7 @@ final class CatalogViewModel: ObservableObject {
         self.actionHistoryExporter = actionHistoryExporter
         self.preferencesStore = preferencesStore
         self.notificationScheduler = notificationScheduler
+        self.homebrewStateNotifier = HomebrewStateNotifier(notificationCenter: notificationCenter)
         let restoredHistory = actionHistoryStore.loadHistory()
         actionHistory = restoredHistory
         nextHistoryIdentifier = (restoredHistory.map { $0.id }.max() ?? -1) + 1
@@ -373,6 +375,9 @@ final class CatalogViewModel: ObservableObject {
                     progress: completedProgress,
                     outcome: .succeeded(result.exitCode)
                 )
+                if actionKind.affectsHomebrewState {
+                    homebrewStateNotifier.notifyDidChange()
+                }
                 await notifyActionSucceeded(actionKind: actionKind, detail: detail)
             } catch is CancellationError {
                 flushPendingLogs()

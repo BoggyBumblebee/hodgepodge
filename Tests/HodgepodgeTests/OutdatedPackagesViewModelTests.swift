@@ -303,6 +303,28 @@ final class OutdatedPackagesViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.upgradeAllLogs.contains(where: { $0.text == "Upgrading visible packages..." }))
     }
 
+    func testHomebrewStateChangeRefreshesLoadedPackages() async {
+        let original = OutdatedPackage.fixture(slug: "wget", currentVersion: "1.25.0")
+        let refreshed = OutdatedPackage.fixture(slug: "wget", currentVersion: "1.25.1")
+        let provider = CyclingOutdatedPackagesProvider(results: [[refreshed]])
+        let notificationCenter = NotificationCenter()
+        let viewModel = OutdatedPackagesViewModel(
+            provider: provider,
+            commandExecutor: MockOutdatedBrewCommandExecutor(),
+            notificationCenter: notificationCenter
+        )
+        viewModel.packagesState = .loaded([original])
+        viewModel.selectedPackage = original
+
+        notificationCenter.post(name: .homebrewStateDidChange, object: nil)
+        await waitUntil {
+            viewModel.selectedPackage?.currentVersion == "1.25.1"
+        }
+
+        XCTAssertEqual(provider.fetchCallCount, 1)
+        XCTAssertEqual(viewModel.selectedPackage, refreshed)
+    }
+
     func testPinnedPackageDoesNotStartUpgradeAction() async {
         let package = OutdatedPackage.fixture(isPinned: true, pinnedVersion: "1.24.5")
         let executor = MockOutdatedBrewCommandExecutor()

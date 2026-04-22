@@ -3,6 +3,7 @@ import SwiftUI
 
 struct CatalogView: View {
     @ObservedObject var viewModel: CatalogViewModel
+    @ObservedObject var installedPackagesViewModel: InstalledPackagesViewModel
     @State private var isPresentingSaveSearch = false
     @State private var savedSearchName = ""
 
@@ -18,6 +19,7 @@ struct CatalogView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task {
             viewModel.loadCatalogIfNeeded()
+            installedPackagesViewModel.loadIfNeeded()
         }
         .sheet(isPresented: $isPresentingSaveSearch) {
             CatalogSavedSearchSheet(
@@ -84,6 +86,9 @@ struct CatalogView: View {
                                 .foregroundStyle(.tertiary)
 
                             HStack(spacing: 6) {
+                                if installedPackagesViewModel.isInstalled(package) {
+                                    summaryBadge("Installed", color: .green)
+                                }
                                 if package.hasCaveats {
                                     summaryBadge("Caveats", color: .orange)
                                 }
@@ -258,6 +263,7 @@ struct CatalogView: View {
             CatalogDetailView(
                 detail: detail,
                 isFavorite: viewModel.isFavorite(detail),
+                isInstalled: installedPackagesViewModel.isInstalled(detail),
                 actionState: viewModel.actionState(for: detail),
                 actionLogs: viewModel.actionLogs(for: detail),
                 actionHistory: viewModel.actionHistory(for: detail),
@@ -336,6 +342,7 @@ struct CatalogView: View {
 private struct CatalogDetailView: View {
     let detail: CatalogPackageDetail
     let isFavorite: Bool
+    let isInstalled: Bool
     let actionState: CatalogPackageActionState
     let actionLogs: [CatalogPackageActionLogEntry]
     let actionHistory: [CatalogPackageActionHistoryEntry]
@@ -484,6 +491,15 @@ private struct CatalogDetailView: View {
                         .padding(.vertical, 6)
                         .background(.quaternary, in: Capsule())
 
+                    if isInstalled {
+                        Text("Installed")
+                            .font(.caption.weight(.semibold))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Color.green.opacity(0.14), in: Capsule())
+                            .foregroundStyle(.green)
+                    }
+
                     Text(detail.version)
                         .font(.caption.monospaced())
                         .foregroundStyle(.secondary)
@@ -497,12 +513,12 @@ private struct CatalogDetailView: View {
     private var actionBlock: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
-                Button("Install...") {
+                Button(isInstalled ? "Installed" : "Install...") {
                     beginAction(.install)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(hasRunningAction)
-                .accessibilityLabel("Install package")
+                .disabled(hasRunningAction || isInstalled)
+                .accessibilityLabel(isInstalled ? "Package is already installed" : "Install package")
 
                 Button("Fetch") {
                     beginAction(.fetch)

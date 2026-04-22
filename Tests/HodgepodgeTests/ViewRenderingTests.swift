@@ -299,7 +299,14 @@ final class ViewRenderingTests: XCTestCase {
             )
         ]
 
-        XCTAssertNotNil(render(CatalogView(viewModel: viewModel)))
+        XCTAssertNotNil(
+            render(
+                CatalogView(
+                    viewModel: viewModel,
+                    installedPackagesViewModel: makeInstalledPackagesModel()
+                )
+            )
+        )
     }
 
     func testCatalogAnalyticsViewRendersLoadedState() {

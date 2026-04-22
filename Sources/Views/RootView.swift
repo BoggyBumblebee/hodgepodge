@@ -31,7 +31,10 @@ struct RootView: View {
         case .overview:
             OverviewView(model: model)
         case .catalog:
-            CatalogView(viewModel: catalogModel)
+            CatalogView(
+                viewModel: catalogModel,
+                installedPackagesViewModel: installedPackagesModel
+            )
         case .catalogAnalytics:
             CatalogAnalyticsView(
                 viewModel: catalogModel,

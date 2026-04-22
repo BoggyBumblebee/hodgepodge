@@ -11,7 +11,9 @@ protocol CommandNotificationScheduling: Sendable {
 }
 
 struct NullCommandNotificationScheduler: CommandNotificationScheduling {
-    func schedule(_ notification: CommandNotification) async {}
+    func schedule(_: CommandNotification) async {
+        // Intentionally no-op for previews, tests, and configurations that disable notifications.
+    }
 }
 
 protocol UserNotificationCentering: Sendable {

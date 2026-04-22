@@ -316,6 +316,29 @@ final class InstalledPackagesViewModelTests: XCTestCase {
         }
     }
 
+    func testHomebrewStateChangeRefreshesLoadedPackages() async {
+        let original = makePackage(slug: "wget", title: "wget", version: "1.25.0")
+        let refreshed = makePackage(slug: "wget", title: "wget", version: "1.25.1")
+        let provider = CyclingInstalledPackagesProvider(results: [[refreshed]])
+        let notificationCenter = NotificationCenter()
+        let viewModel = InstalledPackagesViewModel(
+            provider: provider,
+            commandExecutor: MockInstalledPackagesCommandExecutor(),
+            destinationPicker: MockBrewfileDumpDestinationPicker(),
+            notificationCenter: notificationCenter
+        )
+        viewModel.packagesState = .loaded([original])
+        viewModel.selectedPackage = original
+
+        notificationCenter.post(name: .homebrewStateDidChange, object: nil)
+        await waitUntil {
+            viewModel.selectedPackage?.version == "1.25.1"
+        }
+
+        XCTAssertEqual(provider.fetchCallCount, 1)
+        XCTAssertEqual(viewModel.selectedPackage, refreshed)
+    }
+
     func testOpenAnalyticsItemSelectsMatchingLoadedInstalledPackage() {
         let package = makePackage(slug: "wget", title: "wget")
         let analyticsItem = CatalogAnalyticsItem(
@@ -420,6 +443,40 @@ final class InstalledPackagesViewModelTests: XCTestCase {
 
         XCTAssertEqual(viewModel.exportState, .idle)
         XCTAssertTrue(executor.executedArguments.isEmpty)
+    }
+
+    func testSuccessfulInstalledActionPostsHomebrewStateChangeNotification() async {
+        let package = makePackage(slug: "wget", title: "wget")
+        let notificationCenter = NotificationCenter()
+        let viewModel = InstalledPackagesViewModel(
+            provider: MockInstalledPackagesProvider(result: .success([package])),
+            commandExecutor: MockInstalledPackagesCommandExecutor(
+                result: .success(CommandResult(stdout: "Linked\n", stderr: "", exitCode: 0))
+            ),
+            destinationPicker: MockBrewfileDumpDestinationPicker(),
+            notificationCenter: notificationCenter
+        )
+        var notificationCount = 0
+        let observer = notificationCenter.addObserver(
+            forName: .homebrewStateDidChange,
+            object: nil,
+            queue: .main
+        ) { _ in
+            notificationCount += 1
+        }
+        defer {
+            notificationCenter.removeObserver(observer)
+        }
+
+        viewModel.runAction(.unlink, for: package)
+        await waitUntil {
+            if case .succeeded = viewModel.actionState {
+                return true
+            }
+            return false
+        }
+
+        XCTAssertEqual(notificationCount, 1)
     }
 
     func testClearExportOutputResetsExportState() {
