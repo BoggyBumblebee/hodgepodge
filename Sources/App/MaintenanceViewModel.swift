@@ -192,7 +192,9 @@ final class MaintenanceViewModel: ObservableObject {
 }
 
 extension MaintenanceViewModel {
-    static func live() -> MaintenanceViewModel {
+    static func live(
+        notificationScheduler: any CommandNotificationScheduling = CommandNotificationScheduler.live()
+    ) -> MaintenanceViewModel {
         let runner = ProcessCommandRunner()
         let brewLocator = BrewLocator(runner: runner)
 
@@ -205,7 +207,7 @@ extension MaintenanceViewModel {
                 brewLocator: brewLocator,
                 runner: runner
             ),
-            notificationScheduler: CommandNotificationScheduler.shared
+            notificationScheduler: notificationScheduler
         )
     }
 }

@@ -43,19 +43,25 @@ private struct UserNotificationCenterAdapter: UserNotificationCentering, @unchec
 }
 
 actor CommandNotificationScheduler: CommandNotificationScheduling {
-    static let shared = CommandNotificationScheduler(
-        center: UserNotificationCenterAdapter(center: UNUserNotificationCenter.current())
-    )
-
     private let center: any UserNotificationCentering
+    private let settingsStore: any AppSettingsStoring
     private var authorizationChecked = false
     private var isAuthorized = false
 
-    init(center: any UserNotificationCentering) {
+    init(
+        center: any UserNotificationCentering,
+        settingsStore: any AppSettingsStoring = AppSettingsStore()
+    ) {
         self.center = center
+        self.settingsStore = settingsStore
     }
 
     func schedule(_ notification: CommandNotification) async {
+        let settings = settingsStore.loadSettings()
+        guard settings.completionNotificationsEnabled else {
+            return
+        }
+
         guard await ensureAuthorization() else {
             return
         }
@@ -63,7 +69,9 @@ actor CommandNotificationScheduler: CommandNotificationScheduling {
         let content = UNMutableNotificationContent()
         content.title = notification.title
         content.body = notification.body
-        content.sound = .default
+        if settings.notificationSoundEnabled {
+            content.sound = .default
+        }
 
         let request = UNNotificationRequest(
             identifier: UUID().uuidString,
@@ -94,5 +102,16 @@ actor CommandNotificationScheduler: CommandNotificationScheduling {
         }
 
         return isAuthorized
+    }
+}
+
+extension CommandNotificationScheduler {
+    static func live(
+        settingsStore: any AppSettingsStoring = AppSettingsStore()
+    ) -> CommandNotificationScheduler {
+        CommandNotificationScheduler(
+            center: UserNotificationCenterAdapter(center: UNUserNotificationCenter.current()),
+            settingsStore: settingsStore
+        )
     }
 }

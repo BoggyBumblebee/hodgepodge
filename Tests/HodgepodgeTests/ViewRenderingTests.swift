@@ -18,7 +18,7 @@ final class ViewRenderingTests: XCTestCase {
         XCTAssertNotNil(render(OverviewView(model: model)))
     }
 
-    func testRootViewRendersOverviewAndPlaceholderSections() {
+    func testRootViewRendersAvailableSections() {
         let model = makeModel()
         let catalogModel = makeCatalogModel()
         let installedPackagesModel = makeInstalledPackagesModel()
@@ -155,8 +155,19 @@ final class ViewRenderingTests: XCTestCase {
         ))
     }
 
-    func testPlaceholderFeatureViewRenders() {
-        XCTAssertNotNil(render(PlaceholderFeatureView(section: .services)))
+    func testSettingsViewRenders() {
+        let model = AppSettingsModel(
+            store: PreviewAppSettingsStore(
+                snapshot: AppSettingsSnapshot(
+                    defaultLaunchSection: .installed,
+                    completionNotificationsEnabled: true,
+                    notificationSoundEnabled: false,
+                    restoreLastSelectedBrewfile: true
+                )
+            )
+        )
+
+        XCTAssertNotNil(render(SettingsView(model: model)))
     }
 
     func testHodgepodgeCommandsBuildsMenuCommands() {
@@ -716,6 +727,16 @@ final class ViewRenderingTests: XCTestCase {
         _ = hostingView.fittingSize
         return hostingView
     }
+}
+
+private struct PreviewAppSettingsStore: AppSettingsStoring {
+    let snapshot: AppSettingsSnapshot
+
+    func loadSettings() -> AppSettingsSnapshot {
+        snapshot
+    }
+
+    func saveSettings(_ snapshot: AppSettingsSnapshot) {}
 }
 
 private struct ViewTestBrewLocator: BrewLocating {

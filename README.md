@@ -57,6 +57,7 @@ The current project state already includes:
 - Brewfile inspection, check, install, export, and entry add/remove flows
 - command history for catalog actions
 - completion notifications for long-running Homebrew actions
+- a dedicated Settings window for launch, notification, and Brewfile preferences
 - bundled help documentation and app icon resources
 
 ## Roadmap
@@ -121,8 +122,10 @@ The current project state already includes:
 
 ### Phase 9: Polish, Settings, and Compatibility - In Progress
 
+- completed:
+  - UI and Settings audit
+  - dedicated Settings window with launch, notification, and Brewfile preferences
 - normalize the macOS UI toward Apple's platform conventions, with cleaner layouts, clearer hierarchy, and more consistent controls
-- introduce a proper Settings experience for user-configurable behavior and app preferences
 - identify which preferences belong in Settings versus transient per-screen UI state
 - harden Homebrew command and JSON compatibility so Hodgepodge continues working across supported Homebrew releases starting from today's versions
 - add compatibility-focused tests and defensive decoding around version-sensitive Homebrew behavior

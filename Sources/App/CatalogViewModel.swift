@@ -668,7 +668,9 @@ final class CatalogViewModel: ObservableObject {
 }
 
 extension CatalogViewModel {
-    static func live() -> CatalogViewModel {
+    static func live(
+        notificationScheduler: any CommandNotificationScheduling = CommandNotificationScheduler.live()
+    ) -> CatalogViewModel {
         let runner = ProcessCommandRunner()
         let brewLocator = BrewLocator(runner: runner)
 
@@ -681,7 +683,7 @@ extension CatalogViewModel {
             actionHistoryStore: CatalogActionHistoryStore(),
             actionHistoryExporter: CatalogActionHistoryExporter(),
             preferencesStore: CatalogPreferencesStore(),
-            notificationScheduler: CommandNotificationScheduler.shared,
+            notificationScheduler: notificationScheduler,
             notificationCenter: .default
         )
     }

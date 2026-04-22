@@ -412,7 +412,9 @@ final class OutdatedPackagesViewModel: ObservableObject {
 }
 
 extension OutdatedPackagesViewModel {
-    static func live() -> OutdatedPackagesViewModel {
+    static func live(
+        notificationScheduler: any CommandNotificationScheduling = CommandNotificationScheduler.live()
+    ) -> OutdatedPackagesViewModel {
         let runner = ProcessCommandRunner()
         let brewLocator = BrewLocator(runner: runner)
         let commandExecutor = BrewCommandExecutor(
@@ -426,7 +428,7 @@ extension OutdatedPackagesViewModel {
                 runner: runner
             ),
             commandExecutor: commandExecutor,
-            notificationScheduler: CommandNotificationScheduler.shared,
+            notificationScheduler: notificationScheduler,
             notificationCenter: .default
         )
     }

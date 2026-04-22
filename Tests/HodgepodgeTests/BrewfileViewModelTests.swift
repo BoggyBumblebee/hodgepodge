@@ -446,6 +446,58 @@ final class BrewfileViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.actionLogs.isEmpty)
     }
 
+    func testLoadIfNeededSkipsStoredSelectionWhenRestoreSettingIsDisabled() {
+        let fileURL = makeExistingBrewfileURL()
+        let viewModel = BrewfileViewModel(
+            loader: MockBrewfileLoader(documents: [:]),
+            selectionStore: MockBrewfileSelectionStore(loadedURL: fileURL),
+            settingsStore: MockAppSettingsStore(
+                snapshot: AppSettingsSnapshot(
+                    defaultLaunchSection: .catalog,
+                    completionNotificationsEnabled: true,
+                    notificationSoundEnabled: true,
+                    restoreLastSelectedBrewfile: false
+                )
+            ),
+            picker: MockBrewfilePicker(),
+            dumpDestinationPicker: MockBrewfileDumpDestinationPicker(),
+            commandExecutor: MockBrewfileCommandExecutor()
+        )
+
+        viewModel.loadIfNeeded()
+
+        XCTAssertEqual(viewModel.documentState, .idle)
+        XCTAssertNil(viewModel.selectedFileURL)
+    }
+
+    func testChooseBrewfileDoesNotPersistSelectionWhenRestoreSettingIsDisabled() async {
+        let fileURL = URL(fileURLWithPath: "/tmp/Brewfile")
+        let document = BrewfileDocument.fixture(fileURL: fileURL)
+        let store = MockBrewfileSelectionStore()
+        let viewModel = BrewfileViewModel(
+            loader: MockBrewfileLoader(documents: [fileURL: document]),
+            selectionStore: store,
+            settingsStore: MockAppSettingsStore(
+                snapshot: AppSettingsSnapshot(
+                    defaultLaunchSection: .catalog,
+                    completionNotificationsEnabled: true,
+                    notificationSoundEnabled: true,
+                    restoreLastSelectedBrewfile: false
+                )
+            ),
+            picker: MockBrewfilePicker(result: fileURL),
+            dumpDestinationPicker: MockBrewfileDumpDestinationPicker(),
+            commandExecutor: MockBrewfileCommandExecutor()
+        )
+
+        viewModel.chooseBrewfile()
+        await waitUntil {
+            viewModel.documentState == .loaded(document)
+        }
+
+        XCTAssertEqual(store.savedURLs, [nil])
+    }
+
     private func waitUntil(
         maxIterations: Int = 50,
         file: StaticString = #filePath,
@@ -518,6 +570,20 @@ private final class MockBrewfileSelectionStore: BrewfileSelectionStoring, @unche
     func saveSelection(_ url: URL?) {
         savedURLs.append(url)
     }
+}
+
+private struct MockAppSettingsStore: AppSettingsStoring {
+    let snapshot: AppSettingsSnapshot
+
+    init(snapshot: AppSettingsSnapshot = .default) {
+        self.snapshot = snapshot
+    }
+
+    func loadSettings() -> AppSettingsSnapshot {
+        snapshot
+    }
+
+    func saveSettings(_ snapshot: AppSettingsSnapshot) {}
 }
 
 private struct MockBrewfilePicker: BrewfilePicking {

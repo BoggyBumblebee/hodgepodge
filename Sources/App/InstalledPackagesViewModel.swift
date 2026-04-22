@@ -618,7 +618,9 @@ final class InstalledPackagesViewModel: ObservableObject {
 }
 
 extension InstalledPackagesViewModel {
-    static func live() -> InstalledPackagesViewModel {
+    static func live(
+        notificationScheduler: any CommandNotificationScheduling = CommandNotificationScheduler.live()
+    ) -> InstalledPackagesViewModel {
         let runner = ProcessCommandRunner()
         let brewLocator = BrewLocator(runner: runner)
         let commandExecutor = BrewCommandExecutor(
@@ -634,7 +636,7 @@ extension InstalledPackagesViewModel {
             commandExecutor: commandExecutor,
             destinationPicker: BrewfileDumpDestinationPicker(),
             favoritesStore: CatalogPreferencesStore(),
-            notificationScheduler: CommandNotificationScheduler.shared,
+            notificationScheduler: notificationScheduler,
             notificationCenter: .default
         )
     }

@@ -60,8 +60,6 @@ struct RootView: View {
             MaintenanceView(viewModel: maintenanceModel)
         case .brewfile:
             BrewfileView(viewModel: brewfileModel)
-        case .settings:
-            PlaceholderFeatureView(section: model.selectedSection ?? .catalog)
         }
     }
 }

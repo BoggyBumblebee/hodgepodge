@@ -36,6 +36,18 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(brewLocator.locateCallCount, 0)
     }
 
+    func testInitUsesConfiguredDefaultLaunchSection() {
+        let model = AppModel(
+            brewLocator: MockBrewLocator(result: .success(.fixture())),
+            helpResolver: MockHelpResolver(),
+            urlOpener: MockURLOpener(),
+            aboutPanelPresenter: MockAboutPanelPresenter(),
+            defaultLaunchSection: .installed
+        )
+
+        XCTAssertEqual(model.selectedSection, .installed)
+    }
+
     func testRefreshInstallationStoresFailureMessage() async {
         let brewLocator = MockBrewLocator(result: .failure(BrewLocatorError.brewNotFound))
         let model = AppModel(

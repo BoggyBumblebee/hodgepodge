@@ -11,7 +11,7 @@ enum InstallationLoadState: Equatable {
 
 @MainActor
 final class AppModel: ObservableObject {
-    @Published var selectedSection: AppSection? = .catalog
+    @Published var selectedSection: AppSection?
     @Published var installationState: InstallationLoadState = .idle
     @Published var lastOpenedHelpURL: URL?
 
@@ -24,8 +24,10 @@ final class AppModel: ObservableObject {
         brewLocator: any BrewLocating,
         helpResolver: any HelpDocumentResolving,
         urlOpener: any URLOpening,
-        aboutPanelPresenter: any AboutPanelPresenting
+        aboutPanelPresenter: any AboutPanelPresenting,
+        defaultLaunchSection: AppSection = .catalog
     ) {
+        self.selectedSection = defaultLaunchSection
         self.brewLocator = brewLocator
         self.helpResolver = helpResolver
         self.urlOpener = urlOpener
@@ -72,7 +74,7 @@ final class AppModel: ObservableObject {
 }
 
 extension AppModel {
-    static func live() -> AppModel {
+    static func live(defaultLaunchSection: AppSection = .catalog) -> AppModel {
         let runner = ProcessCommandRunner()
         let brewLocator = BrewLocator(runner: runner)
         let helpResolver = HelpDocumentResolver(bundle: Bundle.main)
@@ -83,7 +85,8 @@ extension AppModel {
             brewLocator: brewLocator,
             helpResolver: helpResolver,
             urlOpener: urlOpener,
-            aboutPanelPresenter: aboutPanelPresenter
+            aboutPanelPresenter: aboutPanelPresenter,
+            defaultLaunchSection: defaultLaunchSection
         )
     }
 }

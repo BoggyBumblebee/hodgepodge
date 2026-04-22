@@ -346,7 +346,9 @@ final class TapsViewModel: ObservableObject {
 }
 
 extension TapsViewModel {
-    static func live() -> TapsViewModel {
+    static func live(
+        notificationScheduler: any CommandNotificationScheduling = CommandNotificationScheduler.live()
+    ) -> TapsViewModel {
         let runner = ProcessCommandRunner()
         let brewLocator = BrewLocator(runner: runner)
         let commandExecutor = BrewCommandExecutor(
@@ -360,7 +362,7 @@ extension TapsViewModel {
                 runner: runner
             ),
             commandExecutor: commandExecutor,
-            notificationScheduler: CommandNotificationScheduler.shared
+            notificationScheduler: notificationScheduler
         )
     }
 }

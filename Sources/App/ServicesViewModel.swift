@@ -416,7 +416,9 @@ final class ServicesViewModel: ObservableObject {
 }
 
 extension ServicesViewModel {
-    static func live() -> ServicesViewModel {
+    static func live(
+        notificationScheduler: any CommandNotificationScheduling = CommandNotificationScheduler.live()
+    ) -> ServicesViewModel {
         let runner = ProcessCommandRunner()
         let brewLocator = BrewLocator(runner: runner)
         let commandExecutor = BrewCommandExecutor(
@@ -430,7 +432,7 @@ extension ServicesViewModel {
                 runner: runner
             ),
             commandExecutor: commandExecutor,
-            notificationScheduler: CommandNotificationScheduler.shared
+            notificationScheduler: notificationScheduler
         )
     }
 }

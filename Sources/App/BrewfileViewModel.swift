@@ -13,6 +13,7 @@ final class BrewfileViewModel: ObservableObject {
 
     private let loader: any BrewfileDocumentLoading
     private let selectionStore: any BrewfileSelectionStoring
+    private let settingsStore: any AppSettingsStoring
     private let picker: any BrewfilePicking
     private let dumpDestinationPicker: any BrewfileDumpDestinationPicking
     private let commandExecutor: any BrewCommandExecuting
@@ -24,6 +25,7 @@ final class BrewfileViewModel: ObservableObject {
     init(
         loader: any BrewfileDocumentLoading,
         selectionStore: any BrewfileSelectionStoring,
+        settingsStore: any AppSettingsStoring = AppSettingsStore(),
         picker: any BrewfilePicking,
         dumpDestinationPicker: any BrewfileDumpDestinationPicking,
         commandExecutor: any BrewCommandExecuting,
@@ -32,6 +34,7 @@ final class BrewfileViewModel: ObservableObject {
     ) {
         self.loader = loader
         self.selectionStore = selectionStore
+        self.settingsStore = settingsStore
         self.picker = picker
         self.dumpDestinationPicker = dumpDestinationPicker
         self.commandExecutor = commandExecutor
@@ -136,7 +139,7 @@ final class BrewfileViewModel: ObservableObject {
             return
         }
 
-        if let initialURL = initialSelectionURL() {
+        if shouldRestoreLastSelectedBrewfile, let initialURL = initialSelectionURL() {
             loadDocument(at: initialURL)
         }
     }
@@ -265,7 +268,7 @@ final class BrewfileViewModel: ObservableObject {
         clearActionOutput()
         documentState = .loading
         selectedFileURL = fileURL
-        selectionStore.saveSelection(fileURL)
+        selectionStore.saveSelection(shouldRestoreLastSelectedBrewfile ? fileURL : nil)
 
         Task { @MainActor [loader] in
             do {
@@ -370,6 +373,10 @@ final class BrewfileViewModel: ObservableObject {
         }
 
         return nil
+    }
+
+    private var shouldRestoreLastSelectedBrewfile: Bool {
+        settingsStore.loadSettings().restoreLastSelectedBrewfile
     }
 
     private func defaultCandidateURLs() -> [URL] {
@@ -477,20 +484,24 @@ final class BrewfileViewModel: ObservableObject {
 }
 
 extension BrewfileViewModel {
-    static func live() -> BrewfileViewModel {
+    static func live(
+        notificationScheduler: any CommandNotificationScheduling = CommandNotificationScheduler.live(),
+        settingsStore: any AppSettingsStoring = AppSettingsStore()
+    ) -> BrewfileViewModel {
         let runner = ProcessCommandRunner()
         let brewLocator = BrewLocator(runner: runner)
 
         return BrewfileViewModel(
             loader: BrewfileDocumentLoader(),
             selectionStore: BrewfileSelectionStore(),
+            settingsStore: settingsStore,
             picker: BrewfilePicker(),
             dumpDestinationPicker: BrewfileDumpDestinationPicker(),
             commandExecutor: BrewCommandExecutor(
                 brewLocator: brewLocator,
                 runner: runner
             ),
-            notificationScheduler: CommandNotificationScheduler.shared
+            notificationScheduler: notificationScheduler
         )
     }
 }

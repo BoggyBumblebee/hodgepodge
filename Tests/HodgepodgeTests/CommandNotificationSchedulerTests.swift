@@ -8,7 +8,10 @@ final class CommandNotificationSchedulerTests: XCTestCase {
             authorizationStatus: .notDetermined,
             requestAuthorizationResult: true
         )
-        let scheduler = CommandNotificationScheduler(center: center)
+        let scheduler = CommandNotificationScheduler(
+            center: center,
+            settingsStore: TestAppSettingsStore(snapshot: .default)
+        )
 
         await scheduler.schedule(
             CommandNotification(
@@ -29,7 +32,10 @@ final class CommandNotificationSchedulerTests: XCTestCase {
 
     func testScheduleSkipsNotificationWhenAuthorizationIsDenied() async {
         let center = TestUserNotificationCenter(authorizationStatus: .denied)
-        let scheduler = CommandNotificationScheduler(center: center)
+        let scheduler = CommandNotificationScheduler(
+            center: center,
+            settingsStore: TestAppSettingsStore(snapshot: .default)
+        )
 
         await scheduler.schedule(
             CommandNotification(
@@ -49,7 +55,10 @@ final class CommandNotificationSchedulerTests: XCTestCase {
             authorizationStatus: .notDetermined,
             requestAuthorizationResult: true
         )
-        let scheduler = CommandNotificationScheduler(center: center)
+        let scheduler = CommandNotificationScheduler(
+            center: center,
+            settingsStore: TestAppSettingsStore(snapshot: .default)
+        )
 
         await scheduler.schedule(
             CommandNotification(
@@ -69,6 +78,72 @@ final class CommandNotificationSchedulerTests: XCTestCase {
         XCTAssertEqual(requestAuthorizationCallCount, 1)
         XCTAssertEqual(addedRequests.count, 2)
     }
+
+    func testScheduleSkipsNotificationWhenDisabledInSettings() async {
+        let center = TestUserNotificationCenter(
+            authorizationStatus: .authorized,
+            requestAuthorizationResult: true
+        )
+        let scheduler = CommandNotificationScheduler(
+            center: center,
+            settingsStore: TestAppSettingsStore(
+                snapshot: AppSettingsSnapshot(
+                    defaultLaunchSection: .catalog,
+                    completionNotificationsEnabled: false,
+                    notificationSoundEnabled: true,
+                    restoreLastSelectedBrewfile: true
+                )
+            )
+        )
+
+        await scheduler.schedule(
+            CommandNotification(
+                title: "Install Complete",
+                body: "wget completed successfully."
+            )
+        )
+
+        XCTAssertEqual(center.requestAuthorizationCallCount, 0)
+        XCTAssertTrue(center.addedRequests.isEmpty)
+    }
+
+    func testScheduleOmitsSoundWhenDisabledInSettings() async {
+        let center = TestUserNotificationCenter(
+            authorizationStatus: .authorized,
+            requestAuthorizationResult: true
+        )
+        let scheduler = CommandNotificationScheduler(
+            center: center,
+            settingsStore: TestAppSettingsStore(
+                snapshot: AppSettingsSnapshot(
+                    defaultLaunchSection: .catalog,
+                    completionNotificationsEnabled: true,
+                    notificationSoundEnabled: false,
+                    restoreLastSelectedBrewfile: true
+                )
+            )
+        )
+
+        await scheduler.schedule(
+            CommandNotification(
+                title: "Install Complete",
+                body: "wget completed successfully."
+            )
+        )
+
+        XCTAssertEqual(center.addedRequests.count, 1)
+        XCTAssertNil(center.addedRequests.first?.content.sound)
+    }
+}
+
+private struct TestAppSettingsStore: AppSettingsStoring {
+    let snapshot: AppSettingsSnapshot
+
+    func loadSettings() -> AppSettingsSnapshot {
+        snapshot
+    }
+
+    func saveSettings(_ snapshot: AppSettingsSnapshot) {}
 }
 
 private final class TestUserNotificationCenter: @unchecked Sendable, UserNotificationCentering {
