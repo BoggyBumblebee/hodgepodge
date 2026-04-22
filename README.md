@@ -125,23 +125,9 @@ The current project state already includes:
 - completed:
   - UI and Settings audit
   - dedicated Settings window with launch, notification, and Brewfile preferences
-  - toolbar-based search, refresh, filter, and sort normalization across the main operational sections
-  - toolbar and header cleanup across Brewfile, Catalog Analytics, Maintenance, and About Brew for a more standard macOS hierarchy
-  - progressive-disclosure command output so long-running brew actions show compact status first and expandable details only when needed
-  - adaptive Catalog primary actions so installed packages switch from Install to Uninstall automatically
-  - inline command-copy affordances wherever command previews are shown, so command copy stays attached to the command itself instead of extra action buttons
-  - balanced middle/detail pane defaults across the operational sections so list browsing and detail reading follow a cleaner 40/60 split
-  - compact inline homepage and download icons in package headers instead of separate standalone links in the detail body
-  - lighter Installed detail headers so package-state badges and install-source text are not repeated when the list already communicates that state
-  - Installed action controls moved into the detail header flow so Installed and Catalog now share a more consistent action hierarchy
-  - quieter Installed action headers so explanatory copy above and below the action buttons is removed unless there is meaningful action state to show
-  - quieter Outdated upgrade actions so the primary upgrade controls live in the header flow like Catalog and Installed, with guidance retained as a lower supporting panel
-  - action controls in Outdated, Services, and Taps moved up near the section header so operational controls consistently appear before supporting metadata
-  - Services actions now match the Catalog and Installed pattern more closely, with the primary controls integrated into the header flow instead of a dedicated action card
-  - lighter Services detail headers so status lozenges are removed when the service state is already shown more clearly in the structured detail cards
-  - lighter Tap detail headers so duplicate status lozenges are removed when the list and detail cards already communicate that state more clearly
-  - Tap actions now match the Catalog and Installed pattern more closely, with the primary untap controls integrated into the header flow, the force toggle inline beside the action, and guidance retained as a lower supporting panel
-  - Brewfile actions now match the Catalog and Installed pattern more closely, with the primary bundle controls integrated into the header flow and command details retained as lower supporting content
+  - cross-section UI normalization for toolbars, headers, action placement, command copy, and cleaner detail layouts
+  - progressive-disclosure command output with compact status-first action feedback
+  - final layout cleanup across About Brew, Catalog Analytics, and Maintenance to better match native macOS hierarchy
 - normalize the macOS UI toward Apple's platform conventions, with cleaner layouts, clearer hierarchy, and more consistent controls
 - identify which preferences belong in Settings versus transient per-screen UI state
 - harden Homebrew command and JSON compatibility so Hodgepodge continues working across supported Homebrew releases starting from today's versions

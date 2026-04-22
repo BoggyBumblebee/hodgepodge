@@ -98,7 +98,7 @@ struct MaintenanceView: View {
 
     private var outputPane: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Review dry-run snapshots or live command logs from maintenance actions.")
+            Text("Review dry-run snapshots or inspect live command details when needed.")
                 .foregroundStyle(.secondary)
 
             if let progress = viewModel.actionState.progress {
@@ -170,15 +170,15 @@ struct MaintenanceView: View {
     }
 
     private var actionGrid: some View {
-        GroupBox("Actions") {
+        DetailCard(title: "Actions") {
             LazyVGrid(columns: [
-                GridItem(.adaptive(minimum: 180), spacing: 12)
+                GridItem(.adaptive(minimum: 220), spacing: 12)
             ], spacing: 12) {
                 ForEach(BrewMaintenanceTask.allCases) { task in
                     Button {
                         runAction(task)
                     } label: {
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 6) {
                             Label(task.title, systemImage: task.systemImageName)
                                 .font(.headline)
 
@@ -188,10 +188,9 @@ struct MaintenanceView: View {
                                 .multilineTextAlignment(.leading)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(12)
-                        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
                     .accessibilityLabel(task.actionLabel)
                 }
             }

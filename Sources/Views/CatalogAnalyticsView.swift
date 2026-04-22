@@ -40,7 +40,7 @@ struct CatalogAnalyticsView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 8) {
             Text("Public Homebrew leaderboard data from the official analytics API.")
                 .foregroundStyle(.secondary)
         }
@@ -63,8 +63,17 @@ struct CatalogAnalyticsView: View {
 
         case .loaded(let snapshot):
             VStack(alignment: .leading, spacing: 16) {
-                Text("Showing \(snapshot.period.title.lowercased()) of public install and build-error trends.")
-                    .font(.headline)
+                HStack {
+                    Text("Showing \(snapshot.period.title.lowercased()) of public install and build-error trends.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    Spacer()
+
+                    Text("\(snapshot.leaderboards.count) leaderboards")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
 
                 LazyVGrid(
                     columns: [GridItem(.adaptive(minimum: 320), spacing: 16, alignment: .top)],

@@ -5,18 +5,11 @@ struct OverviewView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 16) {
                 Text("Homebrew installation details, health, and quick-access help.")
                     .foregroundStyle(.secondary)
 
                 statusCard
-
-                if let helpURL = model.lastOpenedHelpURL {
-                    Text("Last opened help page: \(helpURL.absoluteString)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                }
             }
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -52,20 +45,31 @@ struct OverviewView: View {
             ContentUnavailableView("Homebrew Not Ready", systemImage: "exclamationmark.triangle", description: Text(message))
 
         case .loaded(let installation):
-            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 16, verticalSpacing: 12) {
-                row("Executable", installation.brewPath)
-                row("Version", installation.version)
-                row("Prefix", installation.prefix)
-                row("Cellar", installation.cellar)
-                row("Repository", installation.repository)
-                row("Tap Count", "\(installation.taps.count)")
+            DetailCard(title: "Installation") {
+                Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 16, verticalSpacing: 12) {
+                    row("Executable", installation.brewPath)
+                    row("Version", installation.version)
+                    row("Prefix", installation.prefix)
+                    row("Cellar", installation.cellar)
+                    row("Repository", installation.repository)
+                    row("Tap Count", "\(installation.taps.count)")
+                }
+
+                if let helpURL = model.lastOpenedHelpURL {
+                    Divider()
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Last Opened Help Page")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        Text(helpURL.absoluteString)
+                            .font(.caption.monospaced())
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                    }
+                }
             }
-            .padding(20)
-            .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color(nsColor: .windowBackgroundColor))
-                    .shadow(color: .black.opacity(0.08), radius: 10, y: 2)
-            )
         }
     }
 
