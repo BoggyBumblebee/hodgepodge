@@ -322,7 +322,8 @@ final class TapsViewModel: ObservableObject {
             CommandNotification(
                 title: "\(command.kind.title) Complete",
                 body: "\(command.tapName) completed successfully.",
-                elapsedTime: elapsedTime
+                elapsedTime: elapsedTime,
+                category: .taps
             )
         )
     }
@@ -335,7 +336,8 @@ final class TapsViewModel: ObservableObject {
             CommandNotification(
                 title: "\(command.kind.title) Cancelled",
                 body: "\(command.tapName) was cancelled before it finished.",
-                elapsedTime: elapsedTime
+                elapsedTime: elapsedTime,
+                category: .taps
             )
         )
     }
@@ -352,7 +354,8 @@ final class TapsViewModel: ObservableObject {
                     error.localizedDescription,
                     fallback: "\(command.tapName) couldn’t be completed."
                 ),
-                elapsedTime: elapsedTime
+                elapsedTime: elapsedTime,
+                category: .taps
             )
         )
     }

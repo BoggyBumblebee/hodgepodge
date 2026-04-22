@@ -293,7 +293,8 @@ final class InstalledPackagesViewModel: ObservableObject {
                     CommandNotification(
                         title: "Brewfile Export Complete",
                         body: "\(destinationURL.lastPathComponent) was generated successfully.",
-                        elapsedTime: completedProgress.elapsedTime()
+                        elapsedTime: completedProgress.elapsedTime(),
+                        category: .brewfiles
                     )
                 )
             } catch is CancellationError {
@@ -305,7 +306,8 @@ final class InstalledPackagesViewModel: ObservableObject {
                     CommandNotification(
                         title: "Brewfile Export Cancelled",
                         body: "The Brewfile export was cancelled before it finished.",
-                        elapsedTime: completedProgress.elapsedTime()
+                        elapsedTime: completedProgress.elapsedTime(),
+                        category: .brewfiles
                     )
                 )
             } catch {
@@ -320,7 +322,8 @@ final class InstalledPackagesViewModel: ObservableObject {
                             error.localizedDescription,
                             fallback: "The Brewfile export couldn’t be completed."
                         ),
-                        elapsedTime: completedProgress.elapsedTime()
+                        elapsedTime: completedProgress.elapsedTime(),
+                        category: .brewfiles
                     )
                 )
             }
@@ -568,7 +571,8 @@ final class InstalledPackagesViewModel: ObservableObject {
             CommandNotification(
                 title: "\(actionKind.title) Complete",
                 body: "\(package.title) completed successfully.",
-                elapsedTime: elapsedTime
+                elapsedTime: elapsedTime,
+                category: .packageActions
             )
         )
     }
@@ -582,7 +586,8 @@ final class InstalledPackagesViewModel: ObservableObject {
             CommandNotification(
                 title: "\(actionKind.title) Cancelled",
                 body: "\(package.title) was cancelled before it finished.",
-                elapsedTime: elapsedTime
+                elapsedTime: elapsedTime,
+                category: .packageActions
             )
         )
     }
@@ -600,7 +605,8 @@ final class InstalledPackagesViewModel: ObservableObject {
                     error.localizedDescription,
                     fallback: "\(package.title) couldn’t be completed."
                 ),
-                elapsedTime: elapsedTime
+                elapsedTime: elapsedTime,
+                category: .packageActions
             )
         )
     }

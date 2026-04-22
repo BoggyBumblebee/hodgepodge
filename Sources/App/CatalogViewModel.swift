@@ -22,6 +22,7 @@ final class CatalogViewModel: ObservableObject {
     private let actionHistoryStore: any CatalogActionHistoryStoring
     private let actionHistoryExporter: any CatalogActionHistoryExporting
     private let preferencesStore: any CatalogPreferencesStoring
+    private let settingsStore: any AppSettingsStoring
     private let notificationScheduler: any CommandNotificationScheduling
     private let homebrewStateNotifier: HomebrewStateNotifier
     private var detailCache: [String: CatalogPackageDetail] = [:]
@@ -30,6 +31,7 @@ final class CatalogViewModel: ObservableObject {
     private var actionTask: Task<Void, Never>?
     private var selectionTask: Task<Void, Never>?
     private var favoritesObserver: FavoritePackageIDsObserver?
+    private var settingsObserver: AppSettingsObserver?
     private var logBuffer = CommandLogBuffer()
     private var nextHistoryIdentifier = 0
 
@@ -39,6 +41,7 @@ final class CatalogViewModel: ObservableObject {
         actionHistoryStore: any CatalogActionHistoryStoring,
         actionHistoryExporter: any CatalogActionHistoryExporting,
         preferencesStore: any CatalogPreferencesStoring,
+        settingsStore: any AppSettingsStoring = AppSettingsStore(),
         notificationScheduler: any CommandNotificationScheduling = NullCommandNotificationScheduler(),
         notificationCenter: NotificationCenter = .default
     ) {
@@ -47,11 +50,16 @@ final class CatalogViewModel: ObservableObject {
         self.actionHistoryStore = actionHistoryStore
         self.actionHistoryExporter = actionHistoryExporter
         self.preferencesStore = preferencesStore
+        self.settingsStore = settingsStore
         self.notificationScheduler = notificationScheduler
         self.homebrewStateNotifier = HomebrewStateNotifier(notificationCenter: notificationCenter)
+        let retentionLimit = settingsStore.loadSettings().catalogHistoryRetentionLimit.rawValue
         let restoredHistory = actionHistoryStore.loadHistory()
-        actionHistory = restoredHistory
-        nextHistoryIdentifier = (restoredHistory.map { $0.id }.max() ?? -1) + 1
+        actionHistory = Self.trimHistory(restoredHistory, limit: retentionLimit)
+        if actionHistory != restoredHistory {
+            actionHistoryStore.saveHistory(actionHistory)
+        }
+        nextHistoryIdentifier = (actionHistory.map { $0.id }.max() ?? -1) + 1
         let restoredPreferences = preferencesStore.loadPreferences()
         favoritePackageIDs = Set(restoredPreferences.favoritePackageIDs)
         savedSearches = restoredPreferences.savedSearches.sorted {
@@ -59,6 +67,9 @@ final class CatalogViewModel: ObservableObject {
         }
         favoritesObserver = FavoritePackageIDsObserver(notificationCenter: notificationCenter) { [weak self] ids in
             self?.favoritePackageIDs = Set(ids)
+        }
+        settingsObserver = AppSettingsObserver(notificationCenter: notificationCenter) { [weak self] snapshot in
+            self?.applySettings(snapshot)
         }
     }
 
@@ -640,11 +651,34 @@ final class CatalogViewModel: ObservableObject {
         )
         nextHistoryIdentifier += 1
 
-        if actionHistory.count > 50 {
-            actionHistory.removeLast(actionHistory.count - 50)
+        trimHistoryToSettingsLimit()
+        actionHistoryStore.saveHistory(actionHistory)
+    }
+
+    private func applySettings(_ snapshot: AppSettingsSnapshot) {
+        let trimmedHistory = Self.trimHistory(actionHistory, limit: snapshot.catalogHistoryRetentionLimit.rawValue)
+        guard trimmedHistory != actionHistory else {
+            return
         }
 
+        actionHistory = trimmedHistory
         actionHistoryStore.saveHistory(actionHistory)
+    }
+
+    private func trimHistoryToSettingsLimit() {
+        let retentionLimit = settingsStore.loadSettings().catalogHistoryRetentionLimit.rawValue
+        actionHistory = Self.trimHistory(actionHistory, limit: retentionLimit)
+    }
+
+    private static func trimHistory(
+        _ entries: [CatalogPackageActionHistoryEntry],
+        limit: Int
+    ) -> [CatalogPackageActionHistoryEntry] {
+        guard entries.count > limit else {
+            return entries
+        }
+
+        return Array(entries.prefix(limit))
     }
 
     private func notifyActionSucceeded(
@@ -656,7 +690,8 @@ final class CatalogViewModel: ObservableObject {
             CommandNotification(
                 title: "\(actionKind.title) Complete",
                 body: "\(detail.title) completed successfully.",
-                elapsedTime: elapsedTime
+                elapsedTime: elapsedTime,
+                category: .packageActions
             )
         )
     }
@@ -670,7 +705,8 @@ final class CatalogViewModel: ObservableObject {
             CommandNotification(
                 title: "\(actionKind.title) Cancelled",
                 body: "\(detail.title) was cancelled before it finished.",
-                elapsedTime: elapsedTime
+                elapsedTime: elapsedTime,
+                category: .packageActions
             )
         )
     }
@@ -688,7 +724,8 @@ final class CatalogViewModel: ObservableObject {
                     error.localizedDescription,
                     fallback: "\(detail.title) couldn’t be completed."
                 ),
-                elapsedTime: elapsedTime
+                elapsedTime: elapsedTime,
+                category: .packageActions
             )
         )
     }
@@ -710,6 +747,7 @@ extension CatalogViewModel {
             actionHistoryStore: CatalogActionHistoryStore(),
             actionHistoryExporter: CatalogActionHistoryExporter(),
             preferencesStore: CatalogPreferencesStore(),
+            settingsStore: AppSettingsStore(),
             notificationScheduler: notificationScheduler,
             notificationCenter: .default
         )

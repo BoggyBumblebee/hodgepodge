@@ -372,7 +372,8 @@ final class ServicesViewModel: ObservableObject {
             CommandNotification(
                 title: "\(command.kind.title) Complete",
                 body: notificationSuccessBody(for: command),
-                elapsedTime: elapsedTime
+                elapsedTime: elapsedTime,
+                category: .services
             )
         )
     }
@@ -385,7 +386,8 @@ final class ServicesViewModel: ObservableObject {
             CommandNotification(
                 title: "\(command.kind.title) Cancelled",
                 body: notificationCancellationBody(for: command),
-                elapsedTime: elapsedTime
+                elapsedTime: elapsedTime,
+                category: .services
             )
         )
     }
@@ -402,7 +404,8 @@ final class ServicesViewModel: ObservableObject {
                     error.localizedDescription,
                     fallback: notificationFailureFallback(for: command)
                 ),
-                elapsedTime: elapsedTime
+                elapsedTime: elapsedTime,
+                category: .services
             )
         )
     }

@@ -22,9 +22,11 @@ final class AppSettingsStoreTests: XCTestCase {
             defaultLaunchSection: .installed,
             completionNotificationsEnabled: false,
             completionNotificationScope: .longRunningOnly,
+            completionNotificationCategories: [.services, .maintenance],
             notificationSoundEnabled: false,
             restoreLastSelectedBrewfile: false,
-            brewfileDefaultExportScope: .cask
+            brewfileDefaultExportScope: .cask,
+            catalogHistoryRetentionLimit: .oneHundred
         )
 
         store.saveSettings(snapshot)
@@ -40,7 +42,9 @@ final class AppSettingsStoreTests: XCTestCase {
         let store = AppSettingsStore(fileURL: fileURL, notificationCenter: notificationCenter)
         let snapshot = AppSettingsSnapshot(
             completionNotificationScope: .longRunningOnly,
-            brewfileDefaultExportScope: .formula
+            completionNotificationCategories: [.brewfiles],
+            brewfileDefaultExportScope: .formula,
+            catalogHistoryRetentionLimit: .twoHundredFifty
         )
         let expectation = expectation(description: "Settings change notification")
         let observer = notificationCenter.addObserver(

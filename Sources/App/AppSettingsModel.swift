@@ -27,6 +27,19 @@ final class AppSettingsModel: ObservableObject {
         update { $0.completionNotificationScope = scope }
     }
 
+    func setCompletionNotificationCategory(
+        _ category: CompletionNotificationCategory,
+        isEnabled: Bool
+    ) {
+        update {
+            if isEnabled {
+                $0.completionNotificationCategories.insert(category)
+            } else {
+                $0.completionNotificationCategories.remove(category)
+            }
+        }
+    }
+
     func setNotificationSoundEnabled(_ isEnabled: Bool) {
         update { $0.notificationSoundEnabled = isEnabled }
     }
@@ -37,6 +50,10 @@ final class AppSettingsModel: ObservableObject {
 
     func setBrewfileDefaultExportScope(_ scope: CatalogScope) {
         update { $0.brewfileDefaultExportScope = scope }
+    }
+
+    func setCatalogHistoryRetentionLimit(_ limit: CatalogHistoryRetentionLimit) {
+        update { $0.catalogHistoryRetentionLimit = limit }
     }
 
     private func update(_ mutate: (inout AppSettingsSnapshot) -> Void) {

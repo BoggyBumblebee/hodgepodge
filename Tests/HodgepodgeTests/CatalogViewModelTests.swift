@@ -768,6 +768,29 @@ final class CatalogViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.actionHistory(for: detail), [persistedEntry])
     }
 
+    func testInitTrimsPersistedActionHistoryToSettingsRetentionLimit() {
+        let detail = CatalogPackageDetail.fixture()
+        let entries = (0..<30).map { index in
+            CatalogPackageActionHistoryEntry(
+                id: index,
+                command: detail.actionCommand(for: .fetch),
+                startedAt: Date(timeIntervalSince1970: Double(index * 10)),
+                finishedAt: Date(timeIntervalSince1970: Double(index * 10 + 5)),
+                outcome: .succeeded(0),
+                outputLineCount: index + 1
+            )
+        }
+        let viewModel = makeViewModel(
+            historyStore: MockCatalogActionHistoryStore(initialEntries: entries),
+            settingsStore: MockAppSettingsStore(
+                snapshot: AppSettingsSnapshot(catalogHistoryRetentionLimit: .twentyFive)
+            )
+        )
+
+        XCTAssertEqual(viewModel.actionHistory.count, 25)
+        XCTAssertEqual(viewModel.actionHistory, Array(entries.prefix(25)))
+    }
+
     func testClearActionHistoryRemovesOnlyMatchingPackageAndPersists() {
         let first = CatalogPackageDetail.fixture(slug: "wget", title: "wget")
         let second = CatalogPackageDetail.fixture(kind: .cask, slug: "docker-desktop", title: "Docker Desktop")
@@ -814,6 +837,43 @@ final class CatalogViewModelTests: XCTestCase {
 
         XCTAssertTrue(viewModel.actionHistory.isEmpty)
         XCTAssertEqual(historyStore.savedEntries.last, [])
+    }
+
+    func testSettingsChangeTrimsActionHistoryToNewRetentionLimit() async {
+        let detail = CatalogPackageDetail.fixture()
+        let entries = (0..<30).map { index in
+            CatalogPackageActionHistoryEntry(
+                id: index,
+                command: detail.actionCommand(for: .fetch),
+                startedAt: Date(timeIntervalSince1970: Double(index * 10)),
+                finishedAt: Date(timeIntervalSince1970: Double(index * 10 + 5)),
+                outcome: .succeeded(0),
+                outputLineCount: index + 1
+            )
+        }
+        let notificationCenter = NotificationCenter()
+        let historyStore = MockCatalogActionHistoryStore(initialEntries: entries)
+        let viewModel = makeViewModel(
+            historyStore: historyStore,
+            settingsStore: MockAppSettingsStore(),
+            notificationCenter: notificationCenter
+        )
+
+        notificationCenter.post(
+            name: .appSettingsDidChange,
+            object: nil,
+            userInfo: [
+                AppSettingsNotificationUserInfoKey.snapshot: AppSettingsSnapshot(
+                    catalogHistoryRetentionLimit: .twentyFive
+                )
+            ]
+        )
+
+        await waitUntil {
+            viewModel.actionHistory.count == 25
+        }
+
+        XCTAssertEqual(historyStore.savedEntries.last?.count, 25)
     }
 
     func testExportActionHistoryUsesExporterWithPackageEntries() {
@@ -875,6 +935,7 @@ final class CatalogViewModelTests: XCTestCase {
         historyStore: any CatalogActionHistoryStoring = MockCatalogActionHistoryStore(),
         historyExporter: any CatalogActionHistoryExporting = MockCatalogActionHistoryExporter(),
         preferencesStore: any CatalogPreferencesStoring = MockCatalogPreferencesStore(),
+        settingsStore: any AppSettingsStoring = MockAppSettingsStore(),
         notificationCenter: NotificationCenter = .default
     ) -> CatalogViewModel {
         CatalogViewModel(
@@ -883,6 +944,7 @@ final class CatalogViewModelTests: XCTestCase {
             actionHistoryStore: historyStore,
             actionHistoryExporter: historyExporter,
             preferencesStore: preferencesStore,
+            settingsStore: settingsStore,
             notificationCenter: notificationCenter
         )
     }
@@ -1026,6 +1088,20 @@ private final class MockCatalogActionHistoryStore: CatalogActionHistoryStoring, 
     func saveHistory(_ entries: [CatalogPackageActionHistoryEntry]) {
         savedEntries.append(entries)
     }
+}
+
+private struct MockAppSettingsStore: AppSettingsStoring {
+    let snapshot: AppSettingsSnapshot
+
+    init(snapshot: AppSettingsSnapshot = .standard) {
+        self.snapshot = snapshot
+    }
+
+    func loadSettings() -> AppSettingsSnapshot {
+        snapshot
+    }
+
+    func saveSettings(_ snapshot: AppSettingsSnapshot) {}
 }
 
 @MainActor

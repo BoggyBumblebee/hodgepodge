@@ -168,7 +168,8 @@ final class MaintenanceViewModel: ObservableObject {
             CommandNotification(
                 title: "\(task.title) Complete",
                 body: "\(task.title) completed successfully.",
-                elapsedTime: elapsedTime
+                elapsedTime: elapsedTime,
+                category: .maintenance
             )
         )
     }
@@ -181,7 +182,8 @@ final class MaintenanceViewModel: ObservableObject {
             CommandNotification(
                 title: "\(task.title) Cancelled",
                 body: "\(task.title) was cancelled before it finished.",
-                elapsedTime: elapsedTime
+                elapsedTime: elapsedTime,
+                category: .maintenance
             )
         )
     }
@@ -198,7 +200,8 @@ final class MaintenanceViewModel: ObservableObject {
                     error.localizedDescription,
                     fallback: "\(task.title) couldn’t be completed."
                 ),
-                elapsedTime: elapsedTime
+                elapsedTime: elapsedTime,
+                category: .maintenance
             )
         )
     }

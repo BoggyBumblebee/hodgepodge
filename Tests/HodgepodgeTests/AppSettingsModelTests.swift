@@ -10,9 +10,11 @@ final class AppSettingsModelTests: XCTestCase {
         model.setDefaultLaunchSection(.services)
         model.setCompletionNotificationsEnabled(false)
         model.setCompletionNotificationScope(.longRunningOnly)
+        model.setCompletionNotificationCategory(.maintenance, isEnabled: false)
         model.setNotificationSoundEnabled(false)
         model.setRestoreLastSelectedBrewfile(false)
         model.setBrewfileDefaultExportScope(.formula)
+        model.setCatalogHistoryRetentionLimit(.oneHundred)
 
         XCTAssertEqual(
             model.settings,
@@ -20,9 +22,11 @@ final class AppSettingsModelTests: XCTestCase {
                 defaultLaunchSection: .services,
                 completionNotificationsEnabled: false,
                 completionNotificationScope: .longRunningOnly,
+                completionNotificationCategories: Set(CompletionNotificationCategory.allCases).subtracting([.maintenance]),
                 notificationSoundEnabled: false,
                 restoreLastSelectedBrewfile: false,
-                brewfileDefaultExportScope: .formula
+                brewfileDefaultExportScope: .formula,
+                catalogHistoryRetentionLimit: .oneHundred
             )
         )
         XCTAssertEqual(store.savedSnapshots.last, model.settings)

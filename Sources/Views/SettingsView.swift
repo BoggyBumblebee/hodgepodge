@@ -44,7 +44,19 @@ struct SettingsView: View {
                 ))
                 .disabled(!model.settings.completionNotificationsEnabled)
 
+                ForEach(CompletionNotificationCategory.allCases) { category in
+                    Toggle(category.title, isOn: Binding(
+                        get: { model.settings.completionNotificationCategories.contains(category) },
+                        set: { model.setCompletionNotificationCategory(category, isEnabled: $0) }
+                    ))
+                    .disabled(!model.settings.completionNotificationsEnabled)
+                }
+
                 Text(model.settings.completionNotificationScope.summary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Text("Choose which areas of the app can raise completion notifications.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -70,6 +82,22 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
 
                 Text("Installed-page Brewfile exports use this scope by default instead of inheriting the current package filter.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Advanced") {
+                Picker("Catalog command history retention", selection: Binding(
+                    get: { model.settings.catalogHistoryRetentionLimit },
+                    set: { model.setCatalogHistoryRetentionLimit($0) }
+                )) {
+                    ForEach(CatalogHistoryRetentionLimit.allCases) { limit in
+                        Text(limit.title).tag(limit)
+                    }
+                }
+                .pickerStyle(.menu)
+
+                Text("The Catalog section keeps up to this many recent command history entries.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

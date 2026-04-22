@@ -5,15 +5,18 @@ struct CommandNotification: Equatable, Sendable {
     let title: String
     let body: String
     let elapsedTime: TimeInterval?
+    let category: CompletionNotificationCategory
 
     init(
         title: String,
         body: String,
-        elapsedTime: TimeInterval? = nil
+        elapsedTime: TimeInterval? = nil,
+        category: CompletionNotificationCategory = .packageActions
     ) {
         self.title = title
         self.body = body
         self.elapsedTime = elapsedTime
+        self.category = category
     }
 }
 
@@ -72,6 +75,10 @@ actor CommandNotificationScheduler: CommandNotificationScheduling {
     func schedule(_ notification: CommandNotification) async {
         let settings = settingsStore.loadSettings()
         guard settings.completionNotificationsEnabled else {
+            return
+        }
+
+        guard settings.completionNotificationCategories.contains(notification.category) else {
             return
         }
 

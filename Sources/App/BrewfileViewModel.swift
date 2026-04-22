@@ -482,7 +482,8 @@ final class BrewfileViewModel: ObservableObject {
             CommandNotification(
                 title: "\(command.kind.title) Complete",
                 body: "\(command.fileURL.lastPathComponent) completed successfully.",
-                elapsedTime: elapsedTime
+                elapsedTime: elapsedTime,
+                category: .brewfiles
             )
         )
     }
@@ -495,7 +496,8 @@ final class BrewfileViewModel: ObservableObject {
             CommandNotification(
                 title: "\(command.kind.title) Cancelled",
                 body: "\(command.fileURL.lastPathComponent) was cancelled before it finished.",
-                elapsedTime: elapsedTime
+                elapsedTime: elapsedTime,
+                category: .brewfiles
             )
         )
     }
@@ -512,7 +514,8 @@ final class BrewfileViewModel: ObservableObject {
                     error.localizedDescription,
                     fallback: "\(command.fileURL.lastPathComponent) couldn’t be completed."
                 ),
-                elapsedTime: elapsedTime
+                elapsedTime: elapsedTime,
+                category: .brewfiles
             )
         )
     }

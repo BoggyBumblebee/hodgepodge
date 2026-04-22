@@ -351,7 +351,8 @@ final class OutdatedPackagesViewModel: ObservableObject {
             CommandNotification(
                 title: "\(command.kind.title) Complete",
                 body: successBody(for: command),
-                elapsedTime: elapsedTime
+                elapsedTime: elapsedTime,
+                category: .packageActions
             )
         )
     }
@@ -364,7 +365,8 @@ final class OutdatedPackagesViewModel: ObservableObject {
             CommandNotification(
                 title: "\(command.kind.title) Cancelled",
                 body: cancellationBody(for: command),
-                elapsedTime: elapsedTime
+                elapsedTime: elapsedTime,
+                category: .packageActions
             )
         )
     }
@@ -381,7 +383,8 @@ final class OutdatedPackagesViewModel: ObservableObject {
                     error.localizedDescription,
                     fallback: failureFallback(for: command)
                 ),
-                elapsedTime: elapsedTime
+                elapsedTime: elapsedTime,
+                category: .packageActions
             )
         )
     }

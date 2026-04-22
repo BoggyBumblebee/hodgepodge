@@ -184,6 +184,56 @@ final class CommandNotificationSchedulerTests: XCTestCase {
 
         XCTAssertEqual(center.addedRequests.count, 1)
     }
+
+    func testScheduleSkipsNotificationWhenCategoryIsDisabledInSettings() async {
+        let center = TestUserNotificationCenter(
+            authorizationStatus: .authorized,
+            requestAuthorizationResult: true
+        )
+        let scheduler = CommandNotificationScheduler(
+            center: center,
+            settingsStore: TestAppSettingsStore(
+                snapshot: AppSettingsSnapshot(
+                    completionNotificationCategories: [.services]
+                )
+            )
+        )
+
+        await scheduler.schedule(
+            CommandNotification(
+                title: "Install Complete",
+                body: "wget completed successfully.",
+                category: .packageActions
+            )
+        )
+
+        XCTAssertTrue(center.addedRequests.isEmpty)
+    }
+
+    func testScheduleAllowsNotificationWhenCategoryIsEnabledInSettings() async {
+        let center = TestUserNotificationCenter(
+            authorizationStatus: .authorized,
+            requestAuthorizationResult: true
+        )
+        let scheduler = CommandNotificationScheduler(
+            center: center,
+            settingsStore: TestAppSettingsStore(
+                snapshot: AppSettingsSnapshot(
+                    completionNotificationCategories: [.services]
+                )
+            )
+        )
+
+        await scheduler.schedule(
+            CommandNotification(
+                title: "Restart Complete",
+                body: "postgresql@17 completed successfully.",
+                category: .services
+            )
+        )
+
+        XCTAssertEqual(center.addedRequests.count, 1)
+    }
 }
 
 private struct TestAppSettingsStore: AppSettingsStoring {

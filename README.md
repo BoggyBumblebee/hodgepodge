@@ -57,7 +57,7 @@ The current project state already includes:
 - Brewfile inspection, check, install, export, and entry add/remove flows
 - command history for catalog actions
 - completion notifications for long-running Homebrew actions
-- a dedicated Settings window for launch, notification, and Brewfile preferences
+- a dedicated Settings window for launch, notification, Brewfile, and history preferences
 - bundled help documentation and app icon resources
 
 ## Roadmap
@@ -124,12 +124,13 @@ The current project state already includes:
 
 - completed:
   - UI and Settings audit
-  - dedicated Settings window with launch, notification, and Brewfile preferences
+  - dedicated Settings window with launch, notification, Brewfile, and history preferences
   - cross-section UI normalization for toolbars, headers, action placement, command copy, and cleaner detail layouts
   - progressive-disclosure command output with compact status-first action feedback
   - final layout cleanup across About Brew, Catalog Analytics, and Maintenance to better match native macOS hierarchy
   - settings extraction audit defining what belongs in Settings vs transient per-screen state
   - first settings-extraction slice for notification scope and Brewfile export defaults
+  - second settings-extraction slice for notification categories and catalog command-history retention
   - Homebrew capability probing for version-sensitive `brew info`, `outdated`, `services`, `tap-info`, and `bundle` surfaces
   - compatibility-aware command composition and friendlier unsupported-feature failures for drift-sensitive Homebrew commands
   - defensive decoding and regression coverage around mixed or partial Homebrew JSON shapes
