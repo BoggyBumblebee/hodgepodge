@@ -3,6 +3,8 @@ import Foundation
 @MainActor
 final class InstalledPackagesViewModel: ObservableObject {
     @Published var packagesState: InstalledPackagesLoadState = .idle
+    @Published var actionState: InstalledPackageActionState = .idle
+    @Published var actionLogs: [CommandLogEntry] = []
     @Published var exportState: InstalledPackagesBrewfileExportState = .idle
     @Published var exportLogs: [CommandLogEntry] = []
     @Published var searchText = ""
@@ -15,8 +17,10 @@ final class InstalledPackagesViewModel: ObservableObject {
     private let commandExecutor: any BrewCommandExecuting
     private let destinationPicker: any BrewfileDumpDestinationPicking
     private let fileManager: FileManager
+    private var actionTask: Task<Void, Never>?
     private var exportTask: Task<Void, Never>?
     private var logBuffer = CommandLogBuffer()
+    private var exportLogBuffer = CommandLogBuffer()
 
     init(
         provider: any InstalledPackagesProviding,
@@ -31,6 +35,7 @@ final class InstalledPackagesViewModel: ObservableObject {
     }
 
     deinit {
+        actionTask?.cancel()
         exportTask?.cancel()
     }
 
@@ -83,6 +88,10 @@ final class InstalledPackagesViewModel: ObservableObject {
 
     var hasRunningExport: Bool {
         exportState.isRunning
+    }
+
+    var hasRunningAction: Bool {
+        actionState.isRunning
     }
 
     var exportCommandPreview: String {
@@ -204,6 +213,85 @@ final class InstalledPackagesViewModel: ObservableObject {
         }
     }
 
+    func runAction(_ actionKind: InstalledPackageActionKind, for package: InstalledPackage) {
+        guard package.availableActionKinds.contains(actionKind) else {
+            return
+        }
+
+        let command = package.actionCommand(for: actionKind)
+        let progress = InstalledPackageActionProgress(command: command, startedAt: Date())
+
+        actionTask?.cancel()
+        actionTask = nil
+        resetActionOutput()
+        actionState = .running(progress)
+        appendActionLog(.system, "Preparing \(actionKind.title.lowercased()) for \(package.title).")
+
+        actionTask = Task { @MainActor [commandExecutor] in
+            do {
+                let result = try await commandExecutor.execute(arguments: command.arguments) { [weak self] kind, text in
+                    self?.appendActionLog(kind, text)
+                }
+                flushPendingActionLogs()
+                actionState = .succeeded(progress.finished(at: Date()), result)
+                reloadPackagesAfterAction(
+                    preservingSelectionID: package.id,
+                    fallbackSelection: actionKind == .uninstall ? package : nil
+                )
+            } catch is CancellationError {
+                flushPendingActionLogs()
+                appendActionLog(.system, "\(actionKind.title) cancelled.")
+                actionState = .cancelled(progress.finished(at: Date()))
+            } catch {
+                flushPendingActionLogs()
+                appendActionLog(.system, error.localizedDescription)
+                actionState = .failed(progress.finished(at: Date()), error.localizedDescription)
+            }
+
+            actionTask = nil
+        }
+    }
+
+    func cancelAction() {
+        actionTask?.cancel()
+    }
+
+    func clearActionOutput() {
+        actionTask?.cancel()
+        actionTask = nil
+        resetActionOutput()
+        actionState = .idle
+
+        if let selectedPackage, !isPackageInCurrentSnapshot(selectedPackage),
+           case .loaded(let packages) = packagesState {
+            self.selectedPackage = defaultSelection(from: packages)
+        }
+    }
+
+    func actionState(for package: InstalledPackage) -> InstalledPackageActionState {
+        guard actionState.command?.packageID == package.id else {
+            return .idle
+        }
+
+        return actionState
+    }
+
+    func actionLogs(for package: InstalledPackage) -> [CommandLogEntry] {
+        guard actionState.command?.packageID == package.id else {
+            return []
+        }
+
+        return actionLogs
+    }
+
+    func isPackageInCurrentSnapshot(_ package: InstalledPackage) -> Bool {
+        guard case .loaded(let packages) = packagesState else {
+            return false
+        }
+
+        return packages.contains(where: { $0.id == package.id })
+    }
+
     func cancelExport() {
         exportTask?.cancel()
     }
@@ -277,6 +365,28 @@ final class InstalledPackagesViewModel: ObservableObject {
         packages.sorted(by: sorter(for: sortOption)).first
     }
 
+    private func reloadPackagesAfterAction(
+        preservingSelectionID: String?,
+        fallbackSelection: InstalledPackage?
+    ) {
+        Task { @MainActor [provider] in
+            do {
+                let packages = try await provider.fetchInstalledPackages()
+                packagesState = .loaded(packages)
+
+                if let preservingSelectionID,
+                   let refreshedSelection = packages.first(where: { $0.id == preservingSelectionID }) {
+                    selectedPackage = refreshedSelection
+                } else {
+                    selectedPackage = fallbackSelection ?? defaultSelection(from: packages)
+                }
+            } catch {
+                packagesState = .failed(error.localizedDescription)
+                selectedPackage = fallbackSelection
+            }
+        }
+    }
+
     private static func compare(_ lhs: String, _ rhs: String, fallback: Bool) -> Bool {
         let result = lhs.localizedCaseInsensitiveCompare(rhs)
         if result != .orderedSame {
@@ -293,18 +403,33 @@ final class InstalledPackagesViewModel: ObservableObject {
     }
 
     private func resetExportOutput() {
-        logBuffer.reset()
+        exportLogBuffer.reset()
         exportLogs = []
     }
 
     private func appendExportLog(_ kind: CommandLogKind, _ text: String, timestamp: Date = Date()) {
-        logBuffer.append(kind, text, timestamp: timestamp)
-        exportLogs = logBuffer.entries
+        exportLogBuffer.append(kind, text, timestamp: timestamp)
+        exportLogs = exportLogBuffer.entries
     }
 
     private func flushPendingExportLogs() {
+        exportLogBuffer.flush()
+        exportLogs = exportLogBuffer.entries
+    }
+
+    private func resetActionOutput() {
+        logBuffer.reset()
+        actionLogs = []
+    }
+
+    private func appendActionLog(_ kind: CommandLogKind, _ text: String, timestamp: Date = Date()) {
+        logBuffer.append(kind, text, timestamp: timestamp)
+        actionLogs = logBuffer.entries
+    }
+
+    private func flushPendingActionLogs() {
         logBuffer.flush()
-        exportLogs = logBuffer.entries
+        actionLogs = logBuffer.entries
     }
 }
 

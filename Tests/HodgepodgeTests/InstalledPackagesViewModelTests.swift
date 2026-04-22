@@ -336,6 +336,146 @@ final class InstalledPackagesViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.exportLogs.isEmpty)
     }
 
+    func testRunActionStoresSuccessStateAndPreservesRemovedPackageSelectionForOutputReview() async {
+        let package = makePackage(slug: "wget", title: "wget")
+        let provider = CyclingInstalledPackagesProvider(results: [[]])
+        let executor = MockInstalledPackagesCommandExecutor(
+            result: .success(CommandResult(stdout: "Uninstalled\n", stderr: "", exitCode: 0)),
+            chunks: [.init(stream: .stdout, text: "Removing...\n")]
+        )
+        let viewModel = InstalledPackagesViewModel(
+            provider: provider,
+            commandExecutor: executor,
+            destinationPicker: MockBrewfileDumpDestinationPicker()
+        )
+        viewModel.packagesState = .loaded([package])
+        viewModel.selectedPackage = package
+
+        viewModel.runAction(.uninstall, for: package)
+        await waitUntil {
+            if case .succeeded = viewModel.actionState {
+                return true
+            }
+            return false
+        }
+        await waitUntil {
+            if case .loaded(let packages) = viewModel.packagesState {
+                return packages.isEmpty
+            }
+            return false
+        }
+
+        XCTAssertEqual(executor.executedArguments, [["uninstall", "wget"]])
+        XCTAssertEqual(viewModel.selectedPackage, package)
+        XCTAssertFalse(viewModel.isPackageInCurrentSnapshot(package))
+        XCTAssertTrue(viewModel.actionLogs.contains(where: { $0.text == "Removing..." }))
+    }
+
+    func testRunActionRefreshesPackageSelectionAfterSuccessfulFormulaAction() async {
+        let original = makePackage(slug: "wget", title: "wget", isPinned: false, isLinked: true)
+        let refreshed = makePackage(slug: "wget", title: "wget", isPinned: true, isLinked: true)
+        let provider = CyclingInstalledPackagesProvider(results: [[refreshed]])
+        let executor = MockInstalledPackagesCommandExecutor(
+            result: .success(CommandResult(stdout: "Pinned\n", stderr: "", exitCode: 0))
+        )
+        let viewModel = InstalledPackagesViewModel(
+            provider: provider,
+            commandExecutor: executor,
+            destinationPicker: MockBrewfileDumpDestinationPicker()
+        )
+        viewModel.packagesState = .loaded([original])
+        viewModel.selectedPackage = original
+
+        viewModel.runAction(.pin, for: original)
+        await waitUntil {
+            viewModel.selectedPackage?.isPinned == true
+        }
+
+        XCTAssertEqual(executor.executedArguments, [["pin", "wget"]])
+        XCTAssertEqual(viewModel.selectedPackage, refreshed)
+    }
+
+    func testRunActionStoresFailureState() async {
+        let package = makePackage(slug: "wget")
+        let executor = MockInstalledPackagesCommandExecutor(
+            result: .failure(CommandRunnerError.nonZeroExitCode(
+                CommandResult(stdout: "", stderr: "could not unlink", exitCode: 1)
+            ))
+        )
+        let viewModel = InstalledPackagesViewModel(
+            provider: MockInstalledPackagesProvider(result: .success([package])),
+            commandExecutor: executor,
+            destinationPicker: MockBrewfileDumpDestinationPicker()
+        )
+
+        viewModel.runAction(.unlink, for: package)
+        await waitUntil {
+            if case .failed = viewModel.actionState {
+                return true
+            }
+            return false
+        }
+    }
+
+    func testCancelActionStoresCancelledState() async {
+        let package = makePackage(slug: "wget")
+        let viewModel = InstalledPackagesViewModel(
+            provider: MockInstalledPackagesProvider(result: .success([package])),
+            commandExecutor: SuspendingInstalledPackagesCommandExecutor(),
+            destinationPicker: MockBrewfileDumpDestinationPicker()
+        )
+
+        viewModel.runAction(.reinstall, for: package)
+        await waitUntil {
+            if case .running = viewModel.actionState {
+                return true
+            }
+            return false
+        }
+
+        viewModel.cancelAction()
+        await waitUntil {
+            if case .cancelled = viewModel.actionState {
+                return true
+            }
+            return false
+        }
+    }
+
+    func testClearActionOutputResetsActionStateAndFallsBackToCurrentSnapshotSelection() {
+        let removedPackage = makePackage(slug: "wget", title: "wget")
+        let fallbackPackage = makePackage(slug: "curl", title: "curl")
+        let viewModel = InstalledPackagesViewModel(
+            provider: MockInstalledPackagesProvider(result: .success([fallbackPackage])),
+            commandExecutor: MockInstalledPackagesCommandExecutor(),
+            destinationPicker: MockBrewfileDumpDestinationPicker()
+        )
+        viewModel.packagesState = .loaded([fallbackPackage])
+        viewModel.selectedPackage = removedPackage
+        viewModel.actionState = .succeeded(
+            InstalledPackageActionProgress(
+                command: removedPackage.actionCommand(for: .uninstall),
+                startedAt: Date(timeIntervalSince1970: 1_000),
+                finishedAt: Date(timeIntervalSince1970: 1_100)
+            ),
+            CommandResult(stdout: "", stderr: "", exitCode: 0)
+        )
+        viewModel.actionLogs = [
+            CommandLogEntry(
+                id: 0,
+                kind: .system,
+                text: "Removed wget",
+                timestamp: Date(timeIntervalSince1970: 1_050)
+            )
+        ]
+
+        viewModel.clearActionOutput()
+
+        XCTAssertEqual(viewModel.actionState, .idle)
+        XCTAssertTrue(viewModel.actionLogs.isEmpty)
+        XCTAssertEqual(viewModel.selectedPackage, fallbackPackage)
+    }
+
     private func waitUntil(
         maxIterations: Int = 50,
         file: StaticString = #filePath,
@@ -459,10 +599,15 @@ private final class CyclingInstalledPackagesProvider: InstalledPackagesProviding
 
 private final class MockInstalledPackagesCommandExecutor: BrewCommandExecuting, @unchecked Sendable {
     let result: Result<CommandResult, Error>
+    let chunks: [CommandOutputChunk]
     private(set) var executedArguments: [[String]] = []
 
-    init(result: Result<CommandResult, Error> = .success(CommandResult(stdout: "", stderr: "", exitCode: 0))) {
+    init(
+        result: Result<CommandResult, Error> = .success(CommandResult(stdout: "", stderr: "", exitCode: 0)),
+        chunks: [CommandOutputChunk] = []
+    ) {
         self.result = result
+        self.chunks = chunks
     }
 
     func execute(
@@ -471,8 +616,37 @@ private final class MockInstalledPackagesCommandExecutor: BrewCommandExecuting, 
     ) async throws -> CommandResult {
         executedArguments.append(arguments)
         await onLog(.system, "Using Homebrew at /opt/homebrew/bin/brew")
-        await onLog(.stdout, "Dumping Brewfile...\n")
+
+        for chunk in chunks {
+            let kind: CatalogPackageActionLogKind = switch chunk.stream {
+            case .stdout:
+                .stdout
+            case .stderr:
+                .stderr
+            }
+            await onLog(kind, chunk.text)
+        }
+
+        if chunks.isEmpty {
+            await onLog(.stdout, "Dumping Brewfile...\n")
+        }
+
         return try result.get()
+    }
+}
+
+private struct SuspendingInstalledPackagesCommandExecutor: BrewCommandExecuting {
+    func execute(
+        arguments: [String],
+        onLog: @escaping @MainActor @Sendable (CatalogPackageActionLogKind, String) -> Void
+    ) async throws -> CommandResult {
+        await onLog(.system, "Using Homebrew at /opt/homebrew/bin/brew")
+
+        while !Task.isCancelled {
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
+
+        throw CancellationError()
     }
 }
 

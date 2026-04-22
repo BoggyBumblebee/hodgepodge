@@ -2,6 +2,7 @@ import SwiftUI
 
 struct InstalledPackagesView: View {
     @ObservedObject var viewModel: InstalledPackagesViewModel
+    @State private var pendingAction: InstalledPackageActionCommand?
 
     var body: some View {
         HSplitView {
@@ -15,6 +16,37 @@ struct InstalledPackagesView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task {
             viewModel.loadIfNeeded()
+        }
+        .confirmationDialog(
+            pendingAction?.confirmationTitle ?? "",
+            isPresented: Binding(
+                get: { pendingAction != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        pendingAction = nil
+                    }
+                }
+            ),
+            presenting: pendingAction
+        ) { action in
+            Button(action.kind.title) {
+                let package = if case .loaded(let packages) = viewModel.packagesState {
+                    packages.first(where: { $0.id == action.packageID }) ?? viewModel.selectedPackage
+                } else {
+                    viewModel.selectedPackage
+                }
+
+                if let package {
+                    viewModel.runAction(action.kind, for: package)
+                }
+                pendingAction = nil
+            }
+
+            Button("Cancel", role: .cancel) {
+                pendingAction = nil
+            }
+        } message: { action in
+            Text(action.confirmationMessage)
         }
     }
 
@@ -236,6 +268,12 @@ struct InstalledPackagesView: View {
             if let package = viewModel.selectedPackage {
                 InstalledPackageDetailView(
                     package: package,
+                    isCurrentSnapshot: viewModel.isPackageInCurrentSnapshot(package),
+                    actionState: viewModel.actionState(for: package),
+                    actionLogs: viewModel.actionLogs(for: package),
+                    onRunAction: handleAction(_:for:),
+                    onCancelAction: viewModel.cancelAction,
+                    onClearOutput: viewModel.clearActionOutput,
                     dependencySnapshot: viewModel.dependencySnapshot(for: package),
                     onSelectPackage: viewModel.selectPackage(id:)
                 )
@@ -260,6 +298,14 @@ struct InstalledPackagesView: View {
                 }
             }
         )
+    }
+
+    private func handleAction(_ action: InstalledPackageActionKind, for package: InstalledPackage) {
+        if action.requiresConfirmation {
+            pendingAction = package.actionCommand(for: action)
+        } else {
+            viewModel.runAction(action, for: package)
+        }
     }
 
     private func logTimestamp(for date: Date) -> String {
@@ -332,6 +378,12 @@ private struct InstalledPackagesExportStatusView: View {
 
 private struct InstalledPackageDetailView: View {
     let package: InstalledPackage
+    let isCurrentSnapshot: Bool
+    let actionState: InstalledPackageActionState
+    let actionLogs: [CommandLogEntry]
+    let onRunAction: (InstalledPackageActionKind, InstalledPackage) -> Void
+    let onCancelAction: () -> Void
+    let onClearOutput: () -> Void
     let dependencySnapshot: InstalledPackageDependencySnapshot?
     let onSelectPackage: (String) -> Void
 
@@ -341,6 +393,8 @@ private struct InstalledPackageDetailView: View {
                 titleBlock
                 metadataCard
                 packageStateCard
+                packageActionsCard
+                actionOutputCard
 
                 if let dependencySnapshot {
                     dependencySummaryCard(snapshot: dependencySnapshot)
@@ -452,6 +506,32 @@ private struct InstalledPackageDetailView: View {
         }
     }
 
+    private var packageActionsCard: some View {
+        InstalledPackageCard(title: "Package Actions") {
+            VStack(alignment: .leading, spacing: 16) {
+                Text(package.actionDescription)
+                    .foregroundStyle(.secondary)
+
+                if !isCurrentSnapshot {
+                    Label(
+                        "The latest refresh no longer reports this package as installed. The detail pane is keeping the last selection visible so you can review the action output.",
+                        systemImage: "info.circle"
+                    )
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                }
+
+                HStack(alignment: .top, spacing: 12) {
+                    ForEach(package.availableActionKinds) { action in
+                        actionButton(for: action)
+                    }
+                }
+
+                InstalledPackageActionStatusView(actionState: actionState)
+            }
+        }
+    }
+
     private func dependencySummaryCard(snapshot: InstalledPackageDependencySnapshot) -> some View {
         InstalledPackageCard(title: "Dependency Summary") {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 12)], spacing: 12) {
@@ -517,6 +597,46 @@ private struct InstalledPackageDetailView: View {
         }
     }
 
+    @ViewBuilder
+    private var actionOutputCard: some View {
+        if actionState != .idle || !actionLogs.isEmpty {
+            InstalledPackageCard(title: "Action Output") {
+                VStack(alignment: .leading, spacing: 12) {
+                    if actionState.isRunning {
+                        Button("Cancel", action: onCancelAction)
+                    } else {
+                        Button("Clear Output", action: onClearOutput)
+                    }
+
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(actionLogs) { entry in
+                                HStack(alignment: .top, spacing: 10) {
+                                    Text(entry.timestamp.formatted(date: .omitted, time: .standard))
+                                        .font(.caption2.monospaced())
+                                        .foregroundStyle(.tertiary)
+
+                                    Text(entry.kind.rawValue.uppercased())
+                                        .font(.caption2.weight(.semibold).monospaced())
+                                        .foregroundStyle(logColor(for: entry.kind))
+
+                                    Text(entry.text)
+                                        .font(.caption.monospaced())
+                                        .textSelection(.enabled)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(minHeight: 120, maxHeight: 220)
+                    .padding(12)
+                    .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+            }
+        }
+    }
+
     private func metadataRow(_ title: String, _ value: String) -> some View {
         GridRow {
             Text(title)
@@ -524,6 +644,73 @@ private struct InstalledPackageDetailView: View {
                 .foregroundStyle(.secondary)
             Text(value)
                 .textSelection(.enabled)
+        }
+    }
+
+    @ViewBuilder
+    private func actionButton(for action: InstalledPackageActionKind) -> some View {
+        if action.requiresConfirmation {
+            Button(action.title) {
+                onRunAction(action, package)
+            }
+            .buttonStyle(.borderedProminent)
+            .accessibilityLabel("\(action.title) \(package.title)")
+        } else {
+            Button(action.title) {
+                onRunAction(action, package)
+            }
+            .buttonStyle(.bordered)
+            .accessibilityLabel("\(action.title) \(package.title)")
+        }
+    }
+
+    private func logColor(for kind: CommandLogKind) -> Color {
+        switch kind {
+        case .system:
+            .secondary
+        case .stdout:
+            .green
+        case .stderr:
+            .orange
+        }
+    }
+}
+
+private struct InstalledPackageActionStatusView: View {
+    let actionState: InstalledPackageActionState
+
+    var body: some View {
+        switch actionState {
+        case .idle:
+            Text("Run package management actions here using your local Homebrew installation.")
+                .foregroundStyle(.secondary)
+        case .running(let progress):
+            Label(
+                "\(progress.command.kind.title) started at \(progress.startedAt.formatted(date: .omitted, time: .standard))",
+                systemImage: "hourglass"
+            )
+            .foregroundStyle(.secondary)
+        case .succeeded:
+            Label(
+                "The package action completed successfully.",
+                systemImage: "checkmark.circle.fill"
+            )
+            .foregroundStyle(.green)
+        case .failed(_, let message):
+            Label(
+                CommandPresentation.friendlyFailureDescription(
+                    message,
+                    fallback: "Homebrew couldn't complete this package action."
+                ),
+                systemImage: "exclamationmark.triangle.fill"
+            )
+            .foregroundStyle(.orange)
+        case .cancelled:
+            Label(
+                "The package action was cancelled.",
+                systemImage: "xmark.circle.fill"
+            )
+            .foregroundStyle(.secondary)
         }
     }
 }

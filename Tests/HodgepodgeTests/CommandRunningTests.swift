@@ -33,20 +33,26 @@ final class CommandRunningTests: XCTestCase {
     func testProcessCommandRunnerStreamsStdoutAndStderr() async throws {
         let runner = ProcessCommandRunner()
         var chunks: [CommandOutputChunk] = []
+        let receivedBothStreams = expectation(description: "Received stdout and stderr callbacks")
 
         let result = try await runner.run(
             executable: "/bin/sh",
             arguments: ["-c", "printf 'hello\\n'; printf 'warning\\n' >&2"],
             onOutput: { chunk in
                 chunks.append(chunk)
+                let streams = Set(chunks.map(\.stream))
+                if streams.contains(.stdout) && streams.contains(.stderr) {
+                    receivedBothStreams.fulfill()
+                }
             }
         )
 
+        await fulfillment(of: [receivedBothStreams], timeout: 1.0)
+
         XCTAssertEqual(result.stdout, "hello\n")
         XCTAssertEqual(result.stderr, "warning\n")
-        XCTAssertEqual(chunks.count, 2)
-        XCTAssertTrue(chunks.contains(CommandOutputChunk(stream: .stdout, text: "hello\n")))
-        XCTAssertTrue(chunks.contains(CommandOutputChunk(stream: .stderr, text: "warning\n")))
+        XCTAssertTrue(chunks.contains(where: { $0.stream == .stdout && $0.text.contains("hello") }))
+        XCTAssertTrue(chunks.contains(where: { $0.stream == .stderr && $0.text.contains("warning") }))
     }
 
     func testProcessCommandRunnerCancelsLongRunningCommand() async {

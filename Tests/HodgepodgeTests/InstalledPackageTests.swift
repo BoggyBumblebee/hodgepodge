@@ -89,6 +89,65 @@ final class InstalledPackageTests: XCTestCase {
         XCTAssertEqual(package.dependencyGroups.first?.items, ["fmt"])
     }
 
+    func testAvailableActionKindsReflectFormulaAndCaskState() {
+        let linkedPinnedFormula = makePackage(isPinned: true, isLinked: true)
+        XCTAssertEqual(
+            linkedPinnedFormula.availableActionKinds,
+            [.reinstall, .unlink, .unpin, .uninstall]
+        )
+
+        let unlinkedFormula = makePackage(isPinned: false, isLinked: false)
+        XCTAssertEqual(
+            unlinkedFormula.availableActionKinds,
+            [.reinstall, .link, .pin, .uninstall]
+        )
+
+        let cask = makePackage(kind: .cask)
+        XCTAssertEqual(cask.availableActionKinds, [.reinstall, .uninstall])
+    }
+
+    func testActionCommandsUseHomebrewCompatibleArguments() {
+        let formula = makePackage(isPinned: true, isLinked: true)
+        XCTAssertEqual(formula.actionCommand(for: .reinstall).arguments, ["reinstall", "wget"])
+        XCTAssertEqual(formula.actionCommand(for: .unlink).arguments, ["unlink", "wget"])
+        XCTAssertEqual(formula.actionCommand(for: .unpin).arguments, ["unpin", "wget"])
+        XCTAssertEqual(formula.actionCommand(for: .uninstall).arguments, ["uninstall", "wget"])
+
+        let cask = makePackage(kind: .cask)
+        XCTAssertEqual(cask.actionCommand(for: .reinstall).arguments, ["reinstall", "--cask", "wget"])
+        XCTAssertEqual(cask.actionCommand(for: .uninstall).arguments, ["uninstall", "--cask", "wget"])
+    }
+
+    func testActionDescriptionsAndConfirmationMetadataStayUserFriendly() {
+        XCTAssertTrue(InstalledPackageActionKind.reinstall.requiresConfirmation)
+        XCTAssertTrue(InstalledPackageActionKind.uninstall.requiresConfirmation)
+        XCTAssertFalse(InstalledPackageActionKind.link.requiresConfirmation)
+        XCTAssertEqual(InstalledPackageActionKind.pin.title, "Pin")
+        XCTAssertEqual(InstalledPackageActionKind.unpin.title, "Unpin")
+
+        let formula = makePackage(kind: .formula, isPinned: false, isLinked: false)
+        XCTAssertEqual(
+            formula.actionDescription,
+            "Manage how this formula is linked and pinned, or reinstall and uninstall it locally."
+        )
+
+        let reinstallCommand = formula.actionCommand(for: .reinstall)
+        XCTAssertEqual(reinstallCommand.confirmationTitle, "Reinstall wget?")
+        XCTAssertTrue(reinstallCommand.confirmationMessage.contains("removes and installs the package again"))
+        XCTAssertEqual(reinstallCommand.command, "brew reinstall wget")
+
+        let cask = makePackage(kind: .cask)
+        XCTAssertEqual(
+            cask.actionDescription,
+            "Reinstall or uninstall this cask from your local Homebrew setup."
+        )
+
+        let uninstallCommand = cask.actionCommand(for: .uninstall)
+        XCTAssertEqual(uninstallCommand.confirmationTitle, "Uninstall wget?")
+        XCTAssertTrue(uninstallCommand.confirmationMessage.contains("removes the package from this Mac"))
+        XCTAssertEqual(uninstallCommand.command, "brew uninstall --cask wget")
+    }
+
     private func makePackage(
         kind: CatalogPackageKind = .formula,
         isPinned: Bool = false,
