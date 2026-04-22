@@ -7,6 +7,7 @@ final class InstalledPackagesViewModel: ObservableObject {
     @Published var actionLogs: [CommandLogEntry] = []
     @Published var exportState: InstalledPackagesBrewfileExportState = .idle
     @Published var exportLogs: [CommandLogEntry] = []
+    @Published var favoritePackageIDs: Set<String> = []
     @Published var searchText = ""
     @Published var scope: CatalogScope = .all
     @Published var activeFilters: Set<InstalledPackageFilterOption> = []
@@ -16,9 +17,11 @@ final class InstalledPackagesViewModel: ObservableObject {
     private let provider: any InstalledPackagesProviding
     private let commandExecutor: any BrewCommandExecuting
     private let destinationPicker: any BrewfileDumpDestinationPicking
+    private let favoritesStore: any FavoritePackageStoring
     private let fileManager: FileManager
     private var actionTask: Task<Void, Never>?
     private var exportTask: Task<Void, Never>?
+    private var favoritesObserver: FavoritePackageIDsObserver?
     private var logBuffer = CommandLogBuffer()
     private var exportLogBuffer = CommandLogBuffer()
 
@@ -26,12 +29,19 @@ final class InstalledPackagesViewModel: ObservableObject {
         provider: any InstalledPackagesProviding,
         commandExecutor: any BrewCommandExecuting,
         destinationPicker: any BrewfileDumpDestinationPicking,
+        favoritesStore: any FavoritePackageStoring = CatalogPreferencesStore(),
+        notificationCenter: NotificationCenter = .default,
         fileManager: FileManager = .default
     ) {
         self.provider = provider
         self.commandExecutor = commandExecutor
         self.destinationPicker = destinationPicker
+        self.favoritesStore = favoritesStore
         self.fileManager = fileManager
+        favoritePackageIDs = Set(favoritesStore.loadFavoritePackageIDs())
+        favoritesObserver = FavoritePackageIDsObserver(notificationCenter: notificationCenter) { [weak self] ids in
+            self?.favoritePackageIDs = Set(ids)
+        }
     }
 
     deinit {
@@ -119,6 +129,20 @@ final class InstalledPackagesViewModel: ObservableObject {
         }
 
         selectedPackage = package
+    }
+
+    func isFavorite(_ package: InstalledPackage) -> Bool {
+        favoritePackageIDs.contains(package.id)
+    }
+
+    func toggleFavorite(_ package: InstalledPackage) {
+        if favoritePackageIDs.contains(package.id) {
+            favoritePackageIDs.remove(package.id)
+        } else {
+            favoritePackageIDs.insert(package.id)
+        }
+
+        favoritesStore.saveFavoritePackageIDs(favoritePackageIDs.sorted())
     }
 
     func loadIfNeeded() {
@@ -306,6 +330,8 @@ final class InstalledPackagesViewModel: ObservableObject {
     private func matchesActiveFilters(for package: InstalledPackage) -> Bool {
         activeFilters.allSatisfy { filter in
             switch filter {
+            case .favorites:
+                favoritePackageIDs.contains(package.id)
             case .pinned:
                 package.isPinned
             case .linked:
@@ -448,7 +474,9 @@ extension InstalledPackagesViewModel {
                 runner: runner
             ),
             commandExecutor: commandExecutor,
-            destinationPicker: BrewfileDumpDestinationPicker()
+            destinationPicker: BrewfileDumpDestinationPicker(),
+            favoritesStore: CatalogPreferencesStore(),
+            notificationCenter: .default
         )
     }
 }

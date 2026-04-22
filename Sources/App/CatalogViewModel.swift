@@ -22,6 +22,7 @@ final class CatalogViewModel: ObservableObject {
     private let preferencesStore: any CatalogPreferencesStoring
     private var detailCache: [String: CatalogPackageDetail] = [:]
     private var actionTask: Task<Void, Never>?
+    private var favoritesObserver: FavoritePackageIDsObserver?
     private var logBuffer = CommandLogBuffer()
     private var nextHistoryIdentifier = 0
 
@@ -30,7 +31,8 @@ final class CatalogViewModel: ObservableObject {
         commandExecutor: any BrewCommandExecuting,
         actionHistoryStore: any CatalogActionHistoryStoring,
         actionHistoryExporter: any CatalogActionHistoryExporting,
-        preferencesStore: any CatalogPreferencesStoring
+        preferencesStore: any CatalogPreferencesStoring,
+        notificationCenter: NotificationCenter = .default
     ) {
         self.apiClient = apiClient
         self.commandExecutor = commandExecutor
@@ -44,6 +46,9 @@ final class CatalogViewModel: ObservableObject {
         favoritePackageIDs = Set(restoredPreferences.favoritePackageIDs)
         savedSearches = restoredPreferences.savedSearches.sorted {
             $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+        }
+        favoritesObserver = FavoritePackageIDsObserver(notificationCenter: notificationCenter) { [weak self] ids in
+            self?.favoritePackageIDs = Set(ids)
         }
     }
 
@@ -511,7 +516,8 @@ extension CatalogViewModel {
             ),
             actionHistoryStore: CatalogActionHistoryStore(),
             actionHistoryExporter: CatalogActionHistoryExporter(),
-            preferencesStore: CatalogPreferencesStore()
+            preferencesStore: CatalogPreferencesStore(),
+            notificationCenter: .default
         )
     }
 }

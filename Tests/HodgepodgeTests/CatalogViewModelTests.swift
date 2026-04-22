@@ -377,6 +377,21 @@ final class CatalogViewModelTests: XCTestCase {
         )
     }
 
+    func testFavoritePackageIDsUpdateWhenSharedNotificationIsPosted() async {
+        let notificationCenter = NotificationCenter()
+        let viewModel = makeViewModel(notificationCenter: notificationCenter)
+
+        notificationCenter.post(
+            name: .favoritePackageIDsDidChange,
+            object: nil,
+            userInfo: [FavoritePackageNotificationUserInfoKey.ids: ["formula:wget", "cask:docker-desktop"]]
+        )
+
+        await waitUntil {
+            viewModel.favoritePackageIDs == ["formula:wget", "cask:docker-desktop"]
+        }
+    }
+
     func testRunActionStoresSuccessStateAndStreamsLogs() async {
         let detail = CatalogPackageDetail.fixture()
         let result = CommandResult(stdout: "Fetched\n", stderr: "", exitCode: 0)
@@ -639,14 +654,16 @@ final class CatalogViewModelTests: XCTestCase {
         commandExecutor: any BrewCommandExecuting = MockBrewCommandExecutor(result: .success(CommandResult(stdout: "", stderr: "", exitCode: 0))),
         historyStore: any CatalogActionHistoryStoring = MockCatalogActionHistoryStore(),
         historyExporter: any CatalogActionHistoryExporting = MockCatalogActionHistoryExporter(),
-        preferencesStore: any CatalogPreferencesStoring = MockCatalogPreferencesStore()
+        preferencesStore: any CatalogPreferencesStoring = MockCatalogPreferencesStore(),
+        notificationCenter: NotificationCenter = .default
     ) -> CatalogViewModel {
         CatalogViewModel(
             apiClient: apiClient,
             commandExecutor: commandExecutor,
             actionHistoryStore: historyStore,
             actionHistoryExporter: historyExporter,
-            preferencesStore: preferencesStore
+            preferencesStore: preferencesStore,
+            notificationCenter: notificationCenter
         )
     }
 
@@ -705,6 +722,19 @@ private final class MockCatalogPreferencesStore: CatalogPreferencesStoring, @unc
 
     func savePreferences(_ snapshot: CatalogPreferencesSnapshot) {
         savedSnapshots.append(snapshot)
+    }
+
+    func loadFavoritePackageIDs() -> [String] {
+        initialSnapshot.favoritePackageIDs
+    }
+
+    func saveFavoritePackageIDs(_ ids: [String]) {
+        savedSnapshots.append(
+            CatalogPreferencesSnapshot(
+                favoritePackageIDs: ids,
+                savedSearches: initialSnapshot.savedSearches
+            )
+        )
     }
 }
 

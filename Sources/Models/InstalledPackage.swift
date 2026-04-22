@@ -17,6 +17,7 @@ enum InstalledPackagesLoadState: Equatable {
 }
 
 enum InstalledPackageFilterOption: String, CaseIterable, Identifiable, Hashable {
+    case favorites
     case pinned
     case linked
     case leaves
@@ -29,6 +30,8 @@ enum InstalledPackageFilterOption: String, CaseIterable, Identifiable, Hashable 
 
     var title: String {
         switch self {
+        case .favorites:
+            "Favorites"
         case .pinned:
             "Pinned"
         case .linked:

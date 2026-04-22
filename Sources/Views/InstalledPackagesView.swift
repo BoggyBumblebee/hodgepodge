@@ -74,8 +74,16 @@ struct InstalledPackagesView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(alignment: .top) {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(package.title)
-                                    .font(.headline)
+                                HStack(spacing: 6) {
+                                    Text(package.title)
+                                        .font(.headline)
+
+                                    if viewModel.isFavorite(package) {
+                                        Image(systemName: "star.fill")
+                                            .font(.caption)
+                                            .foregroundStyle(.yellow)
+                                    }
+                                }
 
                                 Text(package.subtitle)
                                     .font(.subheadline)
@@ -268,9 +276,13 @@ struct InstalledPackagesView: View {
             if let package = viewModel.selectedPackage {
                 InstalledPackageDetailView(
                     package: package,
+                    isFavorite: viewModel.isFavorite(package),
                     isCurrentSnapshot: viewModel.isPackageInCurrentSnapshot(package),
                     actionState: viewModel.actionState(for: package),
                     actionLogs: viewModel.actionLogs(for: package),
+                    onToggleFavorite: {
+                        viewModel.toggleFavorite(package)
+                    },
                     onRunAction: handleAction(_:for:),
                     onCancelAction: viewModel.cancelAction,
                     onClearOutput: viewModel.clearActionOutput,
@@ -378,9 +390,11 @@ private struct InstalledPackagesExportStatusView: View {
 
 private struct InstalledPackageDetailView: View {
     let package: InstalledPackage
+    let isFavorite: Bool
     let isCurrentSnapshot: Bool
     let actionState: InstalledPackageActionState
     let actionLogs: [CommandLogEntry]
+    let onToggleFavorite: () -> Void
     let onRunAction: (InstalledPackageActionKind, InstalledPackage) -> Void
     let onCancelAction: () -> Void
     let onClearOutput: () -> Void
@@ -448,6 +462,17 @@ private struct InstalledPackageDetailView: View {
                 Spacer()
 
                 VStack(alignment: .trailing, spacing: 8) {
+                    Button(action: onToggleFavorite) {
+                        Label(
+                            isFavorite ? "Favorite" : "Add Favorite",
+                            systemImage: isFavorite ? "star.fill" : "star"
+                        )
+                    }
+                    .labelStyle(.iconOnly)
+                    .foregroundStyle(isFavorite ? .yellow : .secondary)
+                    .accessibilityLabel(isFavorite ? "Remove from favorites" : "Add to favorites")
+                    .buttonStyle(.borderless)
+
                     Text(package.kind.title.dropLast())
                         .font(.headline)
                         .padding(.horizontal, 10)

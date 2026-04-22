@@ -112,7 +112,8 @@ The current project state already includes:
 
 - completed:
   - command history for catalog actions
-  - favorites and saved searches for the catalog
+  - shared favorites across catalog and installed packages
+  - saved searches for the catalog
 - still to do:
   - analytics
   - notifications

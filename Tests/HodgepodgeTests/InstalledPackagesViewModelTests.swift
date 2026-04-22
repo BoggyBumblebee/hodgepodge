@@ -67,6 +67,7 @@ final class InstalledPackagesViewModelTests: XCTestCase {
             destinationPicker: MockBrewfileDumpDestinationPicker()
         )
         viewModel.packagesState = .loaded(packages)
+        viewModel.favoritePackageIDs = [packages[1].id]
 
         viewModel.searchText = "docker"
         XCTAssertEqual(viewModel.filteredPackages.map(\.title), ["Docker Desktop"])
@@ -76,6 +77,9 @@ final class InstalledPackagesViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.filteredPackages.map(\.title), ["Beta", "Alpha"])
 
         viewModel.scope = .all
+        viewModel.activeFilters = [.favorites]
+        XCTAssertEqual(viewModel.filteredPackages.map(\.title), ["Docker Desktop"])
+
         viewModel.activeFilters = [.installedAsDependency]
         XCTAssertEqual(viewModel.filteredPackages.map(\.title), ["Beta"])
 
@@ -261,6 +265,55 @@ final class InstalledPackagesViewModelTests: XCTestCase {
         viewModel.selectPackage(id: packages[1].id)
 
         XCTAssertEqual(viewModel.selectedPackage, packages[1])
+    }
+
+    func testInitLoadsPersistedFavorites() {
+        let favoritesStore = MockFavoritePackageStore(initialIDs: ["formula:wget"])
+        let viewModel = InstalledPackagesViewModel(
+            provider: MockInstalledPackagesProvider(result: .success([])),
+            commandExecutor: MockInstalledPackagesCommandExecutor(),
+            destinationPicker: MockBrewfileDumpDestinationPicker(),
+            favoritesStore: favoritesStore
+        )
+
+        XCTAssertEqual(viewModel.favoritePackageIDs, ["formula:wget"])
+    }
+
+    func testToggleFavoritePersistsSharedFavorites() {
+        let package = makePackage(slug: "wget", title: "wget")
+        let favoritesStore = MockFavoritePackageStore()
+        let viewModel = InstalledPackagesViewModel(
+            provider: MockInstalledPackagesProvider(result: .success([package])),
+            commandExecutor: MockInstalledPackagesCommandExecutor(),
+            destinationPicker: MockBrewfileDumpDestinationPicker(),
+            favoritesStore: favoritesStore
+        )
+
+        viewModel.toggleFavorite(package)
+
+        XCTAssertTrue(viewModel.isFavorite(package))
+        XCTAssertEqual(favoritesStore.savedIDs.last, [package.id])
+    }
+
+    func testFavoritePackageIDsUpdateWhenSharedNotificationIsPosted() async {
+        let notificationCenter = NotificationCenter()
+        let viewModel = InstalledPackagesViewModel(
+            provider: MockInstalledPackagesProvider(result: .success([])),
+            commandExecutor: MockInstalledPackagesCommandExecutor(),
+            destinationPicker: MockBrewfileDumpDestinationPicker(),
+            favoritesStore: MockFavoritePackageStore(),
+            notificationCenter: notificationCenter
+        )
+
+        notificationCenter.post(
+            name: .favoritePackageIDsDidChange,
+            object: nil,
+            userInfo: [FavoritePackageNotificationUserInfoKey.ids: ["formula:wget", "cask:docker-desktop"]]
+        )
+
+        await waitUntil {
+            viewModel.favoritePackageIDs == ["formula:wget", "cask:docker-desktop"]
+        }
     }
 
     func testGenerateBrewfileUsesDestinationPickerAndRunsDumpForScope() async {
@@ -556,6 +609,23 @@ final class InstalledPackagesViewModelTests: XCTestCase {
         }
 
         return kind == .formula ? version : nil
+    }
+}
+
+private final class MockFavoritePackageStore: FavoritePackageStoring, @unchecked Sendable {
+    private let initialIDs: [String]
+    private(set) var savedIDs: [[String]] = []
+
+    init(initialIDs: [String] = []) {
+        self.initialIDs = initialIDs
+    }
+
+    func loadFavoritePackageIDs() -> [String] {
+        initialIDs
+    }
+
+    func saveFavoritePackageIDs(_ ids: [String]) {
+        savedIDs.append(ids)
     }
 }
 

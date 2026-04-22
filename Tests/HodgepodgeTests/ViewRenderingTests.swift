@@ -281,6 +281,7 @@ final class ViewRenderingTests: XCTestCase {
         let viewModel = makeInstalledPackagesModel()
         viewModel.packagesState = .loaded([package])
         viewModel.selectedPackage = package
+        viewModel.favoritePackageIDs = [package.id]
         let exportCommand = InstalledPackagesBrewfileExportCommand(
             scope: .formula,
             destinationURL: URL(fileURLWithPath: "/tmp/Brewfile-formulae")
@@ -664,6 +665,12 @@ private struct ViewTestCatalogPreferencesStore: CatalogPreferencesStoring {
     }
 
     func savePreferences(_ snapshot: CatalogPreferencesSnapshot) {}
+
+    func loadFavoritePackageIDs() -> [String] {
+        []
+    }
+
+    func saveFavoritePackageIDs(_ ids: [String]) {}
 }
 
 @MainActor

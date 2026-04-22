@@ -67,4 +67,65 @@ final class CatalogPreferencesStoreTests: XCTestCase {
 
         XCTAssertEqual(store.loadPreferences(), .empty)
     }
+
+    func testSavingFavoritePackageIDsPreservesSavedSearches() {
+        let rootURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let fileURL = rootURL.appendingPathComponent("catalog-preferences.json", isDirectory: false)
+        let store = CatalogPreferencesStore(fileURL: fileURL)
+        let originalSearch = CatalogSavedSearch(
+            id: UUID(uuidString: "88888888-8888-8888-8888-888888888888") ?? UUID(),
+            name: "Casks",
+            searchText: "docker",
+            scope: .cask,
+            activeFilters: [.autoUpdates],
+            sortOption: .tap
+        )
+
+        store.savePreferences(
+            CatalogPreferencesSnapshot(
+                favoritePackageIDs: ["formula:wget"],
+                savedSearches: [originalSearch]
+            )
+        )
+        store.saveFavoritePackageIDs(["formula:wget", "cask:docker-desktop"])
+
+        XCTAssertEqual(
+            store.loadPreferences(),
+            CatalogPreferencesSnapshot(
+                favoritePackageIDs: ["formula:wget", "cask:docker-desktop"],
+                savedSearches: [originalSearch]
+            )
+        )
+
+        try? FileManager.default.removeItem(at: rootURL)
+    }
+
+    func testSavingFavoritePackageIDsPostsChangeNotification() {
+        let notificationCenter = NotificationCenter()
+        let rootURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let fileURL = rootURL.appendingPathComponent("catalog-preferences.json", isDirectory: false)
+        let store = CatalogPreferencesStore(
+            fileURL: fileURL,
+            notificationCenter: notificationCenter
+        )
+        let expectation = expectation(description: "favorite change notification")
+        var receivedIDs: [String] = []
+        let observer = notificationCenter.addObserver(
+            forName: .favoritePackageIDsDidChange,
+            object: nil,
+            queue: nil
+        ) { notification in
+            receivedIDs = notification.userInfo?[FavoritePackageNotificationUserInfoKey.ids] as? [String] ?? []
+            expectation.fulfill()
+        }
+
+        store.saveFavoritePackageIDs(["formula:wget"])
+
+        wait(for: [expectation], timeout: 1)
+        XCTAssertEqual(receivedIDs, ["formula:wget"])
+        notificationCenter.removeObserver(observer)
+        try? FileManager.default.removeItem(at: rootURL)
+    }
 }

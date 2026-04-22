@@ -38,6 +38,7 @@ final class InstalledPackageTests: XCTestCase {
     }
 
     func testInstalledPackageFilterAndSortTitlesAreStable() {
+        XCTAssertEqual(InstalledPackageFilterOption.favorites.title, "Favorites")
         XCTAssertEqual(InstalledPackageFilterOption.pinned.title, "Pinned")
         XCTAssertEqual(InstalledPackageFilterOption.linked.title, "Linked")
         XCTAssertEqual(InstalledPackageFilterOption.leaves.title, "Leaves")

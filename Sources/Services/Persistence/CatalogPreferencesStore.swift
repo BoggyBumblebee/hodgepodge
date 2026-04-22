@@ -1,8 +1,52 @@
 import Foundation
 
-protocol CatalogPreferencesStoring {
+extension Notification.Name {
+    static let favoritePackageIDsDidChange = Notification.Name("Hodgepodge.favoritePackageIDsDidChange")
+}
+
+enum FavoritePackageNotificationUserInfoKey {
+    static let ids = "ids"
+}
+
+protocol FavoritePackageStoring {
+    func loadFavoritePackageIDs() -> [String]
+    func saveFavoritePackageIDs(_ ids: [String])
+}
+
+protocol CatalogPreferencesStoring: FavoritePackageStoring {
     func loadPreferences() -> CatalogPreferencesSnapshot
     func savePreferences(_ snapshot: CatalogPreferencesSnapshot)
+}
+
+final class FavoritePackageIDsObserver {
+    private let notificationCenter: NotificationCenter
+    private var token: NSObjectProtocol?
+
+    init(
+        notificationCenter: NotificationCenter = .default,
+        onChange: @escaping @MainActor ([String]) -> Void
+    ) {
+        self.notificationCenter = notificationCenter
+        token = notificationCenter.addObserver(
+            forName: .favoritePackageIDsDidChange,
+            object: nil,
+            queue: .main
+        ) { notification in
+            guard let ids = notification.userInfo?[FavoritePackageNotificationUserInfoKey.ids] as? [String] else {
+                return
+            }
+
+            MainActor.assumeIsolated {
+                onChange(ids)
+            }
+        }
+    }
+
+    deinit {
+        if let token {
+            notificationCenter.removeObserver(token)
+        }
+    }
 }
 
 struct CatalogPreferencesStore: CatalogPreferencesStoring {
@@ -10,15 +54,18 @@ struct CatalogPreferencesStore: CatalogPreferencesStoring {
     private let fileManager: FileManager
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
+    private let notificationCenter: NotificationCenter
 
     init(
         fileURL: URL? = nil,
         fileManager: FileManager = .default,
+        notificationCenter: NotificationCenter = .default,
         encoder: JSONEncoder = CatalogActionHistoryCodec.makeEncoder(),
         decoder: JSONDecoder = CatalogActionHistoryCodec.makeDecoder()
     ) {
         self.fileURL = fileURL ?? Self.defaultFileURL(fileManager: fileManager)
         self.fileManager = fileManager
+        self.notificationCenter = notificationCenter
         self.encoder = encoder
         self.decoder = decoder
     }
@@ -45,9 +92,32 @@ struct CatalogPreferencesStore: CatalogPreferencesStoring {
             )
             let data = try encoder.encode(snapshot)
             try data.write(to: fileURL, options: .atomic)
+            notifyFavoritePackageIDsChanged(snapshot.favoritePackageIDs)
         } catch {
             report(error, prefix: "Failed to save catalog preferences")
         }
+    }
+
+    func loadFavoritePackageIDs() -> [String] {
+        loadPreferences().favoritePackageIDs
+    }
+
+    func saveFavoritePackageIDs(_ ids: [String]) {
+        let snapshot = loadPreferences()
+        savePreferences(
+            CatalogPreferencesSnapshot(
+                favoritePackageIDs: ids,
+                savedSearches: snapshot.savedSearches
+            )
+        )
+    }
+
+    private func notifyFavoritePackageIDsChanged(_ ids: [String]) {
+        notificationCenter.post(
+            name: .favoritePackageIDsDidChange,
+            object: nil,
+            userInfo: [FavoritePackageNotificationUserInfoKey.ids: ids]
+        )
     }
 
     private static func defaultFileURL(fileManager: FileManager) -> URL {
