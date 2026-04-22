@@ -24,20 +24,29 @@ struct BrewLocator: BrewLocating {
     private let fileManager: FileManager
     private let clock: () -> Date
     private let executableCandidates: [String]
+    private let compatibilityDetector: HomebrewCompatibilityDetector
+    private let cache: BrewInstallationCache
 
     init(
         runner: any CommandRunning,
         fileManager: FileManager = .default,
         clock: @escaping () -> Date = Date.init,
-        executableCandidates: [String]? = nil
+        executableCandidates: [String]? = nil,
+        cache: BrewInstallationCache = BrewInstallationCache()
     ) {
         self.runner = runner
         self.fileManager = fileManager
         self.clock = clock
         self.executableCandidates = executableCandidates ?? Self.defaultExecutableCandidates(using: fileManager)
+        self.compatibilityDetector = HomebrewCompatibilityDetector(runner: runner)
+        self.cache = cache
     }
 
     func locate() async throws -> HomebrewInstallation {
+        if let cachedInstallation = cache.installation {
+            return cachedInstallation
+        }
+
         let brewPath = try await locateExecutable()
         let versionOutput = try await runner.run(executable: brewPath, arguments: ["--version"])
         let version = try parseVersion(from: versionOutput.stdout)
@@ -49,15 +58,22 @@ struct BrewLocator: BrewLocating {
             .split(separator: "\n")
             .map(String.init)
 
-        return HomebrewInstallation(
+        let installation = HomebrewInstallation(
             brewPath: brewPath,
             version: version,
             prefix: prefix,
             cellar: cellar,
             repository: repository,
             taps: taps,
+            compatibility: await compatibilityDetector.detect(
+                executable: brewPath,
+                version: version
+            ),
             detectedAt: clock()
         )
+
+        cache.installation = installation
+        return installation
     }
 
     private func locateExecutable() async throws -> String {
@@ -103,4 +119,9 @@ struct BrewLocator: BrewLocating {
             "brew"
         ]
     }
+}
+
+final class BrewInstallationCache: @unchecked Sendable {
+    @MainActor
+    var installation: HomebrewInstallation?
 }

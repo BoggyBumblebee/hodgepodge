@@ -34,7 +34,7 @@ struct BrewTapsProvider: BrewTapsProviding, @unchecked Sendable {
 
         let infoOutput = try await trimmedOutput(
             executable: executable,
-            arguments: ["tap-info", "--json=v1"] + tapNames
+            arguments: installation.compatibility.tapInfoArguments(for: tapNames)
         )
 
         let decoder = JSONDecoder()

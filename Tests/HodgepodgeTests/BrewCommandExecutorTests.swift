@@ -32,11 +32,81 @@ final class BrewCommandExecutorTests: XCTestCase {
             ]
         )
     }
+
+    func testExecuteUsesCompatibilityAdjustedArguments() async throws {
+        let runner = RecordingCommandRunner(
+            result: .success(CommandResult(stdout: "", stderr: "", exitCode: 0))
+        )
+        let compatibility = HomebrewCompatibilitySnapshot(
+            version: HomebrewVersion(parsing: "5.1.7"),
+            infoJSONArgument: .versioned("v2"),
+            outdatedJSONArgument: .versioned("v2"),
+            tapInfoJSONArgument: .plain,
+            servicesListSupportsJSON: true,
+            servicesInfoSupportsJSON: true,
+            bundleSupportsNoUpgrade: true,
+            bundleSupportsFormulaDump: false,
+            bundleSupportsCaskDump: true,
+            supportedBundleAddKinds: Set(BrewfileEntryKind.addableCases),
+            supportedBundleRemoveKinds: Set(BrewfileEntryKind.allCases.filter(\.supportsBundleRemove))
+        )
+        let executor = BrewCommandExecutor(
+            brewLocator: FixedBrewLocator(compatibility: compatibility),
+            runner: runner
+        )
+        var logs: [(CatalogPackageActionLogKind, String)] = []
+
+        _ = try await executor.execute(arguments: ["bundle", "dump", "--file", "/tmp/Brewfile", "--force", "--cask"]) { kind, text in
+            logs.append((kind, text))
+        }
+
+        XCTAssertEqual(runner.arguments, ["bundle", "dump", "--file", "/tmp/Brewfile", "--force", "--cask"])
+        XCTAssertFalse(logs.map(\.1).contains("Adjusted command arguments for Homebrew 5.1.7."))
+    }
+
+    func testExecuteThrowsWhenCompatibilityRejectsBundleScope() async {
+        let runner = RecordingCommandRunner(
+            result: .success(CommandResult(stdout: "", stderr: "", exitCode: 0))
+        )
+        let compatibility = HomebrewCompatibilitySnapshot(
+            version: HomebrewVersion(parsing: "5.1.7"),
+            infoJSONArgument: .versioned("v2"),
+            outdatedJSONArgument: .versioned("v2"),
+            tapInfoJSONArgument: .plain,
+            servicesListSupportsJSON: true,
+            servicesInfoSupportsJSON: true,
+            bundleSupportsNoUpgrade: true,
+            bundleSupportsFormulaDump: false,
+            bundleSupportsCaskDump: false,
+            supportedBundleAddKinds: Set(BrewfileEntryKind.addableCases),
+            supportedBundleRemoveKinds: Set(BrewfileEntryKind.allCases.filter(\.supportsBundleRemove))
+        )
+        let executor = BrewCommandExecutor(
+            brewLocator: FixedBrewLocator(compatibility: compatibility),
+            runner: runner
+        )
+
+        do {
+            _ = try await executor.execute(arguments: ["bundle", "dump", "--file", "/tmp/Brewfile", "--force", "--formula"]) { _, _ in }
+            XCTFail("Expected compatibility validation to reject the formula-only Brewfile export.")
+        } catch {
+            XCTAssertEqual(
+                error as? HomebrewCompatibilityError,
+                .unsupportedBundleDumpScope(scope: .formula, version: "5.1.7")
+            )
+        }
+    }
 }
 
 private struct FixedBrewLocator: BrewLocating {
+    let compatibility: HomebrewCompatibilitySnapshot
+
+    init(compatibility: HomebrewCompatibilitySnapshot = .modernDefault(version: "5.1.7")) {
+        self.compatibility = compatibility
+    }
+
     func locate() async throws -> HomebrewInstallation {
-        .fixture()
+        .fixture(compatibility: compatibility)
     }
 }
 

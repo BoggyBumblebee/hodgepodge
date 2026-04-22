@@ -81,11 +81,47 @@ final class BrewOutdatedPackagesProviderTests: XCTestCase {
         XCTAssertFalse(packages[0].isPinned)
         XCTAssertFalse(packages[1].isPinned)
     }
+
+    func testFetchOutdatedPackagesFailsWhenCompatibilityDoesNotSupportCombinedJSON() async {
+        let compatibility = HomebrewCompatibilitySnapshot(
+            version: HomebrewVersion(parsing: "5.1.7"),
+            infoJSONArgument: .versioned("v2"),
+            outdatedJSONArgument: nil,
+            tapInfoJSONArgument: .versioned("v1"),
+            servicesListSupportsJSON: true,
+            servicesInfoSupportsJSON: true,
+            bundleSupportsNoUpgrade: true,
+            bundleSupportsFormulaDump: true,
+            bundleSupportsCaskDump: true,
+            supportedBundleAddKinds: Set(BrewfileEntryKind.addableCases),
+            supportedBundleRemoveKinds: Set(BrewfileEntryKind.allCases.filter(\.supportsBundleRemove))
+        )
+        let provider = BrewOutdatedPackagesProvider(
+            brewLocator: OutdatedProviderTestBrewLocator(compatibility: compatibility),
+            runner: OutdatedProviderTestCommandRunner(stdout: "{}")
+        )
+
+        do {
+            _ = try await provider.fetchOutdatedPackages()
+            XCTFail("Expected compatibility validation to fail.")
+        } catch {
+            XCTAssertEqual(
+                error as? HomebrewCompatibilityError,
+                .unsupportedOutdatedJSON(version: "5.1.7")
+            )
+        }
+    }
 }
 
 private struct OutdatedProviderTestBrewLocator: BrewLocating {
+    let compatibility: HomebrewCompatibilitySnapshot
+
+    init(compatibility: HomebrewCompatibilitySnapshot = .modernDefault(version: "5.1.7")) {
+        self.compatibility = compatibility
+    }
+
     func locate() async throws -> HomebrewInstallation {
-        .fixture()
+        .fixture(compatibility: compatibility)
     }
 }
 

@@ -19,6 +19,7 @@ struct BrewServicesProvider: BrewServicesProviding, @unchecked Sendable {
 
     func fetchServices() async throws -> [BrewService] {
         let installation = try await brewLocator.locate()
+        try installation.compatibility.validateServicesJSONSupport()
         let listResult = try await runner.run(
             executable: installation.brewPath,
             arguments: ["services", "list", "--json"]

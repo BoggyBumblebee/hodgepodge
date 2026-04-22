@@ -25,7 +25,7 @@ struct BrewInstalledPackagesProvider: InstalledPackagesProviding, @unchecked Sen
         let installation = try await brewLocator.locate()
         let result = try await runner.run(
             executable: installation.brewPath,
-            arguments: ["info", "--json=v2", "--installed"]
+            arguments: try installation.compatibility.installedInfoArguments()
         )
         let leafFormulae = try await fetchLeafFormulae(using: installation.brewPath)
         let response = try decoder.decode(InstalledPackagesResponse.self, from: Data(result.stdout.utf8))
@@ -59,6 +59,13 @@ private struct InstalledPackagesResponse: Decodable {
     let casks: [InstalledCaskResponse]
 
     init(from decoder: any Decoder) throws {
+        if let container = try? decoder.singleValueContainer(),
+           let formulae = try? container.decode([InstalledFormulaResponse].self) {
+            self.formulae = formulae
+            casks = []
+            return
+        }
+
         let container = try decoder.container(keyedBy: CodingKeys.self)
         formulae = try container.decodeIfPresent([InstalledFormulaResponse].self, forKey: .formulae) ?? []
         casks = try container.decodeIfPresent([InstalledCaskResponse].self, forKey: .casks) ?? []

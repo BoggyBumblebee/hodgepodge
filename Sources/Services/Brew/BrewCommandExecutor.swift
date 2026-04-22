@@ -33,12 +33,16 @@ struct BrewCommandExecutor: BrewCommandExecuting, @unchecked Sendable {
         onLog: @escaping @MainActor @Sendable (CatalogPackageActionLogKind, String) -> Void
     ) async throws -> CommandResult {
         let installation = try await brewLocator.locate()
+        let resolvedArguments = try installation.compatibility.normalized(arguments: arguments)
         await onLog(.system, "Using Homebrew at \(installation.brewPath)")
-        await onLog(.system, "$ \(installation.brewPath) \(arguments.joined(separator: " "))")
+        if resolvedArguments != arguments {
+            await onLog(.system, "Adjusted command arguments for Homebrew \(installation.version).")
+        }
+        await onLog(.system, "$ \(installation.brewPath) \(resolvedArguments.joined(separator: " "))")
 
         return try await runner.run(
             executable: installation.brewPath,
-            arguments: arguments,
+            arguments: resolvedArguments,
             onOutput: { chunk in
                 let logKind: CatalogPackageActionLogKind = switch chunk.stream {
                 case .stdout:

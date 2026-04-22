@@ -7,5 +7,6 @@ struct HomebrewInstallation: Equatable, Sendable {
     let cellar: String
     let repository: String
     let taps: [String]
+    let compatibility: HomebrewCompatibilitySnapshot
     let detectedAt: Date
 }

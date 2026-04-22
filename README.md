@@ -130,9 +130,11 @@ The current project state already includes:
   - final layout cleanup across About Brew, Catalog Analytics, and Maintenance to better match native macOS hierarchy
   - settings extraction audit defining what belongs in Settings vs transient per-screen state
   - first settings-extraction slice for notification scope and Brewfile export defaults
+  - Homebrew capability probing for version-sensitive `brew info`, `outdated`, `services`, `tap-info`, and `bundle` surfaces
+  - compatibility-aware command composition and friendlier unsupported-feature failures for drift-sensitive Homebrew commands
+  - defensive decoding and regression coverage around mixed or partial Homebrew JSON shapes
 - normalize the macOS UI toward Apple's platform conventions, with cleaner layouts, clearer hierarchy, and more consistent controls
-- harden Homebrew command and JSON compatibility so Hodgepodge continues working across supported Homebrew releases starting from today's versions
-- add compatibility-focused tests and defensive decoding around version-sensitive Homebrew behavior
+- continue extracting true app-wide preferences into Settings while keeping transient UI state local to each section
 
 ## Contributing
 

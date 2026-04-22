@@ -23,7 +23,7 @@ struct BrewOutdatedPackagesProvider: OutdatedPackagesProviding, @unchecked Senda
         let installation = try await brewLocator.locate()
         let result = try await runner.run(
             executable: installation.brewPath,
-            arguments: ["outdated", "--json=v2"]
+            arguments: try installation.compatibility.outdatedArguments()
         )
         let response = try decoder.decode(OutdatedPackagesResponse.self, from: Data(result.stdout.utf8))
 

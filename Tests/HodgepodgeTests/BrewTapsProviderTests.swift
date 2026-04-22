@@ -87,11 +87,76 @@ final class BrewTapsProviderTests: XCTestCase {
         XCTAssertTrue(taps.isEmpty)
         XCTAssertEqual(runner.recordedArguments, [["tap"]])
     }
+
+    func testFetchTapsUsesPlainJSONWhenCompatibilityRequiresIt() async throws {
+        let compatibility = HomebrewCompatibilitySnapshot(
+            version: HomebrewVersion(parsing: "5.1.7"),
+            infoJSONArgument: .versioned("v2"),
+            outdatedJSONArgument: .versioned("v2"),
+            tapInfoJSONArgument: .plain,
+            servicesListSupportsJSON: true,
+            servicesInfoSupportsJSON: true,
+            bundleSupportsNoUpgrade: true,
+            bundleSupportsFormulaDump: true,
+            bundleSupportsCaskDump: true,
+            supportedBundleAddKinds: Set(BrewfileEntryKind.addableCases),
+            supportedBundleRemoveKinds: Set(BrewfileEntryKind.allCases.filter(\.supportsBundleRemove))
+        )
+        let runner = MockBrewTapsCommandRunner(resultsByArguments: [
+            ["tap"]: .success(CommandResult(
+                stdout: "keith/formulae\n",
+                stderr: "",
+                exitCode: 0
+            )),
+            ["tap-info", "--json", "keith/formulae"]: .success(CommandResult(
+                stdout: """
+                [
+                  {
+                    "name": "keith/formulae",
+                    "user": "keith",
+                    "repo": "formulae",
+                    "repository": "formulae",
+                    "path": "/opt/homebrew/Library/Taps/keith/homebrew-formulae",
+                    "official": false,
+                    "formula_names": [],
+                    "cask_tokens": [],
+                    "formula_files": [],
+                    "cask_files": [],
+                    "command_files": [],
+                    "remote": "https://github.com/keith/homebrew-formulae",
+                    "custom_remote": false,
+                    "private": false,
+                    "HEAD": "abc123",
+                    "last_commit": "6 weeks ago",
+                    "branch": "master"
+                  }
+                ]
+                """,
+                stderr: "",
+                exitCode: 0
+            ))
+        ])
+        let provider = BrewTapsProvider(
+            brewLocator: MockTapsBrewLocator(compatibility: compatibility),
+            runner: runner
+        )
+
+        let taps = try await provider.fetchTaps()
+
+        XCTAssertEqual(taps.map(\.name), ["keith/formulae"])
+        XCTAssertEqual(runner.recordedArguments, [["tap"], ["tap-info", "--json", "keith/formulae"]])
+    }
 }
 
 private struct MockTapsBrewLocator: BrewLocating {
+    let compatibility: HomebrewCompatibilitySnapshot
+
+    init(compatibility: HomebrewCompatibilitySnapshot = .modernDefault(version: "5.1.7")) {
+        self.compatibility = compatibility
+    }
+
     func locate() async throws -> HomebrewInstallation {
-        .fixture()
+        .fixture(compatibility: compatibility)
     }
 }
 

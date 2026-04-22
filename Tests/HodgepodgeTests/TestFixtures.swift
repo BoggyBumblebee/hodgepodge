@@ -2,7 +2,10 @@ import Foundation
 @testable import Hodgepodge
 
 extension HomebrewInstallation {
-    static func fixture(version: String = "5.1.7") -> HomebrewInstallation {
+    static func fixture(
+        version: String = "5.1.7",
+        compatibility: HomebrewCompatibilitySnapshot? = nil
+    ) -> HomebrewInstallation {
         HomebrewInstallation(
             brewPath: "/opt/homebrew/bin/brew",
             version: version,
@@ -10,6 +13,7 @@ extension HomebrewInstallation {
             cellar: "/opt/homebrew/Cellar",
             repository: "/opt/homebrew/Homebrew",
             taps: ["homebrew/core"],
+            compatibility: compatibility ?? .modernDefault(version: version),
             detectedAt: Date(timeIntervalSince1970: 1_700_000_000)
         )
     }

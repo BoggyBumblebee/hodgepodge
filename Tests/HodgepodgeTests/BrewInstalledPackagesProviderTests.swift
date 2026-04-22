@@ -141,11 +141,66 @@ final class BrewInstalledPackagesProviderTests: XCTestCase {
         XCTAssertEqual(packages[0].version, "0.2.81")
         XCTAssertTrue(packages[0].runtimeDependencies.isEmpty)
     }
+
+    func testFetchInstalledPackagesAcceptsFormulaOnlyArrayPayload() async throws {
+        let provider = BrewInstalledPackagesProvider(
+            brewLocator: ProviderTestBrewLocator(
+                compatibility: HomebrewCompatibilitySnapshot(
+                    version: HomebrewVersion(parsing: "5.1.7"),
+                    infoJSONArgument: .plain,
+                    outdatedJSONArgument: .versioned("v2"),
+                    tapInfoJSONArgument: .versioned("v1"),
+                    servicesListSupportsJSON: true,
+                    servicesInfoSupportsJSON: true,
+                    bundleSupportsNoUpgrade: true,
+                    bundleSupportsFormulaDump: true,
+                    bundleSupportsCaskDump: true,
+                    supportedBundleAddKinds: Set(BrewfileEntryKind.addableCases),
+                    supportedBundleRemoveKinds: Set(BrewfileEntryKind.allCases.filter(\.supportsBundleRemove))
+                )
+            ),
+            runner: ProviderTestCommandRunner(
+                infoStdout:
+                    """
+                    [
+                      {
+                        "name": "wget",
+                        "full_name": "homebrew/core/wget",
+                        "tap": "homebrew/core",
+                        "desc": "Internet file retriever",
+                        "homepage": "https://example.com/wget",
+                        "versions": {
+                          "stable": "1.25.0",
+                          "head": null
+                        },
+                        "installed": [],
+                        "linked_keg": null,
+                        "pinned": false,
+                        "outdated": false,
+                        "deprecated": false,
+                        "disabled": false
+                      }
+                    ]
+                    """,
+                leavesStdout: ""
+            )
+        )
+
+        let packages = try await provider.fetchInstalledPackages()
+
+        XCTAssertEqual(packages.map(\.title), ["wget"])
+    }
 }
 
 private struct ProviderTestBrewLocator: BrewLocating {
+    let compatibility: HomebrewCompatibilitySnapshot
+
+    init(compatibility: HomebrewCompatibilitySnapshot = .modernDefault(version: "5.1.7")) {
+        self.compatibility = compatibility
+    }
+
     func locate() async throws -> HomebrewInstallation {
-        .fixture()
+        .fixture(compatibility: compatibility)
     }
 }
 
@@ -158,7 +213,8 @@ private struct ProviderTestCommandRunner: CommandRunning {
         arguments: [String],
         onOutput: (@MainActor @Sendable (CommandOutputChunk) -> Void)?
     ) async throws -> CommandResult {
-        let stdout = if arguments == ["info", "--json=v2", "--installed"] {
+        let stdout = if arguments == ["info", "--json=v2", "--installed"] ||
+            arguments == ["info", "--json", "--installed"] {
             infoStdout
         } else if arguments == ["leaves"] {
             leavesStdout
