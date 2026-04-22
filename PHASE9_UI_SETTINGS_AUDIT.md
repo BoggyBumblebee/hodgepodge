@@ -172,6 +172,199 @@ Reason:
 
 - these are part of working context, not long-lived application configuration
 
+## Settings vs Transient State Matrix
+
+This is the concrete recommendation for the current app, based on the state already present in the codebase.
+
+### Put In Settings
+
+These are stable, app-wide behavior choices that a user can reasonably expect to persist across launches and apply everywhere:
+
+- `defaultLaunchSection`
+- `completionNotificationsEnabled`
+- `notificationSoundEnabled`
+- `restoreLastSelectedBrewfile`
+
+Recommended next additions:
+
+- Brewfile default export scope
+- Brewfile default export destination behavior
+  - ask every time
+  - reuse last folder
+- notification scope
+  - all command completions
+  - only long-running commands
+- notification categories
+  - package actions
+  - services
+  - maintenance
+  - Brewfile actions
+- command-history retention limit
+- whether command output disclosures start expanded or collapsed by default
+- whether the app should restore the last selected top-level section on launch instead of using the default launch section
+- whether compatibility warnings should be surfaced when Hodgepodge detects a partially supported Homebrew version
+
+### Keep As Transient Per-Screen UI State
+
+These should stay local to the current screen/session because they are part of "what I am doing right now," not "how I want the app to behave in general":
+
+- `searchText` in every section
+- per-section sort selection
+- per-section filter selection
+- current selected row or package or service
+- current analytics period
+- current maintenance output source
+- current add-entry or add-tap draft text
+- current destructive-action confirmation state
+- current command output expansion state for the active screen
+
+### Persist As User Data, Not Settings
+
+These should survive launches, but they are not really preferences. They are user-created or user-curated data:
+
+- favorites
+- saved searches
+- command history
+- last selected Brewfile document
+
+Reason:
+
+- they are content the user has built up over time
+- they should not be mixed into general app-behavior settings
+- they may later deserve management UI of their own
+
+## Section-by-Section Recommendation
+
+### Catalog
+
+Keep transient:
+
+- search text
+- scope
+- filters
+- sort
+- selected package
+- analytics period
+
+Keep as persisted user data:
+
+- favorites
+- saved searches
+
+Do not move these into Settings:
+
+- favorites filter
+- current saved-search selection
+
+### Installed
+
+Keep transient:
+
+- search text
+- scope
+- filters
+- sort
+- selected package
+- current dependency-tree navigation context
+
+Potential Settings candidates:
+
+- default Brewfile dump scope
+- whether post-mutation refresh should auto-jump to the first remaining item or preserve the nearest matching selection
+
+That second item is borderline. My recommendation is to leave it out of Settings unless users explicitly ask for control over it.
+
+### Outdated
+
+Keep transient:
+
+- search text
+- scope
+- filters
+- sort
+- selected package
+
+Potential Settings candidates:
+
+- whether pinned packages are hidden by default
+
+Recommendation:
+
+- do not move this yet; it is better as a local filter until there is evidence users want a persistent app-wide default
+
+### Services
+
+Keep transient:
+
+- search text
+- filters
+- sort
+- selected service
+
+Potential Settings candidates:
+
+- whether service cleanup output is retained after success
+
+Recommendation:
+
+- keep this out of Settings for now
+
+### Taps
+
+Keep transient:
+
+- search text
+- filters
+- sort
+- selected tap
+- `Force untap`
+
+Reason:
+
+- `Force untap` is an action-local choice, not a stable preference
+
+### Brewfile
+
+Keep transient:
+
+- search text
+- filter
+- sort
+- selected line
+- add-entry draft values
+
+Put in Settings or consider for Settings:
+
+- restore last selected Brewfile
+- default export scope
+- export destination behavior
+
+Keep as persisted user data:
+
+- last selected Brewfile path
+
+### Maintenance
+
+Keep transient:
+
+- selected output source
+
+Potential Settings candidates:
+
+- preferred default output source
+
+Recommendation:
+
+- only move this if users show a strong repeated preference for landing on something other than the default snapshot
+
+### About Brew / Catalog Analytics
+
+Keep transient:
+
+- current view-only state
+
+No immediate Settings candidates.
+
 ## Recommended UI Cleanup Priorities
 
 ### Priority 1

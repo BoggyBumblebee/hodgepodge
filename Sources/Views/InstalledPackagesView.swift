@@ -213,6 +213,10 @@ struct InstalledPackagesView: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
 
+                Text("Default scope: \(viewModel.exportScope.title)")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+
                 CommandPreviewField(
                     title: "Export Command",
                     command: viewModel.exportCommandPreview,

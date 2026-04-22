@@ -73,19 +73,22 @@ final class MaintenanceViewModel: ObservableObject {
                 }
                 flushPendingLogs()
                 appendLog(.system, "\(task.title) finished with exit code \(result.exitCode).")
-                actionState = .succeeded(progress.finished(at: Date()), result)
-                await notifyActionSucceeded(task: task)
+                let completedProgress = progress.finished(at: Date())
+                actionState = .succeeded(completedProgress, result)
+                await notifyActionSucceeded(task: task, elapsedTime: completedProgress.elapsedTime())
                 reloadDashboardAfterAction()
             } catch is CancellationError {
                 flushPendingLogs()
                 appendLog(.system, "\(task.title) cancelled.")
-                actionState = .cancelled(progress.finished(at: Date()))
-                await notifyActionCancelled(task: task)
+                let completedProgress = progress.finished(at: Date())
+                actionState = .cancelled(completedProgress)
+                await notifyActionCancelled(task: task, elapsedTime: completedProgress.elapsedTime())
             } catch {
                 flushPendingLogs()
                 appendLog(.system, error.localizedDescription)
-                actionState = .failed(progress.finished(at: Date()), error.localizedDescription)
-                await notifyActionFailed(task: task, error: error)
+                let completedProgress = progress.finished(at: Date())
+                actionState = .failed(completedProgress, error.localizedDescription)
+                await notifyActionFailed(task: task, error: error, elapsedTime: completedProgress.elapsedTime())
             }
 
             actionTask = nil
@@ -157,27 +160,36 @@ final class MaintenanceViewModel: ObservableObject {
         return "[\(formatter.string(from: entry.timestamp))] \(entry.kind.rawValue.uppercased())  \(entry.text)"
     }
 
-    private func notifyActionSucceeded(task: BrewMaintenanceTask) async {
+    private func notifyActionSucceeded(
+        task: BrewMaintenanceTask,
+        elapsedTime: TimeInterval
+    ) async {
         await notificationScheduler.schedule(
             CommandNotification(
                 title: "\(task.title) Complete",
-                body: "\(task.title) completed successfully."
+                body: "\(task.title) completed successfully.",
+                elapsedTime: elapsedTime
             )
         )
     }
 
-    private func notifyActionCancelled(task: BrewMaintenanceTask) async {
+    private func notifyActionCancelled(
+        task: BrewMaintenanceTask,
+        elapsedTime: TimeInterval
+    ) async {
         await notificationScheduler.schedule(
             CommandNotification(
                 title: "\(task.title) Cancelled",
-                body: "\(task.title) was cancelled before it finished."
+                body: "\(task.title) was cancelled before it finished.",
+                elapsedTime: elapsedTime
             )
         )
     }
 
     private func notifyActionFailed(
         task: BrewMaintenanceTask,
-        error: Error
+        error: Error,
+        elapsedTime: TimeInterval
     ) async {
         await notificationScheduler.schedule(
             CommandNotification(
@@ -185,7 +197,8 @@ final class MaintenanceViewModel: ObservableObject {
                 body: CommandPresentation.friendlyFailureDescription(
                     error.localizedDescription,
                     fallback: "\(task.title) couldn’t be completed."
-                )
+                ),
+                elapsedTime: elapsedTime
             )
         )
     }

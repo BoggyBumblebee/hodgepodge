@@ -407,12 +407,16 @@ final class InstalledPackagesViewModelTests: XCTestCase {
             result: .success(CommandResult(stdout: "", stderr: "", exitCode: 0))
         )
         let picker = MockBrewfileDumpDestinationPicker(result: destinationURL)
+        let settingsStore = MockAppSettingsStore(
+            snapshot: AppSettingsSnapshot(brewfileDefaultExportScope: .formula)
+        )
         let viewModel = InstalledPackagesViewModel(
             provider: MockInstalledPackagesProvider(result: .success([makePackage()])),
             commandExecutor: executor,
-            destinationPicker: picker
+            destinationPicker: picker,
+            settingsStore: settingsStore
         )
-        viewModel.scope = .formula
+        viewModel.scope = .cask
 
         viewModel.generateBrewfile()
         await waitUntil {
@@ -428,6 +432,33 @@ final class InstalledPackagesViewModelTests: XCTestCase {
             [["bundle", "dump", "--file", "/tmp/Brewfile-formulae", "--force", "--formula"]]
         )
         XCTAssertFalse(viewModel.exportLogs.isEmpty)
+    }
+
+    func testExportScopeUpdatesWhenAppSettingsChangeIsPosted() async {
+        let notificationCenter = NotificationCenter()
+        let viewModel = InstalledPackagesViewModel(
+            provider: MockInstalledPackagesProvider(result: .success([])),
+            commandExecutor: MockInstalledPackagesCommandExecutor(),
+            destinationPicker: MockBrewfileDumpDestinationPicker(),
+            settingsStore: MockAppSettingsStore(
+                snapshot: AppSettingsSnapshot(brewfileDefaultExportScope: .all)
+            ),
+            notificationCenter: notificationCenter
+        )
+
+        notificationCenter.post(
+            name: .appSettingsDidChange,
+            object: nil,
+            userInfo: [
+                AppSettingsNotificationUserInfoKey.snapshot: AppSettingsSnapshot(
+                    brewfileDefaultExportScope: .cask
+                )
+            ]
+        )
+
+        await waitUntil {
+            viewModel.exportScope == .cask
+        }
     }
 
     func testGenerateBrewfileDoesNothingWhenDestinationPickerCancels() async {
@@ -770,6 +801,16 @@ private final class MockFavoritePackageStore: FavoritePackageStoring, @unchecked
     func saveFavoritePackageIDs(_ ids: [String]) {
         savedIDs.append(ids)
     }
+}
+
+private struct MockAppSettingsStore: AppSettingsStoring {
+    let snapshot: AppSettingsSnapshot
+
+    func loadSettings() -> AppSettingsSnapshot {
+        snapshot
+    }
+
+    func saveSettings(_ snapshot: AppSettingsSnapshot) {}
 }
 
 private struct MockInstalledPackagesProvider: InstalledPackagesProviding {

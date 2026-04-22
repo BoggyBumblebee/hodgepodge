@@ -23,12 +23,20 @@ final class AppSettingsModel: ObservableObject {
         update { $0.completionNotificationsEnabled = isEnabled }
     }
 
+    func setCompletionNotificationScope(_ scope: CompletionNotificationScope) {
+        update { $0.completionNotificationScope = scope }
+    }
+
     func setNotificationSoundEnabled(_ isEnabled: Bool) {
         update { $0.notificationSoundEnabled = isEnabled }
     }
 
     func setRestoreLastSelectedBrewfile(_ isEnabled: Bool) {
         update { $0.restoreLastSelectedBrewfile = isEnabled }
+    }
+
+    func setBrewfileDefaultExportScope(_ scope: CatalogScope) {
+        update { $0.brewfileDefaultExportScope = scope }
     }
 
     private func update(_ mutate: (inout AppSettingsSnapshot) -> Void) {

@@ -134,6 +134,56 @@ final class CommandNotificationSchedulerTests: XCTestCase {
         XCTAssertEqual(center.addedRequests.count, 1)
         XCTAssertNil(center.addedRequests.first?.content.sound)
     }
+
+    func testScheduleSkipsShortNotificationsWhenScopeIsLongRunningOnly() async {
+        let center = TestUserNotificationCenter(
+            authorizationStatus: .authorized,
+            requestAuthorizationResult: true
+        )
+        let scheduler = CommandNotificationScheduler(
+            center: center,
+            settingsStore: TestAppSettingsStore(
+                snapshot: AppSettingsSnapshot(
+                    completionNotificationScope: .longRunningOnly
+                )
+            )
+        )
+
+        await scheduler.schedule(
+            CommandNotification(
+                title: "Install Complete",
+                body: "wget completed successfully.",
+                elapsedTime: 3
+            )
+        )
+
+        XCTAssertTrue(center.addedRequests.isEmpty)
+    }
+
+    func testScheduleAllowsLongRunningNotificationsWhenScopeIsLongRunningOnly() async {
+        let center = TestUserNotificationCenter(
+            authorizationStatus: .authorized,
+            requestAuthorizationResult: true
+        )
+        let scheduler = CommandNotificationScheduler(
+            center: center,
+            settingsStore: TestAppSettingsStore(
+                snapshot: AppSettingsSnapshot(
+                    completionNotificationScope: .longRunningOnly
+                )
+            )
+        )
+
+        await scheduler.schedule(
+            CommandNotification(
+                title: "Upgrade Complete",
+                body: "wget completed successfully.",
+                elapsedTime: 12
+            )
+        )
+
+        XCTAssertEqual(center.addedRequests.count, 1)
+    }
 }
 
 private struct TestAppSettingsStore: AppSettingsStoring {

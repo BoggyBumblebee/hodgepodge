@@ -386,7 +386,11 @@ final class CatalogViewModel: ObservableObject {
                 if actionKind.affectsHomebrewState {
                     homebrewStateNotifier.notifyDidChange()
                 }
-                await notifyActionSucceeded(actionKind: actionKind, detail: detail)
+                await notifyActionSucceeded(
+                    actionKind: actionKind,
+                    detail: detail,
+                    elapsedTime: completedProgress.elapsedTime()
+                )
             } catch is CancellationError {
                 flushPendingLogs()
                 appendLog(.system, "\(actionKind.title) cancelled.")
@@ -397,7 +401,11 @@ final class CatalogViewModel: ObservableObject {
                     progress: completedProgress,
                     outcome: .cancelled
                 )
-                await notifyActionCancelled(actionKind: actionKind, detail: detail)
+                await notifyActionCancelled(
+                    actionKind: actionKind,
+                    detail: detail,
+                    elapsedTime: completedProgress.elapsedTime()
+                )
             } catch {
                 flushPendingLogs()
                 appendLog(.system, error.localizedDescription)
@@ -408,7 +416,12 @@ final class CatalogViewModel: ObservableObject {
                     progress: completedProgress,
                     outcome: .failed(error.localizedDescription)
                 )
-                await notifyActionFailed(actionKind: actionKind, detail: detail, error: error)
+                await notifyActionFailed(
+                    actionKind: actionKind,
+                    detail: detail,
+                    error: error,
+                    elapsedTime: completedProgress.elapsedTime()
+                )
             }
 
             actionTask = nil
@@ -636,24 +649,28 @@ final class CatalogViewModel: ObservableObject {
 
     private func notifyActionSucceeded(
         actionKind: CatalogPackageActionKind,
-        detail: CatalogPackageDetail
+        detail: CatalogPackageDetail,
+        elapsedTime: TimeInterval
     ) async {
         await notificationScheduler.schedule(
             CommandNotification(
                 title: "\(actionKind.title) Complete",
-                body: "\(detail.title) completed successfully."
+                body: "\(detail.title) completed successfully.",
+                elapsedTime: elapsedTime
             )
         )
     }
 
     private func notifyActionCancelled(
         actionKind: CatalogPackageActionKind,
-        detail: CatalogPackageDetail
+        detail: CatalogPackageDetail,
+        elapsedTime: TimeInterval
     ) async {
         await notificationScheduler.schedule(
             CommandNotification(
                 title: "\(actionKind.title) Cancelled",
-                body: "\(detail.title) was cancelled before it finished."
+                body: "\(detail.title) was cancelled before it finished.",
+                elapsedTime: elapsedTime
             )
         )
     }
@@ -661,7 +678,8 @@ final class CatalogViewModel: ObservableObject {
     private func notifyActionFailed(
         actionKind: CatalogPackageActionKind,
         detail: CatalogPackageDetail,
-        error: Error
+        error: Error,
+        elapsedTime: TimeInterval
     ) async {
         await notificationScheduler.schedule(
             CommandNotification(
@@ -669,7 +687,8 @@ final class CatalogViewModel: ObservableObject {
                 body: CommandPresentation.friendlyFailureDescription(
                     error.localizedDescription,
                     fallback: "\(detail.title) couldn’t be completed."
-                )
+                ),
+                elapsedTime: elapsedTime
             )
         )
     }

@@ -193,8 +193,9 @@ final class TapsViewModel: ObservableObject {
                 }
                 flushPendingLogs()
                 appendLog(.system, "\(command.kind.title) finished with exit code \(result.exitCode).")
-                actionState = .succeeded(progress.finished(at: Date()), result)
-                await notifyActionSucceeded(command: command)
+                let completedProgress = progress.finished(at: Date())
+                actionState = .succeeded(completedProgress, result)
+                await notifyActionSucceeded(command: command, elapsedTime: completedProgress.elapsedTime())
                 reloadTapsAfterAction(
                     command: command,
                     preservingSelectionID: preservingSelectionID
@@ -202,13 +203,15 @@ final class TapsViewModel: ObservableObject {
             } catch is CancellationError {
                 flushPendingLogs()
                 appendLog(.system, "\(command.kind.title) cancelled.")
-                actionState = .cancelled(progress.finished(at: Date()))
-                await notifyActionCancelled(command: command)
+                let completedProgress = progress.finished(at: Date())
+                actionState = .cancelled(completedProgress)
+                await notifyActionCancelled(command: command, elapsedTime: completedProgress.elapsedTime())
             } catch {
                 flushPendingLogs()
                 appendLog(.system, error.localizedDescription)
-                actionState = .failed(progress.finished(at: Date()), error.localizedDescription)
-                await notifyActionFailed(command: command, error: error)
+                let completedProgress = progress.finished(at: Date())
+                actionState = .failed(completedProgress, error.localizedDescription)
+                await notifyActionFailed(command: command, error: error, elapsedTime: completedProgress.elapsedTime())
             }
 
             actionTask = nil
@@ -311,27 +314,36 @@ final class TapsViewModel: ObservableObject {
         actionLogs = logBuffer.entries
     }
 
-    private func notifyActionSucceeded(command: BrewTapActionCommand) async {
+    private func notifyActionSucceeded(
+        command: BrewTapActionCommand,
+        elapsedTime: TimeInterval
+    ) async {
         await notificationScheduler.schedule(
             CommandNotification(
                 title: "\(command.kind.title) Complete",
-                body: "\(command.tapName) completed successfully."
+                body: "\(command.tapName) completed successfully.",
+                elapsedTime: elapsedTime
             )
         )
     }
 
-    private func notifyActionCancelled(command: BrewTapActionCommand) async {
+    private func notifyActionCancelled(
+        command: BrewTapActionCommand,
+        elapsedTime: TimeInterval
+    ) async {
         await notificationScheduler.schedule(
             CommandNotification(
                 title: "\(command.kind.title) Cancelled",
-                body: "\(command.tapName) was cancelled before it finished."
+                body: "\(command.tapName) was cancelled before it finished.",
+                elapsedTime: elapsedTime
             )
         )
     }
 
     private func notifyActionFailed(
         command: BrewTapActionCommand,
-        error: Error
+        error: Error,
+        elapsedTime: TimeInterval
     ) async {
         await notificationScheduler.schedule(
             CommandNotification(
@@ -339,7 +351,8 @@ final class TapsViewModel: ObservableObject {
                 body: CommandPresentation.friendlyFailureDescription(
                     error.localizedDescription,
                     fallback: "\(command.tapName) couldn’t be completed."
-                )
+                ),
+                elapsedTime: elapsedTime
             )
         )
     }

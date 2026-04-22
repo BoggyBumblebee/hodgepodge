@@ -90,6 +90,50 @@ final class MaintenanceViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.actionLogs.isEmpty)
     }
 
+    func testRunActionStoresFailureState() async {
+        let viewModel = MaintenanceViewModel(
+            provider: MockBrewMaintenanceProvider(result: .success(.fixture())),
+            commandExecutor: MockMaintenanceCommandExecutor(
+                result: .failure(
+                    CommandRunnerError.nonZeroExitCode(
+                        CommandResult(stdout: "", stderr: "doctor failed", exitCode: 1)
+                    )
+                )
+            )
+        )
+
+        viewModel.runAction(.doctor)
+        await waitUntil {
+            if case .failed = viewModel.actionState {
+                return true
+            }
+            return false
+        }
+    }
+
+    func testCancelActionStoresCancelledState() async {
+        let viewModel = MaintenanceViewModel(
+            provider: MockBrewMaintenanceProvider(result: .success(.fixture())),
+            commandExecutor: SuspendingMaintenanceCommandExecutor()
+        )
+
+        viewModel.runAction(.cleanup)
+        await waitUntil {
+            if case .running = viewModel.actionState {
+                return true
+            }
+            return false
+        }
+
+        viewModel.cancelAction()
+        await waitUntil {
+            if case .cancelled = viewModel.actionState {
+                return true
+            }
+            return false
+        }
+    }
+
     private func waitUntil(
         maxIterations: Int = 50,
         file: StaticString = #filePath,
@@ -161,5 +205,16 @@ private final class MockMaintenanceCommandExecutor: BrewCommandExecuting, @unche
         }
 
         return try result.get()
+    }
+}
+
+@MainActor
+private final class SuspendingMaintenanceCommandExecutor: BrewCommandExecuting, @unchecked Sendable {
+    func execute(
+        arguments: [String],
+        onLog: @escaping @MainActor @Sendable (CatalogPackageActionLogKind, String) -> Void
+    ) async throws -> CommandResult {
+        try await Task.sleep(nanoseconds: 5_000_000_000)
+        return CommandResult(stdout: "", stderr: "", exitCode: 0)
     }
 }

@@ -295,8 +295,9 @@ final class OutdatedPackagesViewModel: ObservableObject {
                 }
                 flushPendingLogs()
                 appendLog(.system, "\(command.kind.title) finished with exit code \(result.exitCode).")
-                actionState = .succeeded(progress.finished(at: Date()), result)
-                await notifyActionSucceeded(command: command)
+                let completedProgress = progress.finished(at: Date())
+                actionState = .succeeded(completedProgress, result)
+                await notifyActionSucceeded(command: command, elapsedTime: completedProgress.elapsedTime())
                 reloadPackagesAfterAction(
                     preservingSelectionID: fallbackSelection?.id,
                     fallbackSelection: fallbackSelection
@@ -304,13 +305,15 @@ final class OutdatedPackagesViewModel: ObservableObject {
             } catch is CancellationError {
                 flushPendingLogs()
                 appendLog(.system, "\(command.kind.title) cancelled.")
-                actionState = .cancelled(progress.finished(at: Date()))
-                await notifyActionCancelled(command: command)
+                let completedProgress = progress.finished(at: Date())
+                actionState = .cancelled(completedProgress)
+                await notifyActionCancelled(command: command, elapsedTime: completedProgress.elapsedTime())
             } catch {
                 flushPendingLogs()
                 appendLog(.system, error.localizedDescription)
-                actionState = .failed(progress.finished(at: Date()), error.localizedDescription)
-                await notifyActionFailed(command: command, error: error)
+                let completedProgress = progress.finished(at: Date())
+                actionState = .failed(completedProgress, error.localizedDescription)
+                await notifyActionFailed(command: command, error: error, elapsedTime: completedProgress.elapsedTime())
             }
 
             actionTask = nil
@@ -340,27 +343,36 @@ final class OutdatedPackagesViewModel: ObservableObject {
         return fallback
     }
 
-    private func notifyActionSucceeded(command: OutdatedPackageActionCommand) async {
+    private func notifyActionSucceeded(
+        command: OutdatedPackageActionCommand,
+        elapsedTime: TimeInterval
+    ) async {
         await notificationScheduler.schedule(
             CommandNotification(
                 title: "\(command.kind.title) Complete",
-                body: successBody(for: command)
+                body: successBody(for: command),
+                elapsedTime: elapsedTime
             )
         )
     }
 
-    private func notifyActionCancelled(command: OutdatedPackageActionCommand) async {
+    private func notifyActionCancelled(
+        command: OutdatedPackageActionCommand,
+        elapsedTime: TimeInterval
+    ) async {
         await notificationScheduler.schedule(
             CommandNotification(
                 title: "\(command.kind.title) Cancelled",
-                body: cancellationBody(for: command)
+                body: cancellationBody(for: command),
+                elapsedTime: elapsedTime
             )
         )
     }
 
     private func notifyActionFailed(
         command: OutdatedPackageActionCommand,
-        error: Error
+        error: Error,
+        elapsedTime: TimeInterval
     ) async {
         await notificationScheduler.schedule(
             CommandNotification(
@@ -368,7 +380,8 @@ final class OutdatedPackagesViewModel: ObservableObject {
                 body: CommandPresentation.friendlyFailureDescription(
                     error.localizedDescription,
                     fallback: failureFallback(for: command)
-                )
+                ),
+                elapsedTime: elapsedTime
             )
         )
     }

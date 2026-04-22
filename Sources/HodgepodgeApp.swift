@@ -21,7 +21,10 @@ struct HodgepodgeApp: App {
         _model = StateObject(wrappedValue: AppModel.live(defaultLaunchSection: settingsModel.defaultLaunchSection))
         _catalogModel = StateObject(wrappedValue: CatalogViewModel.live(notificationScheduler: notificationScheduler))
         _installedPackagesModel = StateObject(
-            wrappedValue: InstalledPackagesViewModel.live(notificationScheduler: notificationScheduler)
+            wrappedValue: InstalledPackagesViewModel.live(
+                notificationScheduler: notificationScheduler,
+                settingsStore: settingsStore
+            )
         )
         _outdatedPackagesModel = StateObject(
             wrappedValue: OutdatedPackagesViewModel.live(notificationScheduler: notificationScheduler)

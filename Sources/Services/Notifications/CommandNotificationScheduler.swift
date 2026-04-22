@@ -4,6 +4,17 @@ import UserNotifications
 struct CommandNotification: Equatable, Sendable {
     let title: String
     let body: String
+    let elapsedTime: TimeInterval?
+
+    init(
+        title: String,
+        body: String,
+        elapsedTime: TimeInterval? = nil
+    ) {
+        self.title = title
+        self.body = body
+        self.elapsedTime = elapsedTime
+    }
 }
 
 protocol CommandNotificationScheduling: Sendable {
@@ -43,6 +54,8 @@ private struct UserNotificationCenterAdapter: UserNotificationCentering, @unchec
 }
 
 actor CommandNotificationScheduler: CommandNotificationScheduling {
+    private static let longRunningThreshold: TimeInterval = 10
+
     private let center: any UserNotificationCentering
     private let settingsStore: any AppSettingsStoring
     private var authorizationChecked = false
@@ -59,6 +72,10 @@ actor CommandNotificationScheduler: CommandNotificationScheduling {
     func schedule(_ notification: CommandNotification) async {
         let settings = settingsStore.loadSettings()
         guard settings.completionNotificationsEnabled else {
+            return
+        }
+
+        guard shouldSchedule(notification, for: settings) else {
             return
         }
 
@@ -80,6 +97,18 @@ actor CommandNotificationScheduler: CommandNotificationScheduling {
         )
 
         try? await center.add(request)
+    }
+
+    private func shouldSchedule(
+        _ notification: CommandNotification,
+        for settings: AppSettingsSnapshot
+    ) -> Bool {
+        switch settings.completionNotificationScope {
+        case .allCompletions:
+            true
+        case .longRunningOnly:
+            (notification.elapsedTime ?? 0) >= Self.longRunningThreshold
+        }
     }
 
     private func ensureAuthorization() async -> Bool {

@@ -177,18 +177,20 @@ final class ServicesViewModel: ObservableObject {
                 flushPendingLogs()
                 let completedProgress = progress.finished(at: Date())
                 actionState = .succeeded(completedProgress, result)
-                await notifyActionSucceeded(command: command)
+                await notifyActionSucceeded(command: command, elapsedTime: completedProgress.elapsedTime())
                 reloadServicesAfterAction(preservingSelectionID: preservingSelectionID)
             } catch is CancellationError {
                 flushPendingLogs()
                 appendLog(.system, "\(command.kind.title) cancelled.")
-                actionState = .cancelled(progress.finished(at: Date()))
-                await notifyActionCancelled(command: command)
+                let completedProgress = progress.finished(at: Date())
+                actionState = .cancelled(completedProgress)
+                await notifyActionCancelled(command: command, elapsedTime: completedProgress.elapsedTime())
             } catch {
                 flushPendingLogs()
                 appendLog(.system, error.localizedDescription)
-                actionState = .failed(progress.finished(at: Date()), error.localizedDescription)
-                await notifyActionFailed(command: command, error: error)
+                let completedProgress = progress.finished(at: Date())
+                actionState = .failed(completedProgress, error.localizedDescription)
+                await notifyActionFailed(command: command, error: error, elapsedTime: completedProgress.elapsedTime())
             }
 
             actionTask = nil
@@ -357,27 +359,36 @@ final class ServicesViewModel: ObservableObject {
         actionLogs = logBuffer.entries
     }
 
-    private func notifyActionSucceeded(command: BrewServiceActionCommand) async {
+    private func notifyActionSucceeded(
+        command: BrewServiceActionCommand,
+        elapsedTime: TimeInterval
+    ) async {
         await notificationScheduler.schedule(
             CommandNotification(
                 title: "\(command.kind.title) Complete",
-                body: notificationSuccessBody(for: command)
+                body: notificationSuccessBody(for: command),
+                elapsedTime: elapsedTime
             )
         )
     }
 
-    private func notifyActionCancelled(command: BrewServiceActionCommand) async {
+    private func notifyActionCancelled(
+        command: BrewServiceActionCommand,
+        elapsedTime: TimeInterval
+    ) async {
         await notificationScheduler.schedule(
             CommandNotification(
                 title: "\(command.kind.title) Cancelled",
-                body: notificationCancellationBody(for: command)
+                body: notificationCancellationBody(for: command),
+                elapsedTime: elapsedTime
             )
         )
     }
 
     private func notifyActionFailed(
         command: BrewServiceActionCommand,
-        error: Error
+        error: Error,
+        elapsedTime: TimeInterval
     ) async {
         await notificationScheduler.schedule(
             CommandNotification(
@@ -385,7 +396,8 @@ final class ServicesViewModel: ObservableObject {
                 body: CommandPresentation.friendlyFailureDescription(
                     error.localizedDescription,
                     fallback: notificationFailureFallback(for: command)
-                )
+                ),
+                elapsedTime: elapsedTime
             )
         )
     }
