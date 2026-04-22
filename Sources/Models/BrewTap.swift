@@ -66,10 +66,6 @@ struct BrewTap: Identifiable, Equatable, Hashable, Sendable {
 
     var id: String { name }
 
-    var title: String {
-        name
-    }
-
     var subtitle: String {
         remote ?? path
     }

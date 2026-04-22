@@ -45,7 +45,7 @@ final class TapsViewModel: ObservableObject {
                 return true
             }
 
-            return tap.title.localizedCaseInsensitiveContains(trimmedQuery) ||
+            return tap.name.localizedCaseInsensitiveContains(trimmedQuery) ||
                 tap.subtitle.localizedCaseInsensitiveContains(trimmedQuery) ||
                 tap.path.localizedCaseInsensitiveContains(trimmedQuery) ||
                 (tap.remote?.localizedCaseInsensitiveContains(trimmedQuery) ?? false)

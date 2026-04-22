@@ -155,10 +155,10 @@ struct BrewfileDocumentLoader: BrewfileDocumentLoading {
                     quoteCharacter = character
                     startIndex = line.index(after: index)
                 }
-            } else if character == quoteCharacter, previousCharacter != "\\" {
-                if let startIndex {
-                    return startIndex..<index
-                }
+            } else if character == quoteCharacter,
+                      previousCharacter != "\\",
+                      let startIndex {
+                return startIndex..<index
             }
 
             previousCharacter = character

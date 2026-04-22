@@ -66,7 +66,7 @@ struct TapsView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(alignment: .top) {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(tap.title)
+                                Text(tap.name)
                                     .font(.headline)
 
                                 Text(tap.subtitle)
@@ -89,7 +89,7 @@ struct TapsView: View {
                     .padding(.vertical, 4)
                     .tag(tap)
                     .accessibilityElement(children: .combine)
-                    .accessibilityLabel("\(tap.title), \(tap.packageCount) packages")
+                    .accessibilityLabel("\(tap.name), \(tap.packageCount) packages")
                 }
                 .listStyle(.sidebar)
                 .overlay {
@@ -277,7 +277,7 @@ private struct TapDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(tap.title)
+                    Text(tap.name)
                         .font(.largeTitle)
                         .bold()
 

@@ -42,66 +42,81 @@ xcodebuild -project Hodgepodge.xcodeproj \
 
 ## Usage
 
-The current project state includes the initial app shell and foundational services:
+The current project state already includes:
 
-- Homebrew detection on launch
-- an Overview screen with installation metadata
-- Help menu entries for:
-  - `Hodgepodge Help`
-  - `Quick Start`
-  - `Troubleshooting`
+- Homebrew detection and an Overview screen with installation metadata
+- hosted formula and cask catalog browsing with rich detail views
+- installed package inventory, outdated packages, package-state filters, and dependency navigation
+- safe action flows for install, fetch, upgrade, service control, and maintenance commands
+- tap management
+- Brewfile inspection, check, install, export, and entry add/remove flows
+- command history for catalog actions
 - bundled help documentation and app icon resources
-
-As additional phases land, Hodgepodge will expand into catalog browsing, installed package management, upgrades, services, taps, Brewfiles, and maintenance tooling.
 
 ## Roadmap
 
-### Phase 1: Foundation
+### Phase 1: Foundation - Completed
 
 - XcodeGen-driven project setup
 - app shell and sidebar navigation
 - Homebrew detection
-- initial Help system
-- icon/resource plumbing
+- Help system
+- icon and resource plumbing
 - unit tests for core non-UI logic
 
-### Phase 2: Catalog Browser
+### Phase 2: Catalog Browser - Completed
 
 - formula and cask browsing from the hosted Homebrew API
-- package search, filters, and detail screens
-- install entry points from detail views
+- package search, filters, sorting, and detail screens
+- install and fetch entry points from detail views
 
-### Phase 3: Local Inventory
+### Phase 3: Local Inventory - Completed
 
 - installed package state from `brew info --json=v2 --installed`
-- pinned, linked, outdated, leaves, and dependency views
+- outdated package inventory from `brew outdated --json=v2`
+- pinned, linked, leaves, and dependency views
+- package-to-package jump navigation in dependency trees
+- Brewfile generation from currently installed packages
 
-### Phase 4: Core Actions
+### Phase 4: Core Actions - In Progress
 
-- install, uninstall, reinstall, fetch, link, unlink, pin, and unpin
-- live logs and state refresh after mutations
+- completed:
+  - install and fetch flows from catalog detail
+  - single-package and bulk upgrade flows from the Outdated screen
+  - live logs, cancellation, confirmation, and state refresh after mutations
+- still to do:
+  - uninstall, reinstall, link, unlink, pin, and unpin
 
-### Phase 5: Services
+### Phase 5: Services - In Progress
 
-- `brew services` list/detail integration
-- start, stop, restart, kill, and cleanup flows
+- completed:
+  - `brew services` list and detail integration
+  - start, stop, and restart flows
+- still to do:
+  - kill and cleanup flows
 
-### Phase 6: Maintenance and Diagnostics
+### Phase 6: Maintenance and Diagnostics - Completed
 
 - update, outdated, cleanup, autoremove, doctor, and config flows
-- health-oriented dashboarding
+- health-oriented dashboarding with raw output access
 
-### Phase 7: Taps and Brewfile
+### Phase 7: Taps and Brewfile - Completed
 
 - tap management
-- Brewfile inspection and `brew bundle` workflows
+- Brewfile inspection
+- `brew bundle check`
+- `brew bundle install`
+- Brewfile export and dump flows
+- Brewfile entry add and remove flows
 
-### Phase 8: Advanced UX
+### Phase 8: Advanced UX - In Progress
 
-- command history
-- analytics
-- notifications
-- favorites and saved searches
+- completed:
+  - command history for catalog actions
+- still to do:
+  - analytics
+  - notifications
+  - favorites and saved searches
 
 ## Contributing
 
