@@ -120,7 +120,7 @@ The current project state already includes:
   - saved searches for the catalog
   - notifications for long-running Homebrew actions
 
-### Phase 9: Polish, Settings, and Compatibility - In Progress
+### Phase 9: Polish, Settings, and Compatibility - Completed
 
 - completed:
   - UI and Settings audit
@@ -134,8 +134,8 @@ The current project state already includes:
   - Homebrew capability probing for version-sensitive `brew info`, `outdated`, `services`, `tap-info`, and `bundle` surfaces
   - compatibility-aware command composition and friendlier unsupported-feature failures for drift-sensitive Homebrew commands
   - defensive decoding and regression coverage around mixed or partial Homebrew JSON shapes
-- normalize the macOS UI toward Apple's platform conventions, with cleaner layouts, clearer hierarchy, and more consistent controls
-- continue extracting true app-wide preferences into Settings while keeping transient UI state local to each section
+  - final macOS UI normalization pass for cleaner layouts, clearer hierarchy, and more consistent controls
+  - continued Settings extraction to move app-wide preferences out of section state while keeping transient UI state local
 
 ## Contributing
 
