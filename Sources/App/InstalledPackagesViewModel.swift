@@ -650,6 +650,14 @@ struct InstalledPackageDependencySnapshot: Equatable {
     let dependencyGroups: [InstalledPackageDependencyGroup]
     let dependencyTree: [InstalledPackageTreeRow]
     let dependentTree: [InstalledPackageTreeRow]
+
+    var hasDependencyTree: Bool {
+        !dependencyTree.isEmpty
+    }
+
+    var hasDependentTree: Bool {
+        !dependentTree.isEmpty
+    }
 }
 
 struct InstalledPackageDependencyMetric: Identifiable, Equatable {

@@ -131,6 +131,8 @@ The current project state already includes:
   - adaptive Catalog primary actions so installed packages switch from Install to Uninstall automatically
   - inline command-copy affordances wherever command previews are shown, so command copy stays attached to the command itself instead of extra action buttons
   - balanced middle/detail pane defaults across the operational sections so list browsing and detail reading follow a cleaner 40/60 split
+  - compact inline homepage and download icons in package headers instead of separate standalone links in the detail body
+  - lighter Installed detail headers so package-state badges and install-source text are not repeated when the list already communicates that state
 - normalize the macOS UI toward Apple's platform conventions, with cleaner layouts, clearer hierarchy, and more consistent controls
 - identify which preferences belong in Settings versus transient per-screen UI state
 - harden Homebrew command and JSON compatibility so Hodgepodge continues working across supported Homebrew releases starting from today's versions

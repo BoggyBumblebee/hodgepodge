@@ -243,6 +243,28 @@ final class ViewRenderingTests: XCTestCase {
         )
     }
 
+    func testHomepageLinkIconRenders() {
+        XCTAssertNotNil(
+            render(
+                HomepageLinkIcon(
+                    url: URL(string: "https://example.com")!,
+                    accessibilityLabel: "Open package homepage"
+                )
+            )
+        )
+    }
+
+    func testDownloadLinkIconRenders() {
+        XCTAssertNotNil(
+            render(
+                DownloadLinkIcon(
+                    url: URL(string: "https://example.com/archive.tar.gz")!,
+                    accessibilityLabel: "Open package download URL"
+                )
+            )
+        )
+    }
+
     func testHodgepodgeCommandsBuildsMenuCommands() {
         let commands = HodgepodgeCommands(model: makeModel())
 

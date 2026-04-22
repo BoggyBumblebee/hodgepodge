@@ -90,6 +90,40 @@ final class InstalledPackageTests: XCTestCase {
         XCTAssertEqual(package.dependencyGroups.first?.items, ["fmt"])
     }
 
+    func testDependencySnapshotFlagsOnlyTreeCardsWithContent() {
+        let emptySnapshot = InstalledPackageDependencySnapshot(
+            summaryMetrics: [],
+            dependencyGroups: [],
+            dependencyTree: [],
+            dependentTree: []
+        )
+        XCTAssertFalse(emptySnapshot.hasDependencyTree)
+        XCTAssertFalse(emptySnapshot.hasDependentTree)
+
+        let populatedSnapshot = InstalledPackageDependencySnapshot(
+            summaryMetrics: [],
+            dependencyGroups: [],
+            dependencyTree: [
+                InstalledPackageTreeRow(
+                    id: "formula:wget->formula:openssl@3",
+                    packageID: "formula:openssl@3",
+                    title: "openssl@3",
+                    depth: 0
+                )
+            ],
+            dependentTree: [
+                InstalledPackageTreeRow(
+                    id: "formula:wget<-formula:curl",
+                    packageID: "formula:curl",
+                    title: "curl",
+                    depth: 0
+                )
+            ]
+        )
+        XCTAssertTrue(populatedSnapshot.hasDependencyTree)
+        XCTAssertTrue(populatedSnapshot.hasDependentTree)
+    }
+
     func testAvailableActionKindsReflectFormulaAndCaskState() {
         let linkedPinnedFormula = makePackage(isPinned: true, isLinked: true)
         XCTAssertEqual(

@@ -459,9 +459,25 @@ private struct CatalogDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(detail.title)
-                        .font(.largeTitle)
-                        .bold()
+                    HStack(alignment: .center, spacing: 8) {
+                        Text(detail.title)
+                            .font(.largeTitle)
+                            .bold()
+
+                        if let homepage = detail.homepage {
+                            HomepageLinkIcon(
+                                url: homepage,
+                                accessibilityLabel: "Open package homepage"
+                            )
+                        }
+
+                        if let downloadURL = detail.downloadURL {
+                            DownloadLinkIcon(
+                                url: downloadURL,
+                                accessibilityLabel: "Open package download URL"
+                            )
+                        }
+                    }
 
                     if detail.fullName != detail.title {
                         Text(detail.fullName)
@@ -536,16 +552,6 @@ private struct CatalogDetailView: View {
                     Button("Cancel", action: cancelAction)
                         .keyboardShortcut(.cancelAction)
                         .accessibilityLabel("Cancel running package command")
-                }
-
-                if let homepage = detail.homepage {
-                    Link("Open Homepage", destination: homepage)
-                        .accessibilityLabel("Open package homepage")
-                }
-
-                if let downloadURL = detail.downloadURL {
-                    Link("Open Download", destination: downloadURL)
-                        .accessibilityLabel("Open package download URL")
                 }
 
                 Button("Refresh Detail", action: refreshAction)

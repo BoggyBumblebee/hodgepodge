@@ -392,8 +392,13 @@ private struct InstalledPackageDetailView: View {
                         }
                     }
 
-                    dependencyTreeCard(snapshot: dependencySnapshot)
-                    dependentTreeCard(snapshot: dependencySnapshot)
+                    if dependencySnapshot.hasDependencyTree {
+                        dependencyTreeCard(snapshot: dependencySnapshot)
+                    }
+
+                    if dependencySnapshot.hasDependentTree {
+                        dependentTreeCard(snapshot: dependencySnapshot)
+                    }
                 }
 
                 if !package.installedVersions.isEmpty {
@@ -416,9 +421,18 @@ private struct InstalledPackageDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(package.title)
-                        .font(.largeTitle)
-                        .bold()
+                    HStack(alignment: .center, spacing: 8) {
+                        Text(package.title)
+                            .font(.largeTitle)
+                            .bold()
+
+                        if let homepage = package.homepage {
+                            HomepageLinkIcon(
+                                url: homepage,
+                                accessibilityLabel: "Open package homepage"
+                            )
+                        }
+                    }
 
                     if package.fullName != package.title {
                         Text(package.fullName)
@@ -454,22 +468,6 @@ private struct InstalledPackageDetailView: View {
 
                     Text(package.version)
                         .font(.caption.monospaced())
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            if !package.statusBadges.isEmpty {
-                InstalledPackageTagFlow(items: package.statusBadges)
-            }
-
-            HStack(spacing: 12) {
-                if let homepage = package.homepage {
-                    Link("Open Homepage", destination: homepage)
-                }
-
-                if package.kind == .formula {
-                    Text(package.installSourceDescription)
-                        .font(.callout)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -547,29 +545,19 @@ private struct InstalledPackageDetailView: View {
 
     private func dependencyTreeCard(snapshot: InstalledPackageDependencySnapshot) -> some View {
         InstalledPackageCard(title: "Dependency Tree") {
-            if snapshot.dependencyTree.isEmpty {
-                Text("No installed dependency tree is available for this package.")
-                    .foregroundStyle(.secondary)
-            } else {
-                InstalledPackageTreeView(
-                    rows: snapshot.dependencyTree,
-                    onSelectPackage: onSelectPackage
-                )
-            }
+            InstalledPackageTreeView(
+                rows: snapshot.dependencyTree,
+                onSelectPackage: onSelectPackage
+            )
         }
     }
 
     private func dependentTreeCard(snapshot: InstalledPackageDependencySnapshot) -> some View {
         InstalledPackageCard(title: "Dependents") {
-            if snapshot.dependentTree.isEmpty {
-                Text("No installed packages currently depend on this package.")
-                    .foregroundStyle(.secondary)
-            } else {
-                InstalledPackageTreeView(
-                    rows: snapshot.dependentTree,
-                    onSelectPackage: onSelectPackage
-                )
-            }
+            InstalledPackageTreeView(
+                rows: snapshot.dependentTree,
+                onSelectPackage: onSelectPackage
+            )
         }
     }
 
