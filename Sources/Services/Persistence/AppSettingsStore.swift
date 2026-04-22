@@ -25,7 +25,7 @@ struct AppSettingsStore: AppSettingsStoring, @unchecked Sendable {
 
     func loadSettings() -> AppSettingsSnapshot {
         guard fileManager.fileExists(atPath: fileURL.path) else {
-            return .default
+            return .standard
         }
 
         do {
@@ -33,7 +33,7 @@ struct AppSettingsStore: AppSettingsStoring, @unchecked Sendable {
             return try decoder.decode(AppSettingsSnapshot.self, from: data)
         } catch {
             report(error, prefix: "Failed to load app settings")
-            return .default
+            return .standard
         }
     }
 

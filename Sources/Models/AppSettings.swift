@@ -6,7 +6,7 @@ struct AppSettingsSnapshot: Codable, Equatable, Sendable {
     var notificationSoundEnabled: Bool
     var restoreLastSelectedBrewfile: Bool
 
-    static let `default` = AppSettingsSnapshot(
+    static let standard = AppSettingsSnapshot(
         defaultLaunchSection: .catalog,
         completionNotificationsEnabled: true,
         notificationSoundEnabled: true,

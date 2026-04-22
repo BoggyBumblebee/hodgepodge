@@ -11,18 +11,6 @@ struct OverviewView: View {
 
                 statusCard
 
-                HStack(spacing: 12) {
-                    Button("Refresh Homebrew") {
-                        model.refreshInstallation()
-                    }
-                    .keyboardShortcut("r", modifiers: [.command])
-
-                    Button("Quick Start Help") {
-                        model.openHelp(anchor: .quickStart)
-                    }
-                    .keyboardShortcut("1", modifiers: [.command, .option])
-                }
-
                 if let helpURL = model.lastOpenedHelpURL {
                     Text("Last opened help page: \(helpURL.absoluteString)")
                         .font(.caption)
@@ -32,6 +20,23 @@ struct OverviewView: View {
             }
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .toolbar {
+            ToolbarItemGroup {
+                Button {
+                    model.refreshInstallation()
+                } label: {
+                    Label("Refresh Homebrew", systemImage: "arrow.clockwise")
+                }
+                .keyboardShortcut("r", modifiers: [.command])
+
+                Button {
+                    model.openHelp(anchor: .quickStart)
+                } label: {
+                    Label("Quick Start Help", systemImage: "questionmark.circle")
+                }
+                .keyboardShortcut("1", modifiers: [.command, .option])
+            }
         }
     }
 

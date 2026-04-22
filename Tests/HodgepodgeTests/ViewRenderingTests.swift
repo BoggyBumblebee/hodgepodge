@@ -394,6 +394,119 @@ final class ViewRenderingTests: XCTestCase {
         )
     }
 
+    func testCatalogAnalyticsViewRendersLoadingAndFailureStates() {
+        let viewModel = makeCatalogModel()
+        let installedPackagesViewModel = makeInstalledPackagesModel()
+
+        viewModel.analyticsState = .loading(.days30)
+        XCTAssertNotNil(
+            render(
+                CatalogAnalyticsView(
+                    viewModel: viewModel,
+                    installedPackagesViewModel: installedPackagesViewModel,
+                    openInstalledPackage: { _ in },
+                    openPackageInCatalog: { _ in }
+                )
+            )
+        )
+
+        viewModel.analyticsState = .failed(.days30, "Broken")
+        XCTAssertNotNil(
+            render(
+                CatalogAnalyticsView(
+                    viewModel: viewModel,
+                    installedPackagesViewModel: installedPackagesViewModel,
+                    openInstalledPackage: { _ in },
+                    openPackageInCatalog: { _ in }
+                )
+            )
+        )
+    }
+
+    func testCatalogAnalyticsLeaderboardCardRendersEmptyAndPopulatedStates() {
+        let installedPackagesViewModel = makeInstalledPackagesModel()
+        let emptyLeaderboard = CatalogAnalyticsLeaderboard(
+            kind: .formulaInstalls,
+            period: .days30,
+            startDate: "2026-03-01",
+            endDate: "2026-03-30",
+            totalItems: 0,
+            totalCount: "0",
+            items: []
+        )
+        let populatedLeaderboard = CatalogAnalyticsLeaderboard(
+            kind: .formulaInstalls,
+            period: .days30,
+            startDate: "2026-03-01",
+            endDate: "2026-03-30",
+            totalItems: 10,
+            totalCount: "12,345",
+            items: [
+                CatalogAnalyticsItem(
+                    kind: .formula,
+                    slug: "wget",
+                    rank: 1,
+                    count: "1,200",
+                    percent: "9.72"
+                )
+            ]
+        )
+
+        XCTAssertNotNil(
+            render(
+                CatalogAnalyticsLeaderboardCard(
+                    leaderboard: emptyLeaderboard,
+                    installedPackagesViewModel: installedPackagesViewModel,
+                    openInstalledPackage: { _ in },
+                    openPackageInCatalog: { _ in }
+                )
+            )
+        )
+
+        XCTAssertNotNil(
+            render(
+                CatalogAnalyticsLeaderboardCard(
+                    leaderboard: populatedLeaderboard,
+                    installedPackagesViewModel: installedPackagesViewModel,
+                    openInstalledPackage: { _ in },
+                    openPackageInCatalog: { _ in }
+                )
+            )
+        )
+    }
+
+    func testCatalogAnalyticsItemRowRendersInstalledAndUninstalledStates() {
+        let item = CatalogAnalyticsItem(
+            kind: .formula,
+            slug: "wget",
+            rank: 1,
+            count: "1,200",
+            percent: "9.72"
+        )
+
+        XCTAssertNotNil(
+            render(
+                CatalogAnalyticsItemRow(
+                    item: item,
+                    isInstalled: true,
+                    openInstalledPackage: { _ in },
+                    openPackageInCatalog: { _ in }
+                )
+            )
+        )
+
+        XCTAssertNotNil(
+            render(
+                CatalogAnalyticsItemRow(
+                    item: item,
+                    isInstalled: false,
+                    openInstalledPackage: { _ in },
+                    openPackageInCatalog: { _ in }
+                )
+            )
+        )
+    }
+
     func testInstalledPackagesViewRendersLoadedState() {
         let package = InstalledPackage(
             kind: .formula,
@@ -713,11 +826,13 @@ final class ViewRenderingTests: XCTestCase {
 
     private func makeBrewfileModel() -> BrewfileViewModel {
         BrewfileViewModel(
-            loader: ViewTestBrewfileLoader(),
-            selectionStore: ViewTestBrewfileSelectionStore(),
-            picker: ViewTestBrewfilePicker(),
-            dumpDestinationPicker: ViewTestBrewfileDumpDestinationPicker(),
-            commandExecutor: ViewTestBrewfileCommandExecutor()
+            dependencies: .init(
+                loader: ViewTestBrewfileLoader(),
+                selectionStore: ViewTestBrewfileSelectionStore(),
+                picker: ViewTestBrewfilePicker(),
+                dumpDestinationPicker: ViewTestBrewfileDumpDestinationPicker(),
+                commandExecutor: ViewTestBrewfileCommandExecutor()
+            )
         )
     }
 

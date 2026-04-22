@@ -10,7 +10,7 @@ final class AppSettingsStoreTests: XCTestCase {
                 .appendingPathComponent("app-settings.json")
         )
 
-        XCTAssertEqual(store.loadSettings(), .default)
+        XCTAssertEqual(store.loadSettings(), .standard)
     }
 
     func testSaveAndLoadSettingsRoundTripsSnapshot() {

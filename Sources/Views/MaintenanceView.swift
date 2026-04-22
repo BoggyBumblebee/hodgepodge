@@ -42,6 +42,23 @@ struct MaintenanceView: View {
         } message: {
             Text(pendingAction?.confirmationMessage ?? "")
         }
+        .toolbar {
+            ToolbarItemGroup {
+                Picker("Output Source", selection: $viewModel.selectedOutputSource) {
+                    ForEach(BrewMaintenanceOutputSource.allCases) { source in
+                        Text(source.title).tag(source)
+                    }
+                }
+                .pickerStyle(.menu)
+
+                Button {
+                    viewModel.refreshDashboard()
+                } label: {
+                    Label("Refresh Snapshot", systemImage: "arrow.clockwise")
+                }
+                .keyboardShortcut("r", modifiers: [.command])
+            }
+        }
     }
 
     @ViewBuilder
@@ -81,26 +98,8 @@ struct MaintenanceView: View {
 
     private var outputPane: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .center) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Output")
-                        .font(.title2)
-                        .bold()
-
-                    Text("Review dry-run snapshots or live command logs from maintenance actions.")
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                Picker("Output Source", selection: $viewModel.selectedOutputSource) {
-                    ForEach(BrewMaintenanceOutputSource.allCases) { source in
-                        Text(source.title).tag(source)
-                    }
-                }
-                .pickerStyle(.menu)
-                .frame(maxWidth: 180)
-            }
+            Text("Review dry-run snapshots or live command logs from maintenance actions.")
+                .foregroundStyle(.secondary)
 
             if let progress = viewModel.actionState.progress {
                 maintenanceStatusCard(progress: progress, state: viewModel.actionState)
@@ -143,16 +142,9 @@ struct MaintenanceView: View {
             Text("Keep the local Homebrew environment healthy with diagnostics, previews, and careful maintenance actions.")
                 .foregroundStyle(.secondary)
 
-            HStack(spacing: 12) {
-                Button("Refresh Snapshot") {
-                    viewModel.refreshDashboard()
-                }
-                .keyboardShortcut("r", modifiers: [.command, .shift])
-
-                Text("Last captured \(dashboard.capturedAt.formatted(date: .abbreviated, time: .shortened))")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            Text("Last captured \(dashboard.capturedAt.formatted(date: .abbreviated, time: .shortened))")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 

@@ -338,10 +338,7 @@ final class InstalledPackagesViewModel: ObservableObject {
                     homebrewStateNotifier.notifyDidChange(sourceID: homebrewStateSourceID)
                 }
                 await notifyActionSucceeded(actionKind: actionKind, package: package)
-                reloadPackagesAfterAction(
-                    preservingSelectionID: package.id,
-                    fallbackSelection: actionKind == .uninstall ? package : nil
-                )
+                reloadPackagesAfterAction(preservingSelectionID: package.id)
             } catch is CancellationError {
                 flushPendingActionLogs()
                 appendActionLog(.system, "\(actionKind.title) cancelled.")
@@ -490,10 +487,7 @@ final class InstalledPackagesViewModel: ObservableObject {
         packages.sorted(by: sorter(for: sortOption)).first
     }
 
-    private func reloadPackagesAfterAction(
-        preservingSelectionID: String?,
-        fallbackSelection: InstalledPackage?
-    ) {
+    private func reloadPackagesAfterAction(preservingSelectionID: String?) {
         Task { @MainActor [provider] in
             do {
                 let packages = try await provider.fetchInstalledPackages()
@@ -503,11 +497,11 @@ final class InstalledPackagesViewModel: ObservableObject {
                    let refreshedSelection = packages.first(where: { $0.id == preservingSelectionID }) {
                     selectedPackage = refreshedSelection
                 } else {
-                    selectedPackage = fallbackSelection ?? defaultSelection(from: packages)
+                    selectedPackage = defaultSelection(from: packages)
                 }
             } catch {
                 packagesState = .failed(error.localizedDescription)
-                selectedPackage = fallbackSelection
+                selectedPackage = nil
             }
         }
     }

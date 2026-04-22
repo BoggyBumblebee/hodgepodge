@@ -59,6 +59,32 @@ struct BrewfileView: View {
         } message: {
             Text(pendingAction?.confirmationMessage ?? "")
         }
+        .searchable(text: $viewModel.searchText, placement: .toolbar, prompt: "Search Brewfile")
+        .toolbar {
+            ToolbarItemGroup {
+                Picker("Filter", selection: $viewModel.filterOption) {
+                    ForEach(BrewfileFilterOption.allCases) { filter in
+                        Text(filter.title).tag(filter)
+                    }
+                }
+                .pickerStyle(.menu)
+
+                Picker("Sort", selection: $viewModel.sortOption) {
+                    ForEach(BrewfileSortOption.allCases) { option in
+                        Text(option.title).tag(option)
+                    }
+                }
+                .pickerStyle(.menu)
+
+                Button {
+                    viewModel.reloadBrewfile()
+                } label: {
+                    Label("Reload", systemImage: "arrow.clockwise")
+                }
+                .keyboardShortcut("r", modifiers: [.command])
+                .disabled(viewModel.selectedFileURL == nil)
+            }
+        }
     }
 
     private var sidebar: some View {
@@ -145,32 +171,6 @@ struct BrewfileView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Inspect a Brewfile and run bundle actions against it from the current Mac.")
                 .foregroundStyle(.secondary)
-
-            TextField("Search Brewfile", text: $viewModel.searchText)
-                .textFieldStyle(.roundedBorder)
-                .accessibilityLabel("Search Brewfile")
-
-            HStack(spacing: 12) {
-                Picker("Filter", selection: $viewModel.filterOption) {
-                    ForEach(BrewfileFilterOption.allCases) { filter in
-                        Text(filter.title).tag(filter)
-                    }
-                }
-                .pickerStyle(.menu)
-
-                Picker("Sort", selection: $viewModel.sortOption) {
-                    ForEach(BrewfileSortOption.allCases) { option in
-                        Text(option.title).tag(option)
-                    }
-                }
-                .pickerStyle(.menu)
-
-                Button("Reload") {
-                    viewModel.reloadBrewfile()
-                }
-                .keyboardShortcut("r", modifiers: [.command, .shift])
-                .disabled(viewModel.selectedFileURL == nil)
-            }
         }
     }
 

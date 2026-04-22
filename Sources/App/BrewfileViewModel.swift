@@ -2,6 +2,34 @@ import Foundation
 
 @MainActor
 final class BrewfileViewModel: ObservableObject {
+    struct Dependencies {
+        let loader: any BrewfileDocumentLoading
+        let selectionStore: any BrewfileSelectionStoring
+        let settingsStore: any AppSettingsStoring
+        let picker: any BrewfilePicking
+        let dumpDestinationPicker: any BrewfileDumpDestinationPicking
+        let commandExecutor: any BrewCommandExecuting
+        let fileManager: FileManager
+
+        init(
+            loader: any BrewfileDocumentLoading,
+            selectionStore: any BrewfileSelectionStoring,
+            settingsStore: any AppSettingsStoring = AppSettingsStore(),
+            picker: any BrewfilePicking,
+            dumpDestinationPicker: any BrewfileDumpDestinationPicking,
+            commandExecutor: any BrewCommandExecuting,
+            fileManager: FileManager = .default
+        ) {
+            self.loader = loader
+            self.selectionStore = selectionStore
+            self.settingsStore = settingsStore
+            self.picker = picker
+            self.dumpDestinationPicker = dumpDestinationPicker
+            self.commandExecutor = commandExecutor
+            self.fileManager = fileManager
+        }
+    }
+
     @Published var documentState: BrewfileLoadState = .idle
     @Published var actionState: BrewfileActionState = .idle
     @Published var actionLogs: [CommandLogEntry] = []
@@ -23,23 +51,17 @@ final class BrewfileViewModel: ObservableObject {
     private var logBuffer = CommandLogBuffer()
 
     init(
-        loader: any BrewfileDocumentLoading,
-        selectionStore: any BrewfileSelectionStoring,
-        settingsStore: any AppSettingsStoring = AppSettingsStore(),
-        picker: any BrewfilePicking,
-        dumpDestinationPicker: any BrewfileDumpDestinationPicking,
-        commandExecutor: any BrewCommandExecuting,
-        notificationScheduler: any CommandNotificationScheduling = NullCommandNotificationScheduler(),
-        fileManager: FileManager = .default
+        dependencies: Dependencies,
+        notificationScheduler: any CommandNotificationScheduling = NullCommandNotificationScheduler()
     ) {
-        self.loader = loader
-        self.selectionStore = selectionStore
-        self.settingsStore = settingsStore
-        self.picker = picker
-        self.dumpDestinationPicker = dumpDestinationPicker
-        self.commandExecutor = commandExecutor
+        self.loader = dependencies.loader
+        self.selectionStore = dependencies.selectionStore
+        self.settingsStore = dependencies.settingsStore
+        self.picker = dependencies.picker
+        self.dumpDestinationPicker = dependencies.dumpDestinationPicker
+        self.commandExecutor = dependencies.commandExecutor
         self.notificationScheduler = notificationScheduler
-        self.fileManager = fileManager
+        self.fileManager = dependencies.fileManager
     }
 
     deinit {
@@ -492,14 +514,16 @@ extension BrewfileViewModel {
         let brewLocator = BrewLocator(runner: runner)
 
         return BrewfileViewModel(
-            loader: BrewfileDocumentLoader(),
-            selectionStore: BrewfileSelectionStore(),
-            settingsStore: settingsStore,
-            picker: BrewfilePicker(),
-            dumpDestinationPicker: BrewfileDumpDestinationPicker(),
-            commandExecutor: BrewCommandExecutor(
-                brewLocator: brewLocator,
-                runner: runner
+            dependencies: Dependencies(
+                loader: BrewfileDocumentLoader(),
+                selectionStore: BrewfileSelectionStore(),
+                settingsStore: settingsStore,
+                picker: BrewfilePicker(),
+                dumpDestinationPicker: BrewfileDumpDestinationPicker(),
+                commandExecutor: BrewCommandExecutor(
+                    brewLocator: brewLocator,
+                    runner: runner
+                )
             ),
             notificationScheduler: notificationScheduler
         )

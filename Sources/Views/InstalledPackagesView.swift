@@ -555,15 +555,6 @@ private struct InstalledPackageDetailView: View {
                 Text(package.actionDescription)
                     .foregroundStyle(.secondary)
 
-                if !isCurrentSnapshot {
-                    Label(
-                        "The latest refresh no longer reports this package as installed. The detail pane is keeping the last selection visible so you can review the action output.",
-                        systemImage: "info.circle"
-                    )
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                }
-
                 HStack(alignment: .top, spacing: 12) {
                     ForEach(package.availableActionKinds) { action in
                         actionButton(for: action)

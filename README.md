@@ -126,6 +126,7 @@ The current project state already includes:
   - UI and Settings audit
   - dedicated Settings window with launch, notification, and Brewfile preferences
   - toolbar-based search, refresh, filter, and sort normalization across the main operational sections
+  - toolbar and header cleanup across Brewfile, Catalog Analytics, Maintenance, and About Brew for a more standard macOS hierarchy
 - normalize the macOS UI toward Apple's platform conventions, with cleaner layouts, clearer hierarchy, and more consistent controls
 - identify which preferences belong in Settings versus transient per-screen UI state
 - harden Homebrew command and JSON compatibility so Hodgepodge continues working across supported Homebrew releases starting from today's versions

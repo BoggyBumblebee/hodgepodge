@@ -575,7 +575,7 @@ private final class MockBrewfileSelectionStore: BrewfileSelectionStoring, @unche
 private struct MockAppSettingsStore: AppSettingsStoring {
     let snapshot: AppSettingsSnapshot
 
-    init(snapshot: AppSettingsSnapshot = .default) {
+    init(snapshot: AppSettingsSnapshot = .standard) {
         self.snapshot = snapshot
     }
 
@@ -584,6 +584,32 @@ private struct MockAppSettingsStore: AppSettingsStoring {
     }
 
     func saveSettings(_ snapshot: AppSettingsSnapshot) {}
+}
+
+private extension BrewfileViewModel {
+    convenience init(
+        loader: any BrewfileDocumentLoading,
+        selectionStore: any BrewfileSelectionStoring,
+        settingsStore: any AppSettingsStoring = AppSettingsStore(),
+        picker: any BrewfilePicking,
+        dumpDestinationPicker: any BrewfileDumpDestinationPicking,
+        commandExecutor: any BrewCommandExecuting,
+        notificationScheduler: any CommandNotificationScheduling = NullCommandNotificationScheduler(),
+        fileManager: FileManager = .default
+    ) {
+        self.init(
+            dependencies: Dependencies(
+                loader: loader,
+                selectionStore: selectionStore,
+                settingsStore: settingsStore,
+                picker: picker,
+                dumpDestinationPicker: dumpDestinationPicker,
+                commandExecutor: commandExecutor,
+                fileManager: fileManager
+            ),
+            notificationScheduler: notificationScheduler
+        )
+    }
 }
 
 private struct MockBrewfilePicker: BrewfilePicking {

@@ -29,7 +29,7 @@ private final class RecordingAppSettingsStore: AppSettingsStoring, @unchecked Se
     private(set) var savedSnapshots: [AppSettingsSnapshot] = []
 
     func loadSettings() -> AppSettingsSnapshot {
-        .default
+        .standard
     }
 
     func saveSettings(_ snapshot: AppSettingsSnapshot) {

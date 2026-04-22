@@ -508,7 +508,7 @@ final class InstalledPackagesViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.exportLogs.isEmpty)
     }
 
-    func testRunActionStoresSuccessStateAndPreservesRemovedPackageSelectionForOutputReview() async {
+    func testRunActionStoresSuccessStateAndClearsSelectionWhenUninstallRemovesLastPackage() async {
         let package = makePackage(slug: "wget", title: "wget")
         let provider = CyclingInstalledPackagesProvider(results: [[]])
         let executor = MockInstalledPackagesCommandExecutor(
@@ -538,9 +538,33 @@ final class InstalledPackagesViewModelTests: XCTestCase {
         }
 
         XCTAssertEqual(executor.executedArguments, [["uninstall", "wget"]])
-        XCTAssertEqual(viewModel.selectedPackage, package)
-        XCTAssertFalse(viewModel.isPackageInCurrentSnapshot(package))
+        XCTAssertNil(viewModel.selectedPackage)
         XCTAssertTrue(viewModel.actionLogs.contains(where: { $0.text == "Removing..." }))
+    }
+
+    func testRunActionSelectsTopPackageWhenUninstallRemovesCurrentPackage() async {
+        let removedPackage = makePackage(slug: "wget", title: "wget", installedAt: Date(timeIntervalSince1970: 100))
+        let fallbackPackage = makePackage(slug: "curl", title: "curl", installedAt: Date(timeIntervalSince1970: 200))
+        let provider = CyclingInstalledPackagesProvider(results: [[fallbackPackage]])
+        let executor = MockInstalledPackagesCommandExecutor(
+            result: .success(CommandResult(stdout: "Uninstalled\n", stderr: "", exitCode: 0)),
+            chunks: [.init(stream: .stdout, text: "Removing...\n")]
+        )
+        let viewModel = InstalledPackagesViewModel(
+            provider: provider,
+            commandExecutor: executor,
+            destinationPicker: MockBrewfileDumpDestinationPicker()
+        )
+        viewModel.packagesState = .loaded([removedPackage, fallbackPackage])
+        viewModel.selectedPackage = removedPackage
+
+        viewModel.runAction(.uninstall, for: removedPackage)
+        await waitUntil {
+            viewModel.selectedPackage == fallbackPackage
+        }
+
+        XCTAssertEqual(viewModel.selectedPackage, fallbackPackage)
+        XCTAssertTrue(viewModel.isPackageInCurrentSnapshot(fallbackPackage))
     }
 
     func testRunActionRefreshesPackageSelectionAfterSuccessfulFormulaAction() async {

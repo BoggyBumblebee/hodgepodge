@@ -10,7 +10,7 @@ final class CommandNotificationSchedulerTests: XCTestCase {
         )
         let scheduler = CommandNotificationScheduler(
             center: center,
-            settingsStore: TestAppSettingsStore(snapshot: .default)
+            settingsStore: TestAppSettingsStore(snapshot: .standard)
         )
 
         await scheduler.schedule(
@@ -34,7 +34,7 @@ final class CommandNotificationSchedulerTests: XCTestCase {
         let center = TestUserNotificationCenter(authorizationStatus: .denied)
         let scheduler = CommandNotificationScheduler(
             center: center,
-            settingsStore: TestAppSettingsStore(snapshot: .default)
+            settingsStore: TestAppSettingsStore(snapshot: .standard)
         )
 
         await scheduler.schedule(
@@ -57,7 +57,7 @@ final class CommandNotificationSchedulerTests: XCTestCase {
         )
         let scheduler = CommandNotificationScheduler(
             center: center,
-            settingsStore: TestAppSettingsStore(snapshot: .default)
+            settingsStore: TestAppSettingsStore(snapshot: .standard)
         )
 
         await scheduler.schedule(
