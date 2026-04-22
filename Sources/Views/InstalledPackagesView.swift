@@ -213,10 +213,11 @@ struct InstalledPackagesView: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
 
-                Text(viewModel.exportCommandPreview)
-                    .font(.caption.monospaced())
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
+                CommandPreviewField(
+                    title: "Export Command",
+                    command: viewModel.exportCommandPreview,
+                    copyAccessibilityLabel: "Copy Brewfile export command"
+                )
 
                 InstalledPackagesExportStatusView(exportState: viewModel.exportState)
 

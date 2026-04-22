@@ -295,9 +295,11 @@ struct MaintenanceView: View {
                         .background(.quaternary, in: Capsule())
                 }
 
-                Text(progress.command.command)
-                    .font(.callout.monospaced())
-                    .textSelection(.enabled)
+                CommandPreviewField(
+                    title: "Executed Command",
+                    command: progress.command.command,
+                    copyAccessibilityLabel: "Copy maintenance command"
+                )
 
                 Text("Elapsed \(progress.elapsedTime(), format: .number.precision(.fractionLength(1)))s")
                     .font(.caption)

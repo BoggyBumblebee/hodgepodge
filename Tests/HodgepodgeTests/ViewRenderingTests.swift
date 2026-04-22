@@ -230,6 +230,19 @@ final class ViewRenderingTests: XCTestCase {
         )
     }
 
+    func testCommandPreviewFieldRenders() {
+        XCTAssertNotNil(
+            render(
+                CommandPreviewField(
+                    title: "Install Command",
+                    command: "brew install wget",
+                    copyAccessibilityLabel: "Copy install command",
+                    lineLimit: 1
+                )
+            )
+        )
+    }
+
     func testHodgepodgeCommandsBuildsMenuCommands() {
         let commands = HodgepodgeCommands(model: makeModel())
 

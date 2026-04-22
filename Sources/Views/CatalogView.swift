@@ -548,22 +548,20 @@ private struct CatalogDetailView: View {
                         .accessibilityLabel("Open package download URL")
                 }
 
-                Button(primaryActionKind == .install ? "Copy Install Command" : "Copy Uninstall Command") {
-                    copyToPasteboard(primaryActionCommand.command)
-                }
-                .accessibilityLabel(primaryActionKind == .install ? "Copy install command" : "Copy uninstall command")
-
-                Button("Copy Fetch Command") {
-                    copyToPasteboard(detail.fetchCommand)
-                }
-                .accessibilityLabel("Copy fetch command")
-
                 Button("Refresh Detail", action: refreshAction)
                     .accessibilityLabel("Refresh package details")
             }
 
-            commandBlock(title: primaryActionKind.title, command: primaryActionCommand.command)
-            commandBlock(title: "Fetch", command: detail.fetchCommand)
+            commandBlock(
+                title: primaryActionKind.title,
+                command: primaryActionCommand.command,
+                copyAccessibilityLabel: primaryActionKind == .install ? "Copy install command" : "Copy uninstall command"
+            )
+            commandBlock(
+                title: "Fetch",
+                command: detail.fetchCommand,
+                copyAccessibilityLabel: "Copy fetch command"
+            )
             actionSummary
             actionHistoryBlock
 
@@ -624,22 +622,18 @@ private struct CatalogDetailView: View {
         DetailCard(title: "Command Output") {
             VStack(alignment: .leading, spacing: 12) {
                 if let command = actionState.command {
-                    commandBlock(title: "Executed Command", command: command.command)
+                    commandBlock(
+                        title: "Executed Command",
+                        command: command.command,
+                        copyAccessibilityLabel: "Copy executed command"
+                    )
                 }
 
-                if actionLogs.isEmpty {
-                    CommandOutputDisclosure(
-                        entries: actionLogs,
-                        isRunning: actionState.isRunning,
-                        emptyMessage: "Command details will appear here if you choose to inspect Homebrew output."
-                    )
-                } else {
-                    CommandOutputDisclosure(
-                        entries: actionLogs,
-                        isRunning: actionState.isRunning,
-                        emptyMessage: "Command details will appear here if you choose to inspect Homebrew output."
-                    )
-                }
+                CommandOutputDisclosure(
+                    entries: actionLogs,
+                    isRunning: actionState.isRunning,
+                    emptyMessage: "Command details will appear here if you choose to inspect Homebrew output."
+                )
 
                 if !actionState.isRunning {
                     Button("Clear Output", action: clearActionOutput)
@@ -761,20 +755,16 @@ private struct CatalogDetailView: View {
         }
     }
 
-    private func commandBlock(title: String, command: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            Text(command)
-                .font(.caption.monospaced())
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .textSelection(.enabled)
-        }
+    private func commandBlock(
+        title: String,
+        command: String,
+        copyAccessibilityLabel: String = "Copy command"
+    ) -> some View {
+        CommandPreviewField(
+            title: title,
+            command: command,
+            copyAccessibilityLabel: copyAccessibilityLabel
+        )
     }
 
     private func actionStatusCard(
@@ -871,12 +861,6 @@ private struct CatalogDetailView: View {
             .foregroundStyle(.secondary)
     }
 
-    private func copyToPasteboard(_ string: String) {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(string, forType: .string)
-    }
-
     private func beginAction(_ kind: CatalogPackageActionKind) {
         if kind.requiresConfirmation {
             pendingConfirmation = detail.actionCommand(for: kind)
@@ -901,13 +885,10 @@ private struct CatalogDetailView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Text(entry.command.command)
-                .font(.caption.monospaced())
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .textSelection(.enabled)
+            CommandPreviewField(
+                command: entry.command.command,
+                copyAccessibilityLabel: "Copy \(entry.command.kind.title.lowercased()) command"
+            )
 
             HStack(spacing: 12) {
                 actionHistoryMetric("Outcome", entry.outcome.title)
@@ -917,14 +898,10 @@ private struct CatalogDetailView: View {
             }
 
             HStack(spacing: 12) {
-                    Button("\(entry.command.kind.title)...") {
-                        beginAction(entry.command.kind)
-                    }
-                    .disabled(hasRunningAction)
-
-                Button("Copy Command") {
-                    copyToPasteboard(entry.command.command)
+                Button("\(entry.command.kind.title)...") {
+                    beginAction(entry.command.kind)
                 }
+                .disabled(hasRunningAction)
             }
         }
         .padding(14)

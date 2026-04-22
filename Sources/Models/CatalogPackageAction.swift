@@ -28,12 +28,7 @@ enum CatalogPackageActionKind: String, CaseIterable, Codable, Equatable, Identif
     }
 
     var affectsHomebrewState: Bool {
-        switch self {
-        case .install, .uninstall:
-            true
-        case .fetch:
-            false
-        }
+        self != .fetch
     }
 }
 

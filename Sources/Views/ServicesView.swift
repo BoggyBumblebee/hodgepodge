@@ -194,10 +194,11 @@ struct ServicesView: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
 
-                Text(viewModel.cleanupCommand.command)
-                    .font(.caption.monospaced())
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
+                CommandPreviewField(
+                    title: "Cleanup Command",
+                    command: viewModel.cleanupCommand.command,
+                    copyAccessibilityLabel: "Copy services cleanup command"
+                )
 
                 BrewServiceCleanupStatusView(actionState: viewModel.cleanupState)
 
@@ -402,10 +403,10 @@ private struct BrewServiceDetailView: View {
 
     private func commandCard(_ command: String) -> some View {
         BrewServiceCard(title: "Command") {
-            Text(command)
-                .font(.body.monospaced())
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            CommandPreviewField(
+                command: command,
+                copyAccessibilityLabel: "Copy service command"
+            )
         }
     }
 

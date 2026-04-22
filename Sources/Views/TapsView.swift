@@ -176,12 +176,12 @@ struct TapsView: View {
                     .accessibilityLabel("Optional remote URL")
 
                 HStack {
-                    Text(viewModel.addTapCommand?.command ?? "brew tap user/repo")
-                        .font(.caption.monospaced())
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-
-                    Spacer()
+                    CommandPreviewField(
+                        title: "Add Tap Command",
+                        command: viewModel.addTapCommand?.command ?? "brew tap user/repo",
+                        copyAccessibilityLabel: "Copy add tap command",
+                        lineLimit: 1
+                    )
 
                     Button("Add Tap") {
                         viewModel.runAddTap()
@@ -393,9 +393,11 @@ private struct TapDetailView: View {
                                 .foregroundStyle(.secondary)
                         }
 
-                        Text(progress.command.command)
-                            .font(.callout.monospaced())
-                            .textSelection(.enabled)
+                        CommandPreviewField(
+                            title: "Executed Command",
+                            command: progress.command.command,
+                            copyAccessibilityLabel: "Copy executed tap command"
+                        )
                     }
                 } else {
                     Text("Add or untap a repository to stream Homebrew output here.")

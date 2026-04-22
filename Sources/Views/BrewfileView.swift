@@ -191,10 +191,11 @@ struct BrewfileView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                Text(viewModel.dumpCommandPreview)
-                    .font(.caption.monospaced())
-                    .foregroundStyle(.tertiary)
-                    .textSelection(.enabled)
+                CommandPreviewField(
+                    title: "Dump Preview",
+                    command: viewModel.dumpCommandPreview,
+                    copyAccessibilityLabel: "Copy Brewfile dump command"
+                )
 
                 HStack {
                     Button("Choose Brewfile") {
@@ -363,35 +364,29 @@ private struct BrewfileLoadedDetailView: View {
         BrewfileCard(title: "Bundle Actions") {
             VStack(alignment: .leading, spacing: 12) {
                 if let checkCommand {
-                    Label(checkCommand.kind.subtitle, systemImage: checkCommand.kind.systemImageName)
-                        .foregroundStyle(.secondary)
-
-                    Text(checkCommand.command)
-                        .font(.caption.monospaced())
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
+                    CommandPreviewField(
+                        title: checkCommand.kind.subtitle,
+                        command: checkCommand.command,
+                        copyAccessibilityLabel: "Copy bundle check command"
+                    )
                 } else {
                     Text("Choose a Brewfile to run `brew bundle check --no-upgrade`.")
                         .foregroundStyle(.secondary)
                 }
 
                 if let installCommand {
-                    Label(installCommand.kind.subtitle, systemImage: installCommand.kind.systemImageName)
-                        .foregroundStyle(.secondary)
-
-                    Text(installCommand.command)
-                        .font(.caption.monospaced())
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
+                    CommandPreviewField(
+                        title: installCommand.kind.subtitle,
+                        command: installCommand.command,
+                        copyAccessibilityLabel: "Copy bundle install command"
+                    )
                 }
 
-                Label(BrewfileActionKind.dump.subtitle, systemImage: BrewfileActionKind.dump.systemImageName)
-                    .foregroundStyle(.secondary)
-
-                Text(dumpCommandPreview)
-                    .font(.caption.monospaced())
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
+                CommandPreviewField(
+                    title: BrewfileActionKind.dump.subtitle,
+                    command: dumpCommandPreview,
+                    copyAccessibilityLabel: "Copy Brewfile dump command"
+                )
 
                 BrewfileActionStatusView(actionState: actionState)
 
@@ -440,13 +435,11 @@ private struct BrewfileLoadedDetailView: View {
                 if let removeCommand {
                     Divider()
 
-                    Label(BrewfileActionKind.remove.subtitle, systemImage: BrewfileActionKind.remove.systemImageName)
-                        .foregroundStyle(.secondary)
-
-                    Text(removeCommand.command)
-                        .font(.caption.monospaced())
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
+                    CommandPreviewField(
+                        title: BrewfileActionKind.remove.subtitle,
+                        command: removeCommand.command,
+                        copyAccessibilityLabel: "Copy bundle remove command"
+                    )
                 }
             }
         }
@@ -501,15 +494,11 @@ private struct BrewfileAddEntrySheet: View {
                 .accessibilityLabel("Entry Name")
 
             if let commandPreview {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Command Preview")
-                        .font(.headline)
-
-                    Text(commandPreview)
-                        .font(.caption.monospaced())
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                }
+                CommandPreviewField(
+                    title: "Command Preview",
+                    command: commandPreview,
+                    copyAccessibilityLabel: "Copy bundle add command"
+                )
             } else {
                 Text("Enter a supported entry name to preview the Homebrew command.")
                     .foregroundStyle(.secondary)

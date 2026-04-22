@@ -202,10 +202,11 @@ struct OutdatedPackagesView: View {
                     .foregroundStyle(.secondary)
 
                 if let command = viewModel.upgradeAllCommand {
-                    Text(command.command)
-                        .font(.caption.monospaced())
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
+                    CommandPreviewField(
+                        title: "Upgrade Command",
+                        command: command.command,
+                        copyAccessibilityLabel: "Copy bulk upgrade command"
+                    )
                 } else {
                     Text("No upgrade command is available for the current view.")
                         .font(.caption)
@@ -416,7 +417,6 @@ private struct OutdatedPackageDetailView: View {
             Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 16, verticalSpacing: 12) {
                 metadataRow("Installed", package.installedVersionSummary)
                 metadataRow("Current", package.currentVersion)
-                metadataRow("Command", package.upgradeCommand)
 
                 if let pinnedVersion = package.pinnedVersion, !pinnedVersion.isEmpty {
                     metadataRow("Pinned At", pinnedVersion)
@@ -431,12 +431,11 @@ private struct OutdatedPackageDetailView: View {
                 Text(package.upgradeReadinessDescription)
                     .foregroundStyle(.secondary)
 
-                Text(package.upgradeCommand)
-                    .font(.body.monospaced())
-                    .textSelection(.enabled)
-                    .padding(12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                CommandPreviewField(
+                    title: "Upgrade Command",
+                    command: package.upgradeCommand,
+                    copyAccessibilityLabel: "Copy upgrade command"
+                )
 
                 HStack(spacing: 12) {
                     Button("Upgrade Now") {
@@ -476,9 +475,11 @@ private struct OutdatedPackageDetailView: View {
                                 .foregroundStyle(.secondary)
                         }
 
-                        Text(progress.command.command)
-                            .font(.callout.monospaced())
-                            .textSelection(.enabled)
+                        CommandPreviewField(
+                            title: "Executed Command",
+                            command: progress.command.command,
+                            copyAccessibilityLabel: "Copy executed upgrade command"
+                        )
                     }
                 } else {
                     Text("Run an upgrade from this detail pane to stream Homebrew output here.")

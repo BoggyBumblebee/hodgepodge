@@ -28,6 +28,7 @@ final class CatalogViewModel: ObservableObject {
     private var analyticsCache: [CatalogAnalyticsPeriod: CatalogAnalyticsSnapshot] = [:]
     private var analyticsTask: Task<Void, Never>?
     private var actionTask: Task<Void, Never>?
+    private var selectionTask: Task<Void, Never>?
     private var favoritesObserver: FavoritePackageIDsObserver?
     private var logBuffer = CommandLogBuffer()
     private var nextHistoryIdentifier = 0
@@ -64,6 +65,7 @@ final class CatalogViewModel: ObservableObject {
     deinit {
         analyticsTask?.cancel()
         actionTask?.cancel()
+        selectionTask?.cancel()
     }
 
     var filteredPackages: [CatalogPackageSummary] {
@@ -235,15 +237,21 @@ final class CatalogViewModel: ObservableObject {
     }
 
     func selectPackage(_ package: CatalogPackageSummary?) {
-        selectedPackage = package
+        selectionTask?.cancel()
+        selectionTask = Task { @MainActor [weak self] in
+            await Task.yield()
+            guard let self, !Task.isCancelled else {
+                return
+            }
 
-        guard let package else {
-            detailState = .idle
-            return
-        }
+            self.selectedPackage = package
 
-        Task { @MainActor in
-            await loadDetail(for: package)
+            guard let package else {
+                self.detailState = .idle
+                return
+            }
+
+            await self.loadDetail(for: package)
         }
     }
 
