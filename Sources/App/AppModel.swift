@@ -11,7 +11,7 @@ enum InstallationLoadState: Equatable {
 
 @MainActor
 final class AppModel: ObservableObject {
-    @Published var selectedSection: AppSection? = .overview
+    @Published var selectedSection: AppSection? = .catalog
     @Published var installationState: InstallationLoadState = .idle
     @Published var lastOpenedHelpURL: URL?
 

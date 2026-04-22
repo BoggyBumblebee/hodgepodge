@@ -27,7 +27,7 @@ struct RootView: View {
 
     @ViewBuilder
     private var detailView: some View {
-        switch model.selectedSection ?? .overview {
+        switch model.selectedSection ?? .catalog {
         case .overview:
             OverviewView(model: model)
         case .catalog:
@@ -57,8 +57,8 @@ struct RootView: View {
             MaintenanceView(viewModel: maintenanceModel)
         case .brewfile:
             BrewfileView(viewModel: brewfileModel)
-        case .commandCenter, .settings:
-            PlaceholderFeatureView(section: model.selectedSection ?? .overview)
+        case .settings:
+            PlaceholderFeatureView(section: model.selectedSection ?? .catalog)
         }
     }
 }

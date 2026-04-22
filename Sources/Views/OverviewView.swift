@@ -6,9 +6,11 @@ struct OverviewView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                Text("Homebrew Overview")
+                Text("About Brew")
                     .font(.largeTitle)
                     .bold()
+                Text("Homebrew installation details, health, and quick-access help.")
+                    .foregroundStyle(.secondary)
 
                 statusCard
 

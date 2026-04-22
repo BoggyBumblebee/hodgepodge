@@ -1,7 +1,6 @@
 import AppKit
 
 enum AppSection: String, CaseIterable, Identifiable {
-    case overview
     case catalog
     case catalogAnalytics
     case installed
@@ -10,15 +9,13 @@ enum AppSection: String, CaseIterable, Identifiable {
     case taps
     case brewfile
     case maintenance
-    case commandCenter
     case settings
+    case overview
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .overview:
-            "Overview"
         case .catalog:
             "Catalog"
         case .catalogAnalytics:
@@ -35,17 +32,15 @@ enum AppSection: String, CaseIterable, Identifiable {
             "Brewfile"
         case .maintenance:
             "Maintenance"
-        case .commandCenter:
-            "Command Center"
         case .settings:
             "Settings"
+        case .overview:
+            "About Brew"
         }
     }
 
     var systemImageName: String {
         switch self {
-        case .overview:
-            "square.grid.2x2"
         case .catalog:
             "books.vertical"
         case .catalogAnalytics:
@@ -62,10 +57,10 @@ enum AppSection: String, CaseIterable, Identifiable {
             "doc.text"
         case .maintenance:
             "stethoscope"
-        case .commandCenter:
-            "terminal"
         case .settings:
             "gearshape"
+        case .overview:
+            "info.circle"
         }
     }
 }

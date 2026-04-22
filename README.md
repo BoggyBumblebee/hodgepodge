@@ -48,7 +48,7 @@ xcodebuild -project Hodgepodge.xcodeproj \
 
 The current project state already includes:
 
-- Homebrew detection and an Overview screen with installation metadata
+- Homebrew detection and an About Brew screen with installation metadata
 - hosted formula and cask catalog browsing with rich detail views
 - a dedicated Catalog Analytics screen for hosted Homebrew analytics leaderboards
 - installed package inventory, outdated packages, package-state filters, and dependency navigation
