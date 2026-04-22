@@ -140,10 +140,6 @@ struct MaintenanceView: View {
 
     private func header(dashboard: BrewMaintenanceDashboard) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Maintenance")
-                .font(.largeTitle)
-                .bold()
-
             Text("Keep the local Homebrew environment healthy with diagnostics, previews, and careful maintenance actions.")
                 .foregroundStyle(.secondary)
 

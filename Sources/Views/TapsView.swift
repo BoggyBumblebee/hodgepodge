@@ -40,6 +40,45 @@ struct TapsView: View {
         } message: {
             Text(pendingUntapCommand?.confirmationMessage ?? "")
         }
+        .navigationTitle("Taps")
+        .searchable(text: $viewModel.searchText, placement: .toolbar, prompt: "Search taps")
+        .toolbar {
+            ToolbarItemGroup {
+                Menu {
+                    ForEach(BrewTapFilterOption.allCases) { filter in
+                        Toggle(isOn: filterBinding(filter)) {
+                            Text(filter.title)
+                        }
+                    }
+
+                    Divider()
+
+                    Button("Clear Filters") {
+                        viewModel.clearFilters()
+                    }
+                    .disabled(viewModel.activeFilters.isEmpty)
+                } label: {
+                    Label(
+                        viewModel.activeFilterCount == 0 ? "Filters" : "Filters (\(viewModel.activeFilterCount))",
+                        systemImage: "line.3.horizontal.decrease.circle"
+                    )
+                }
+
+                Picker("Sort", selection: $viewModel.sortOption) {
+                    ForEach(BrewTapSortOption.allCases) { option in
+                        Text(option.title).tag(option)
+                    }
+                }
+                .pickerStyle(.menu)
+
+                Button {
+                    viewModel.refreshTaps()
+                } label: {
+                    Label("Refresh", systemImage: "arrow.clockwise")
+                }
+                .keyboardShortcut("r", modifiers: [.command])
+            }
+        }
     }
 
     private var sidebar: some View {
@@ -112,51 +151,10 @@ struct TapsView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Taps")
-                .font(.largeTitle)
-                .bold()
-
             Text("Inspect installed taps, add new ones, and remove taps you no longer need.")
                 .foregroundStyle(.secondary)
 
-            TextField("Search taps", text: $viewModel.searchText)
-                .textFieldStyle(.roundedBorder)
-                .accessibilityLabel("Search taps")
-
             HStack(spacing: 12) {
-                Menu {
-                    ForEach(BrewTapFilterOption.allCases) { filter in
-                        Toggle(isOn: filterBinding(filter)) {
-                            Text(filter.title)
-                        }
-                    }
-
-                    Divider()
-
-                    Button("Clear Filters") {
-                        viewModel.clearFilters()
-                    }
-                    .disabled(viewModel.activeFilters.isEmpty)
-                } label: {
-                    Label(
-                        viewModel.activeFilterCount == 0 ? "Filters" : "Filters (\(viewModel.activeFilterCount))",
-                        systemImage: "line.3.horizontal.decrease.circle"
-                    )
-                }
-
-                Picker("Sort Taps", selection: $viewModel.sortOption) {
-                    ForEach(BrewTapSortOption.allCases) { option in
-                        Text(option.title).tag(option)
-                    }
-                }
-                .pickerStyle(.menu)
-                .frame(maxWidth: 180)
-
-                Button("Refresh Taps") {
-                    viewModel.refreshTaps()
-                }
-                .keyboardShortcut("r", modifiers: [.command, .shift])
-
                 if case .loaded(let taps) = viewModel.tapsState {
                     Text("\(taps.count) taps")
                         .font(.caption)

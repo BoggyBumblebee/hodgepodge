@@ -45,6 +45,45 @@ struct ServicesView: View {
         } message: {
             Text(pendingAction?.confirmationMessage ?? "")
         }
+        .navigationTitle("Services")
+        .searchable(text: $viewModel.searchText, placement: .toolbar, prompt: "Search services")
+        .toolbar {
+            ToolbarItemGroup {
+                Menu {
+                    ForEach(BrewServiceFilterOption.allCases) { filter in
+                        Toggle(isOn: filterBinding(filter)) {
+                            Text(filter.title)
+                        }
+                    }
+
+                    Divider()
+
+                    Button("Clear Filters") {
+                        viewModel.clearFilters()
+                    }
+                    .disabled(viewModel.activeFilters.isEmpty)
+                } label: {
+                    Label(
+                        viewModel.activeFilterCount == 0 ? "Filters" : "Filters (\(viewModel.activeFilterCount))",
+                        systemImage: "line.3.horizontal.decrease.circle"
+                    )
+                }
+
+                Picker("Sort", selection: $viewModel.sortOption) {
+                    ForEach(BrewServiceSortOption.allCases) { option in
+                        Text(option.title).tag(option)
+                    }
+                }
+                .pickerStyle(.menu)
+
+                Button {
+                    viewModel.refreshServices()
+                } label: {
+                    Label("Refresh", systemImage: "arrow.clockwise")
+                }
+                .keyboardShortcut("r", modifiers: [.command])
+            }
+        }
     }
 
     private var sidebar: some View {
@@ -131,55 +170,14 @@ struct ServicesView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Services")
-                .font(.largeTitle)
-                .bold()
-
             Text("Inspect and manage Homebrew background services on this Mac.")
                 .foregroundStyle(.secondary)
-
-            TextField("Search services", text: $viewModel.searchText)
-                .textFieldStyle(.roundedBorder)
-                .accessibilityLabel("Search services")
 
             if !viewModel.stateCounts.isEmpty {
                 BrewServiceStateSummary(counts: viewModel.stateCounts)
             }
 
             HStack(spacing: 12) {
-                Menu {
-                    ForEach(BrewServiceFilterOption.allCases) { filter in
-                        Toggle(isOn: filterBinding(filter)) {
-                            Text(filter.title)
-                        }
-                    }
-
-                    Divider()
-
-                    Button("Clear Filters") {
-                        viewModel.clearFilters()
-                    }
-                    .disabled(viewModel.activeFilters.isEmpty)
-                } label: {
-                    Label(
-                        viewModel.activeFilterCount == 0 ? "Filters" : "Filters (\(viewModel.activeFilterCount))",
-                        systemImage: "line.3.horizontal.decrease.circle"
-                    )
-                }
-
-                Picker("Sort Services", selection: $viewModel.sortOption) {
-                    ForEach(BrewServiceSortOption.allCases) { option in
-                        Text(option.title).tag(option)
-                    }
-                }
-                .pickerStyle(.menu)
-                .frame(maxWidth: 170)
-
-                Button("Refresh Services") {
-                    viewModel.refreshServices()
-                }
-                .keyboardShortcut("r", modifiers: [.command, .control])
-
                 if case .loaded(let services) = viewModel.servicesState {
                     Text("\(services.count) services")
                         .font(.caption)

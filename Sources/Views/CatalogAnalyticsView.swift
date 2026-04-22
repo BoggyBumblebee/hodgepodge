@@ -24,10 +24,6 @@ struct CatalogAnalyticsView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Catalog Analytics")
-                .font(.largeTitle)
-                .bold()
-
             Text("Public Homebrew leaderboard data from the official analytics API.")
                 .foregroundStyle(.secondary)
 

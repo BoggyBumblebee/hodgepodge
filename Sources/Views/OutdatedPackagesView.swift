@@ -47,6 +47,45 @@ struct OutdatedPackagesView: View {
         } message: {
             Text(pendingAction?.confirmationMessage ?? "")
         }
+        .navigationTitle("Outdated")
+        .searchable(text: $viewModel.searchText, placement: .toolbar, prompt: "Search outdated packages")
+        .toolbar {
+            ToolbarItemGroup {
+                Menu {
+                    ForEach(OutdatedPackageFilterOption.allCases) { filter in
+                        Toggle(isOn: filterBinding(filter)) {
+                            Text(filter.title)
+                        }
+                    }
+
+                    Divider()
+
+                    Button("Clear Filters") {
+                        viewModel.clearFilters()
+                    }
+                    .disabled(viewModel.activeFilters.isEmpty)
+                } label: {
+                    Label(
+                        viewModel.activeFilterCount == 0 ? "Filters" : "Filters (\(viewModel.activeFilterCount))",
+                        systemImage: "line.3.horizontal.decrease.circle"
+                    )
+                }
+
+                Picker("Sort", selection: $viewModel.sortOption) {
+                    ForEach(OutdatedPackageSortOption.allCases) { option in
+                        Text(option.title).tag(option)
+                    }
+                }
+                .pickerStyle(.menu)
+
+                Button {
+                    viewModel.refreshPackages()
+                } label: {
+                    Label("Refresh", systemImage: "arrow.clockwise")
+                }
+                .keyboardShortcut("r", modifiers: [.command])
+            }
+        }
     }
 
     private var sidebar: some View {
@@ -136,16 +175,8 @@ struct OutdatedPackagesView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Outdated")
-                .font(.largeTitle)
-                .bold()
-
             Text("Review upgrade candidates from this Mac’s Homebrew installation before taking action.")
                 .foregroundStyle(.secondary)
-
-            TextField("Search outdated packages", text: $viewModel.searchText)
-                .textFieldStyle(.roundedBorder)
-                .accessibilityLabel("Search outdated packages")
 
             Picker("Package Scope", selection: $viewModel.scope) {
                 ForEach(CatalogScope.allCases) { scope in
@@ -155,39 +186,6 @@ struct OutdatedPackagesView: View {
             .pickerStyle(.segmented)
 
             HStack(spacing: 12) {
-                Menu {
-                    ForEach(OutdatedPackageFilterOption.allCases) { filter in
-                        Toggle(isOn: filterBinding(filter)) {
-                            Text(filter.title)
-                        }
-                    }
-
-                    Divider()
-
-                    Button("Clear Filters") {
-                        viewModel.clearFilters()
-                    }
-                    .disabled(viewModel.activeFilters.isEmpty)
-                } label: {
-                    Label(
-                        viewModel.activeFilterCount == 0 ? "Filters" : "Filters (\(viewModel.activeFilterCount))",
-                        systemImage: "line.3.horizontal.decrease.circle"
-                    )
-                }
-
-                Picker("Sort Outdated Packages", selection: $viewModel.sortOption) {
-                    ForEach(OutdatedPackageSortOption.allCases) { option in
-                        Text(option.title).tag(option)
-                    }
-                }
-                .pickerStyle(.menu)
-                .frame(maxWidth: 190)
-
-                Button("Refresh Outdated Packages") {
-                    viewModel.refreshPackages()
-                }
-                .keyboardShortcut("r", modifiers: [.command, .option])
-
                 if case .loaded(let packages) = viewModel.packagesState {
                     Text("\(packages.count) packages")
                         .font(.caption)

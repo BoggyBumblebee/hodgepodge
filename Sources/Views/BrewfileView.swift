@@ -143,10 +143,6 @@ struct BrewfileView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Brewfile")
-                .font(.largeTitle)
-                .bold()
-
             Text("Inspect a Brewfile and run bundle actions against it from the current Mac.")
                 .foregroundStyle(.secondary)
 

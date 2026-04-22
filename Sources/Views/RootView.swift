@@ -21,13 +21,18 @@ struct RootView: View {
             .navigationSplitViewColumnWidth(min: 220, ideal: 240, max: 260)
         } detail: {
             detailView
+                .navigationTitle(currentSection.title)
         }
         .navigationSplitViewStyle(.balanced)
     }
 
+    private var currentSection: AppSection {
+        model.selectedSection ?? .catalog
+    }
+
     @ViewBuilder
     private var detailView: some View {
-        switch model.selectedSection ?? .catalog {
+        switch currentSection {
         case .overview:
             OverviewView(model: model)
         case .catalog:

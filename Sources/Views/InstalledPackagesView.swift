@@ -48,6 +48,45 @@ struct InstalledPackagesView: View {
         } message: { action in
             Text(action.confirmationMessage)
         }
+        .navigationTitle("Installed")
+        .searchable(text: $viewModel.searchText, placement: .toolbar, prompt: "Search installed packages")
+        .toolbar {
+            ToolbarItemGroup {
+                Menu {
+                    ForEach(InstalledPackageFilterOption.allCases) { filter in
+                        Toggle(isOn: filterBinding(filter)) {
+                            Text(filter.title)
+                        }
+                    }
+
+                    Divider()
+
+                    Button("Clear Filters") {
+                        viewModel.clearFilters()
+                    }
+                    .disabled(viewModel.activeFilters.isEmpty)
+                } label: {
+                    Label(
+                        viewModel.activeFilterCount == 0 ? "Filters" : "Filters (\(viewModel.activeFilterCount))",
+                        systemImage: "line.3.horizontal.decrease.circle"
+                    )
+                }
+
+                Picker("Sort", selection: $viewModel.sortOption) {
+                    ForEach(InstalledPackageSortOption.allCases) { option in
+                        Text(option.title).tag(option)
+                    }
+                }
+                .pickerStyle(.menu)
+
+                Button {
+                    viewModel.refreshPackages()
+                } label: {
+                    Label("Refresh", systemImage: "arrow.clockwise")
+                }
+                .keyboardShortcut("r", modifiers: [.command])
+            }
+        }
     }
 
     private var sidebar: some View {
@@ -143,16 +182,8 @@ struct InstalledPackagesView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Installed")
-                .font(.largeTitle)
-                .bold()
-
             Text("Inspect what is currently installed on this Mac through Homebrew.")
                 .foregroundStyle(.secondary)
-
-            TextField("Search installed packages", text: $viewModel.searchText)
-                .textFieldStyle(.roundedBorder)
-                .accessibilityLabel("Search installed packages")
 
             Picker("Package Scope", selection: $viewModel.scope) {
                 ForEach(CatalogScope.allCases) { scope in
@@ -166,39 +197,6 @@ struct InstalledPackagesView: View {
             }
 
             HStack(spacing: 12) {
-                Menu {
-                    ForEach(InstalledPackageFilterOption.allCases) { filter in
-                        Toggle(isOn: filterBinding(filter)) {
-                            Text(filter.title)
-                        }
-                    }
-
-                    Divider()
-
-                    Button("Clear Filters") {
-                        viewModel.clearFilters()
-                    }
-                    .disabled(viewModel.activeFilters.isEmpty)
-                } label: {
-                    Label(
-                        viewModel.activeFilterCount == 0 ? "Filters" : "Filters (\(viewModel.activeFilterCount))",
-                        systemImage: "line.3.horizontal.decrease.circle"
-                    )
-                }
-
-                Picker("Sort Installed Packages", selection: $viewModel.sortOption) {
-                    ForEach(InstalledPackageSortOption.allCases) { option in
-                        Text(option.title).tag(option)
-                    }
-                }
-                .pickerStyle(.menu)
-                .frame(maxWidth: 180)
-
-                Button("Refresh Installed Packages") {
-                    viewModel.refreshPackages()
-                }
-                .keyboardShortcut("r", modifiers: [.command, .shift])
-
                 if case .loaded(let packages) = viewModel.packagesState {
                     Text("\(packages.count) packages")
                         .font(.caption)

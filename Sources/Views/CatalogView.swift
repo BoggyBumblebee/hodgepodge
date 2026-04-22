@@ -35,6 +35,46 @@ struct CatalogView: View {
                 }
             )
         }
+        .navigationTitle("Catalog")
+        .searchable(text: $viewModel.searchText, placement: .toolbar, prompt: "Search formulae and casks")
+        .toolbar {
+            ToolbarItemGroup {
+                Menu {
+                    ForEach(CatalogFilterOption.allCases) { filter in
+                        Toggle(isOn: filterBinding(filter)) {
+                            Text(filter.title)
+                        }
+                    }
+
+                    Divider()
+
+                    Button("Clear Filters") {
+                        viewModel.clearFilters()
+                    }
+                    .disabled(viewModel.activeFilters.isEmpty)
+                } label: {
+                    Label(
+                        viewModel.activeFilterCount == 0 ? "Filters" : "Filters (\(viewModel.activeFilterCount))",
+                        systemImage: "line.3.horizontal.decrease.circle"
+                    )
+                }
+                .accessibilityLabel("Catalog filters")
+
+                Picker("Sort", selection: $viewModel.sortOption) {
+                    ForEach(CatalogSortOption.allCases) { option in
+                        Text(option.title).tag(option)
+                    }
+                }
+                .pickerStyle(.menu)
+
+                Button {
+                    viewModel.refreshCatalog()
+                } label: {
+                    Label("Refresh", systemImage: "arrow.clockwise")
+                }
+                .keyboardShortcut("r", modifiers: [.command])
+            }
+        }
     }
 
     private var sidebar: some View {
@@ -129,16 +169,8 @@ struct CatalogView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Catalog")
-                .font(.largeTitle)
-                .bold()
-
             Text("Browse Homebrew formulae and casks from the hosted API.")
                 .foregroundStyle(.secondary)
-
-            TextField("Search formulae and casks", text: $viewModel.searchText)
-                .textFieldStyle(.roundedBorder)
-                .accessibilityLabel("Search packages")
 
             Picker("Package Scope", selection: $viewModel.scope) {
                 ForEach(CatalogScope.allCases) { scope in
@@ -153,40 +185,6 @@ struct CatalogView: View {
                     isPresentingSaveSearch = true
                 }
                 .disabled(!viewModel.hasSearchConfiguration)
-
-                Menu {
-                    ForEach(CatalogFilterOption.allCases) { filter in
-                        Toggle(isOn: filterBinding(filter)) {
-                            Text(filter.title)
-                        }
-                    }
-
-                    Divider()
-
-                    Button("Clear Filters") {
-                        viewModel.clearFilters()
-                    }
-                    .disabled(viewModel.activeFilters.isEmpty)
-                } label: {
-                    Label(
-                        viewModel.activeFilterCount == 0 ? "Filters" : "Filters (\(viewModel.activeFilterCount))",
-                        systemImage: "line.3.horizontal.decrease.circle"
-                    )
-                }
-                .accessibilityLabel("Catalog filters")
-
-                Picker("Sort Packages", selection: $viewModel.sortOption) {
-                    ForEach(CatalogSortOption.allCases) { option in
-                        Text(option.title).tag(option)
-                    }
-                }
-                .pickerStyle(.menu)
-                .frame(maxWidth: 180)
-
-                Button("Refresh Catalog") {
-                    viewModel.refreshCatalog()
-                }
-                .keyboardShortcut("r", modifiers: [.command, .shift])
 
                 if case .loaded(let packages) = viewModel.packagesState {
                     Text("\(packages.count) packages")
