@@ -3,6 +3,8 @@ import SwiftUI
 
 struct CatalogView: View {
     @ObservedObject var viewModel: CatalogViewModel
+    @State private var isPresentingSaveSearch = false
+    @State private var savedSearchName = ""
 
     var body: some View {
         HSplitView {
@@ -17,11 +19,26 @@ struct CatalogView: View {
         .task {
             viewModel.loadIfNeeded()
         }
+        .sheet(isPresented: $isPresentingSaveSearch) {
+            CatalogSavedSearchSheet(
+                name: $savedSearchName,
+                onSave: {
+                    viewModel.saveCurrentSearch(named: savedSearchName)
+                    savedSearchName = ""
+                    isPresentingSaveSearch = false
+                },
+                onCancel: {
+                    savedSearchName = ""
+                    isPresentingSaveSearch = false
+                }
+            )
+        }
     }
 
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 16) {
             header
+            savedSearchesCard
 
             switch viewModel.packagesState {
             case .idle, .loading:
@@ -43,6 +60,13 @@ struct CatalogView: View {
                         HStack {
                             Text(package.title)
                                 .font(.headline)
+
+                            if viewModel.isFavorite(package) {
+                                Image(systemName: "star.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(.yellow)
+                            }
+
                             Spacer()
                             Text(package.kind.title.dropLast())
                                 .font(.caption)
@@ -110,6 +134,12 @@ struct CatalogView: View {
             .pickerStyle(.segmented)
 
             HStack(spacing: 12) {
+                Button("Save Search...") {
+                    savedSearchName = viewModel.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+                    isPresentingSaveSearch = true
+                }
+                .disabled(!viewModel.hasSearchConfiguration)
+
                 Menu {
                     ForEach(CatalogFilterOption.allCases) { filter in
                         Toggle(isOn: filterBinding(filter)) {
@@ -153,6 +183,44 @@ struct CatalogView: View {
         }
     }
 
+    private var savedSearchesCard: some View {
+        GroupBox("Saved Searches") {
+            VStack(alignment: .leading, spacing: 12) {
+                if viewModel.savedSearches.isEmpty {
+                    Text("Save your current search, scope, filters, and sort order for quick reuse.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(viewModel.savedSearches) { search in
+                        HStack(alignment: .top, spacing: 12) {
+                            Button {
+                                viewModel.applySavedSearch(search)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(search.name)
+                                        .font(.headline)
+                                    Text(search.summary)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .multilineTextAlignment(.leading)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .buttonStyle(.plain)
+
+                            Button {
+                                viewModel.removeSavedSearch(search)
+                            } label: {
+                                Image(systemName: "trash")
+                            }
+                            .buttonStyle(.borderless)
+                            .accessibilityLabel("Delete saved search \(search.name)")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     @ViewBuilder
     private var detail: some View {
         switch viewModel.detailState {
@@ -180,10 +248,14 @@ struct CatalogView: View {
         case .loaded(let detail):
             CatalogDetailView(
                 detail: detail,
+                isFavorite: viewModel.isFavorite(detail),
                 actionState: viewModel.actionState(for: detail),
                 actionLogs: viewModel.actionLogs(for: detail),
                 actionHistory: viewModel.actionHistory(for: detail),
                 hasRunningAction: viewModel.hasRunningAction,
+                toggleFavorite: {
+                    viewModel.toggleFavorite(detail)
+                },
                 refreshAction: {
                     viewModel.refreshSelectedDetail()
                 },
@@ -243,10 +315,12 @@ struct CatalogView: View {
 
 private struct CatalogDetailView: View {
     let detail: CatalogPackageDetail
+    let isFavorite: Bool
     let actionState: CatalogPackageActionState
     let actionLogs: [CatalogPackageActionLogEntry]
     let actionHistory: [CatalogPackageActionHistoryEntry]
     let hasRunningAction: Bool
+    let toggleFavorite: () -> Void
     let refreshAction: () -> Void
     let runAction: (CatalogPackageActionKind, CatalogPackageDetail) -> Void
     let cancelAction: () -> Void
@@ -371,6 +445,19 @@ private struct CatalogDetailView: View {
                 Spacer()
 
                 VStack(alignment: .trailing, spacing: 8) {
+                    Button {
+                        toggleFavorite()
+                    } label: {
+                        Label(
+                            isFavorite ? "Favorite" : "Add Favorite",
+                            systemImage: isFavorite ? "star.fill" : "star"
+                        )
+                    }
+                    .labelStyle(.iconOnly)
+                    .foregroundStyle(isFavorite ? .yellow : .secondary)
+                    .accessibilityLabel(isFavorite ? "Remove from favorites" : "Add to favorites")
+                    .buttonStyle(.borderless)
+
                     Text(detail.kind.title.dropLast())
                         .font(.headline)
                         .padding(.horizontal, 10)
@@ -1015,5 +1102,38 @@ private struct FlowLayout<Data: RandomAccessCollection, Content: View>: View whe
                 content(item)
             }
         }
+    }
+}
+
+private struct CatalogSavedSearchSheet: View {
+    @Binding var name: String
+    let onSave: () -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Save Search")
+                .font(.title2.bold())
+
+            Text("Save the current search text, scope, filters, and sort order for quick reuse.")
+                .foregroundStyle(.secondary)
+
+            TextField("Search name", text: $name)
+                .textFieldStyle(.roundedBorder)
+                .accessibilityLabel("Saved search name")
+
+            HStack {
+                Spacer()
+
+                Button("Cancel", action: onCancel)
+                    .keyboardShortcut(.cancelAction)
+
+                Button("Save", action: onSave)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding(24)
+        .frame(minWidth: 420)
     }
 }

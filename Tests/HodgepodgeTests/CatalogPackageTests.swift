@@ -109,6 +109,7 @@ final class CatalogPackageTests: XCTestCase {
     }
 
     func testFilterAndSortTitlesAreStable() {
+        XCTAssertEqual(CatalogFilterOption.favorites.title, "Favorites")
         XCTAssertEqual(CatalogFilterOption.hasCaveats.title, "Has Caveats")
         XCTAssertEqual(CatalogFilterOption.deprecated.title, "Deprecated")
         XCTAssertEqual(CatalogFilterOption.disabled.title, "Disabled")

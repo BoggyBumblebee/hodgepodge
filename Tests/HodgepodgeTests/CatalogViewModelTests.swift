@@ -101,6 +101,10 @@ final class CatalogViewModelTests: XCTestCase {
         )
         let viewModel = makeViewModel(apiClient: MockCatalogAPIClient(packages: .success([]), details: [:]))
         viewModel.packagesState = .loaded([cask, deprecated, formula])
+        viewModel.favoritePackageIDs = [cask.id]
+
+        viewModel.activeFilters = [.favorites]
+        XCTAssertEqual(viewModel.filteredPackages.map(\.title), ["Zulu"])
 
         viewModel.activeFilters = [.hasCaveats]
         XCTAssertEqual(viewModel.filteredPackages.map(\.title), ["Alpha"])
@@ -252,6 +256,125 @@ final class CatalogViewModelTests: XCTestCase {
         viewModel.refreshSelectedDetail()
 
         XCTAssertEqual(viewModel.detailState, .idle)
+    }
+
+    func testInitLoadsPersistedFavoritesAndSavedSearches() {
+        let package = CatalogPackageSummary.fixture()
+        let savedSearch = CatalogSavedSearch(
+            id: UUID(uuidString: "11111111-1111-1111-1111-111111111111") ?? UUID(),
+            name: "Favorites",
+            searchText: "wget",
+            scope: .formula,
+            activeFilters: [.hasCaveats],
+            sortOption: .tap
+        )
+        let preferencesStore = MockCatalogPreferencesStore(
+            initialSnapshot: CatalogPreferencesSnapshot(
+                favoritePackageIDs: [package.id],
+                savedSearches: [savedSearch]
+            )
+        )
+        let viewModel = makeViewModel(preferencesStore: preferencesStore)
+
+        XCTAssertEqual(viewModel.favoritePackageIDs, [package.id])
+        XCTAssertEqual(viewModel.savedSearches, [savedSearch])
+    }
+
+    func testToggleFavoritePersistsPreferences() {
+        let package = CatalogPackageSummary.fixture()
+        let preferencesStore = MockCatalogPreferencesStore()
+        let viewModel = makeViewModel(preferencesStore: preferencesStore)
+
+        viewModel.toggleFavorite(package)
+
+        XCTAssertEqual(viewModel.favoritePackageIDs, [package.id])
+        XCTAssertEqual(
+            preferencesStore.savedSnapshots.last,
+            CatalogPreferencesSnapshot(
+                favoritePackageIDs: [package.id],
+                savedSearches: []
+            )
+        )
+    }
+
+    func testSaveCurrentSearchPersistsAndReplacesMatchingName() {
+        let existingSearch = CatalogSavedSearch(
+            id: UUID(uuidString: "22222222-2222-2222-2222-222222222222") ?? UUID(),
+            name: "Working Set",
+            searchText: "curl",
+            scope: .all,
+            activeFilters: [],
+            sortOption: .name
+        )
+        let preferencesStore = MockCatalogPreferencesStore(
+            initialSnapshot: CatalogPreferencesSnapshot(
+                favoritePackageIDs: [],
+                savedSearches: [existingSearch]
+            )
+        )
+        let viewModel = makeViewModel(preferencesStore: preferencesStore)
+        viewModel.searchText = "wget"
+        viewModel.scope = .formula
+        viewModel.activeFilters = [.hasCaveats]
+        viewModel.sortOption = .tap
+
+        viewModel.saveCurrentSearch(named: "  working set  ")
+
+        XCTAssertEqual(viewModel.savedSearches.count, 1)
+        XCTAssertEqual(viewModel.savedSearches.first?.id, existingSearch.id)
+        XCTAssertEqual(viewModel.savedSearches.first?.searchText, "wget")
+        XCTAssertEqual(viewModel.savedSearches.first?.scope, .formula)
+        XCTAssertEqual(viewModel.savedSearches.first?.activeFilters, [.hasCaveats])
+        XCTAssertEqual(viewModel.savedSearches.first?.sortOption, .tap)
+        XCTAssertEqual(preferencesStore.savedSnapshots.last?.savedSearches, viewModel.savedSearches)
+    }
+
+    func testApplySavedSearchRestoresCatalogConfiguration() {
+        let savedSearch = CatalogSavedSearch(
+            id: UUID(uuidString: "33333333-3333-3333-3333-333333333333") ?? UUID(),
+            name: "Casks",
+            searchText: "docker",
+            scope: .cask,
+            activeFilters: [.autoUpdates],
+            sortOption: .version
+        )
+        let viewModel = makeViewModel()
+
+        viewModel.applySavedSearch(savedSearch)
+
+        XCTAssertEqual(viewModel.searchText, "docker")
+        XCTAssertEqual(viewModel.scope, .cask)
+        XCTAssertEqual(viewModel.activeFilters, [.autoUpdates])
+        XCTAssertEqual(viewModel.sortOption, .version)
+    }
+
+    func testRemoveSavedSearchPersistsPreferences() {
+        let savedSearch = CatalogSavedSearch(
+            id: UUID(uuidString: "44444444-4444-4444-4444-444444444444") ?? UUID(),
+            name: "Pinned",
+            searchText: "node",
+            scope: .formula,
+            activeFilters: [.deprecated],
+            sortOption: .tap
+        )
+        let preferencesStore = MockCatalogPreferencesStore(
+            initialSnapshot: CatalogPreferencesSnapshot(
+                favoritePackageIDs: ["formula:wget"],
+                savedSearches: [savedSearch]
+            )
+        )
+        let viewModel = makeViewModel(preferencesStore: preferencesStore)
+
+        viewModel.removeSavedSearch(savedSearch)
+
+        XCTAssertTrue(viewModel.savedSearches.isEmpty)
+        XCTAssertEqual(
+            preferencesStore.savedSnapshots.last,
+            CatalogPreferencesSnapshot(
+                favoritePackageIDs: ["formula:wget"],
+                savedSearches: []
+            )
+        )
     }
 
     func testRunActionStoresSuccessStateAndStreamsLogs() async {
@@ -515,13 +638,15 @@ final class CatalogViewModelTests: XCTestCase {
         apiClient: any HomebrewAPIClienting = MockCatalogAPIClient(packages: .success([]), details: [:]),
         commandExecutor: any BrewCommandExecuting = MockBrewCommandExecutor(result: .success(CommandResult(stdout: "", stderr: "", exitCode: 0))),
         historyStore: any CatalogActionHistoryStoring = MockCatalogActionHistoryStore(),
-        historyExporter: any CatalogActionHistoryExporting = MockCatalogActionHistoryExporter()
+        historyExporter: any CatalogActionHistoryExporting = MockCatalogActionHistoryExporter(),
+        preferencesStore: any CatalogPreferencesStoring = MockCatalogPreferencesStore()
     ) -> CatalogViewModel {
         CatalogViewModel(
             apiClient: apiClient,
             commandExecutor: commandExecutor,
             actionHistoryStore: historyStore,
-            actionHistoryExporter: historyExporter
+            actionHistoryExporter: historyExporter,
+            preferencesStore: preferencesStore
         )
     }
 
@@ -563,6 +688,23 @@ final class CatalogViewModelTests: XCTestCase {
         }
 
         return false
+    }
+}
+
+private final class MockCatalogPreferencesStore: CatalogPreferencesStoring, @unchecked Sendable {
+    private let initialSnapshot: CatalogPreferencesSnapshot
+    private(set) var savedSnapshots: [CatalogPreferencesSnapshot] = []
+
+    init(initialSnapshot: CatalogPreferencesSnapshot = .empty) {
+        self.initialSnapshot = initialSnapshot
+    }
+
+    func loadPreferences() -> CatalogPreferencesSnapshot {
+        initialSnapshot
+    }
+
+    func savePreferences(_ snapshot: CatalogPreferencesSnapshot) {
+        savedSnapshots.append(snapshot)
     }
 }
 

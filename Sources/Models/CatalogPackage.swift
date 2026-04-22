@@ -25,7 +25,7 @@ enum CatalogPackageKind: String, CaseIterable, Codable, Equatable, Identifiable,
     }
 }
 
-enum CatalogScope: String, CaseIterable, Equatable, Identifiable, Sendable {
+enum CatalogScope: String, CaseIterable, Codable, Equatable, Identifiable, Sendable {
     case all
     case formula
     case cask
@@ -55,7 +55,8 @@ enum CatalogScope: String, CaseIterable, Equatable, Identifiable, Sendable {
     }
 }
 
-enum CatalogFilterOption: String, CaseIterable, Equatable, Hashable, Identifiable, Sendable {
+enum CatalogFilterOption: String, CaseIterable, Codable, Equatable, Hashable, Identifiable, Sendable {
+    case favorites
     case hasCaveats
     case deprecated
     case disabled
@@ -65,6 +66,8 @@ enum CatalogFilterOption: String, CaseIterable, Equatable, Hashable, Identifiabl
 
     var title: String {
         switch self {
+        case .favorites:
+            "Favorites"
         case .hasCaveats:
             "Has Caveats"
         case .deprecated:
@@ -77,7 +80,7 @@ enum CatalogFilterOption: String, CaseIterable, Equatable, Hashable, Identifiabl
     }
 }
 
-enum CatalogSortOption: String, CaseIterable, Equatable, Identifiable, Sendable {
+enum CatalogSortOption: String, CaseIterable, Codable, Equatable, Identifiable, Sendable {
     case name
     case packageType
     case version

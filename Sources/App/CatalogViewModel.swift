@@ -7,6 +7,8 @@ final class CatalogViewModel: ObservableObject {
     @Published var actionState: CatalogPackageActionState = .idle
     @Published var actionLogs: [CatalogPackageActionLogEntry] = []
     @Published var actionHistory: [CatalogPackageActionHistoryEntry] = []
+    @Published var favoritePackageIDs: Set<String> = []
+    @Published var savedSearches: [CatalogSavedSearch] = []
     @Published var searchText = ""
     @Published var scope: CatalogScope = .all
     @Published var activeFilters: Set<CatalogFilterOption> = []
@@ -17,6 +19,7 @@ final class CatalogViewModel: ObservableObject {
     private let commandExecutor: any BrewCommandExecuting
     private let actionHistoryStore: any CatalogActionHistoryStoring
     private let actionHistoryExporter: any CatalogActionHistoryExporting
+    private let preferencesStore: any CatalogPreferencesStoring
     private var detailCache: [String: CatalogPackageDetail] = [:]
     private var actionTask: Task<Void, Never>?
     private var logBuffer = CommandLogBuffer()
@@ -26,15 +29,22 @@ final class CatalogViewModel: ObservableObject {
         apiClient: any HomebrewAPIClienting,
         commandExecutor: any BrewCommandExecuting,
         actionHistoryStore: any CatalogActionHistoryStoring,
-        actionHistoryExporter: any CatalogActionHistoryExporting
+        actionHistoryExporter: any CatalogActionHistoryExporting,
+        preferencesStore: any CatalogPreferencesStoring
     ) {
         self.apiClient = apiClient
         self.commandExecutor = commandExecutor
         self.actionHistoryStore = actionHistoryStore
         self.actionHistoryExporter = actionHistoryExporter
+        self.preferencesStore = preferencesStore
         let restoredHistory = actionHistoryStore.loadHistory()
         actionHistory = restoredHistory
         nextHistoryIdentifier = (restoredHistory.map { $0.id }.max() ?? -1) + 1
+        let restoredPreferences = preferencesStore.loadPreferences()
+        favoritePackageIDs = Set(restoredPreferences.favoritePackageIDs)
+        savedSearches = restoredPreferences.savedSearches.sorted {
+            $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+        }
     }
 
     deinit {
@@ -71,6 +81,13 @@ final class CatalogViewModel: ObservableObject {
 
     var activeFilterCount: Int {
         activeFilters.count
+    }
+
+    var hasSearchConfiguration: Bool {
+        !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+            scope != .all ||
+            !activeFilters.isEmpty ||
+            sortOption != .name
     }
 
     var hasRunningAction: Bool {
@@ -173,6 +190,59 @@ final class CatalogViewModel: ObservableObject {
 
     func isFilterActive(_ filter: CatalogFilterOption) -> Bool {
         activeFilters.contains(filter)
+    }
+
+    func isFavorite(_ package: CatalogPackageSummary) -> Bool {
+        favoritePackageIDs.contains(package.id)
+    }
+
+    func isFavorite(_ detail: CatalogPackageDetail) -> Bool {
+        favoritePackageIDs.contains(detail.packageID)
+    }
+
+    func toggleFavorite(_ package: CatalogPackageSummary) {
+        toggleFavorite(packageID: package.id)
+    }
+
+    func toggleFavorite(_ detail: CatalogPackageDetail) {
+        toggleFavorite(packageID: detail.packageID)
+    }
+
+    func saveCurrentSearch(named rawName: String) {
+        let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else {
+            return
+        }
+
+        let savedSearch = CatalogSavedSearch(
+            id: existingSavedSearch(named: name)?.id ?? UUID(),
+            name: name,
+            searchText: searchText,
+            scope: scope,
+            activeFilters: activeFilters,
+            sortOption: sortOption
+        )
+
+        savedSearches.removeAll {
+            $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame
+        }
+        savedSearches.append(savedSearch)
+        savedSearches.sort {
+            $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+        }
+        persistPreferences()
+    }
+
+    func applySavedSearch(_ search: CatalogSavedSearch) {
+        searchText = search.searchText
+        scope = search.scope
+        activeFilters = search.activeFilters
+        sortOption = search.sortOption
+    }
+
+    func removeSavedSearch(_ search: CatalogSavedSearch) {
+        savedSearches.removeAll { $0.id == search.id }
+        persistPreferences()
     }
 
     func runAction(_ actionKind: CatalogPackageActionKind, for detail: CatalogPackageDetail) {
@@ -304,6 +374,8 @@ final class CatalogViewModel: ObservableObject {
     private func matchesActiveFilters(for package: CatalogPackageSummary) -> Bool {
         activeFilters.allSatisfy { filter in
             switch filter {
+            case .favorites:
+                favoritePackageIDs.contains(package.id)
             case .hasCaveats:
                 package.hasCaveats
             case .deprecated:
@@ -371,6 +443,31 @@ final class CatalogViewModel: ObservableObject {
         actionLogs = []
     }
 
+    private func toggleFavorite(packageID: String) {
+        if favoritePackageIDs.contains(packageID) {
+            favoritePackageIDs.remove(packageID)
+        } else {
+            favoritePackageIDs.insert(packageID)
+        }
+
+        persistPreferences()
+    }
+
+    private func existingSavedSearch(named name: String) -> CatalogSavedSearch? {
+        savedSearches.first {
+            $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame
+        }
+    }
+
+    private func persistPreferences() {
+        preferencesStore.savePreferences(
+            CatalogPreferencesSnapshot(
+                favoritePackageIDs: favoritePackageIDs.sorted(),
+                savedSearches: savedSearches
+            )
+        )
+    }
+
     private func appendHistoryEntry(
         command: CatalogPackageActionCommand,
         progress: CatalogPackageActionProgress,
@@ -413,7 +510,8 @@ extension CatalogViewModel {
                 runner: runner
             ),
             actionHistoryStore: CatalogActionHistoryStore(),
-            actionHistoryExporter: CatalogActionHistoryExporter()
+            actionHistoryExporter: CatalogActionHistoryExporter(),
+            preferencesStore: CatalogPreferencesStore()
         )
     }
 }

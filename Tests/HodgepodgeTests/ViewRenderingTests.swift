@@ -199,6 +199,17 @@ final class ViewRenderingTests: XCTestCase {
         viewModel.packagesState = .loaded([package])
         viewModel.activeFilters = [.hasCaveats]
         viewModel.sortOption = .tap
+        viewModel.favoritePackageIDs = [package.id]
+        viewModel.savedSearches = [
+            CatalogSavedSearch(
+                id: UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa") ?? UUID(),
+                name: "Caveats",
+                searchText: "wget",
+                scope: .formula,
+                activeFilters: [.hasCaveats],
+                sortOption: .tap
+            )
+        ]
         viewModel.selectedPackage = package
         viewModel.detailState = .loaded(detail)
         let command = detail.actionCommand(for: .fetch)
@@ -511,7 +522,8 @@ final class ViewRenderingTests: XCTestCase {
             apiClient: ViewTestCatalogAPIClient(),
             commandExecutor: ViewTestBrewCommandExecutor(),
             actionHistoryStore: ViewTestCatalogActionHistoryStore(),
-            actionHistoryExporter: ViewTestCatalogActionHistoryExporter()
+            actionHistoryExporter: ViewTestCatalogActionHistoryExporter(),
+            preferencesStore: ViewTestCatalogPreferencesStore()
         )
     }
 
@@ -644,6 +656,14 @@ private struct ViewTestCatalogActionHistoryStore: CatalogActionHistoryStoring {
     }
 
     func saveHistory(_ entries: [CatalogPackageActionHistoryEntry]) {}
+}
+
+private struct ViewTestCatalogPreferencesStore: CatalogPreferencesStoring {
+    func loadPreferences() -> CatalogPreferencesSnapshot {
+        .empty
+    }
+
+    func savePreferences(_ snapshot: CatalogPreferencesSnapshot) {}
 }
 
 @MainActor
