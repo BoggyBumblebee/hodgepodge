@@ -119,6 +119,14 @@ The current project state already includes:
   - saved searches for the catalog
   - notifications for long-running Homebrew actions
 
+### Phase 9: Polish, Settings, and Compatibility - In Progress
+
+- normalize the macOS UI toward Apple's platform conventions, with cleaner layouts, clearer hierarchy, and more consistent controls
+- introduce a proper Settings experience for user-configurable behavior and app preferences
+- identify which preferences belong in Settings versus transient per-screen UI state
+- harden Homebrew command and JSON compatibility so Hodgepodge continues working across supported Homebrew releases starting from today's versions
+- add compatibility-focused tests and defensive decoding around version-sensitive Homebrew behavior
+
 ## Contributing
 
 Contributions are welcome. A good contribution path is:
