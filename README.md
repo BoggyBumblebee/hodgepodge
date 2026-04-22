@@ -1,5 +1,9 @@
 # Hodgepodge
 
+[![CI](https://github.com/BoggyBumblebee/hodgepodge/actions/workflows/ci.yml/badge.svg)](https://github.com/BoggyBumblebee/hodgepodge/actions/workflows/ci.yml)
+[![SonarCloud Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=BoggyBumblebee_hodgepodge&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=BoggyBumblebee_hodgepodge)
+[![SonarCloud Coverage](https://sonarcloud.io/api/project_badges/measure?project=BoggyBumblebee_hodgepodge&metric=coverage)](https://sonarcloud.io/summary/new_code?id=BoggyBumblebee_hodgepodge)
+
 ## About The Project
 
 Hodgepodge is a native macOS SwiftUI application for working with Homebrew in a way that stays transparent to the underlying `brew` tool. The goal is to provide a serious desktop console for package discovery, installed-state inspection, upgrades, services, taps, Brewfiles, and maintenance workflows without relying on Homebrew's private Ruby internals.
