@@ -234,31 +234,12 @@ struct InstalledPackagesView: View {
                     }
                 }
 
-                if !viewModel.exportLogs.isEmpty {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 8) {
-                            ForEach(viewModel.exportLogs) { entry in
-                                HStack(alignment: .top, spacing: 10) {
-                                    Text(logTimestamp(for: entry.timestamp))
-                                        .font(.caption2.monospaced())
-                                        .foregroundStyle(.tertiary)
-
-                                    Text(logLabel(for: entry.kind))
-                                        .font(.caption2.weight(.semibold).monospaced())
-                                        .foregroundStyle(logColor(for: entry.kind))
-
-                                    Text(entry.text)
-                                        .font(.caption.monospaced())
-                                        .textSelection(.enabled)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                }
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .frame(minHeight: 120, maxHeight: 220)
-                    .padding(12)
-                    .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                if viewModel.exportState != .idle || !viewModel.exportLogs.isEmpty {
+                    CommandOutputDisclosure(
+                        entries: viewModel.exportLogs,
+                        isRunning: viewModel.hasRunningExport,
+                        emptyMessage: "Export details will appear here if you choose to inspect Homebrew output."
+                    )
                 }
             }
         }
@@ -327,34 +308,6 @@ struct InstalledPackagesView: View {
         }
     }
 
-    private func logTimestamp(for date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm:ss"
-        return formatter.string(from: date)
-    }
-
-    private func logLabel(for kind: CommandLogKind) -> String {
-        switch kind {
-        case .system:
-            "SYSTEM"
-        case .stdout:
-            "STDOUT"
-        case .stderr:
-            "STDERR"
-        }
-    }
-
-    private func logColor(for kind: CommandLogKind) -> Color {
-        switch kind {
-        case .system:
-            .secondary
-        case .stdout:
-            .green
-        case .stderr:
-            .orange
-        }
-    }
-
     private func scrollSelectionIntoView(using proxy: ScrollViewProxy) {
         guard let selectedID = viewModel.selectedPackage?.id,
               viewModel.filteredPackages.contains(where: { $0.id == selectedID }) else {
@@ -376,11 +329,12 @@ private struct InstalledPackagesExportStatusView: View {
             Text("Use Homebrew's `bundle dump` command to export the currently selected Installed scope.")
                 .foregroundStyle(.secondary)
         case .running(let progress):
-            Label(
-                "Generating since \(progress.startedAt.formatted(date: .omitted, time: .standard))",
-                systemImage: "hourglass"
-            )
-            .foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Generating since \(progress.startedAt.formatted(date: .omitted, time: .standard))")
+                    .foregroundStyle(.secondary)
+            }
         case .succeeded:
             Label(
                 "Brewfile generated successfully.",
@@ -636,36 +590,17 @@ private struct InstalledPackageDetailView: View {
         if actionState != .idle || !actionLogs.isEmpty {
             InstalledPackageCard(title: "Action Output") {
                 VStack(alignment: .leading, spacing: 12) {
-                    if actionState.isRunning {
-                        Button("Cancel", action: onCancelAction)
-                    } else {
-                        Button("Clear Output", action: onClearOutput)
-                    }
+                if actionState.isRunning {
+                    Button("Cancel", action: onCancelAction)
+                } else {
+                    Button("Clear Output", action: onClearOutput)
+                }
 
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 8) {
-                            ForEach(actionLogs) { entry in
-                                HStack(alignment: .top, spacing: 10) {
-                                    Text(entry.timestamp.formatted(date: .omitted, time: .standard))
-                                        .font(.caption2.monospaced())
-                                        .foregroundStyle(.tertiary)
-
-                                    Text(entry.kind.rawValue.uppercased())
-                                        .font(.caption2.weight(.semibold).monospaced())
-                                        .foregroundStyle(logColor(for: entry.kind))
-
-                                    Text(entry.text)
-                                        .font(.caption.monospaced())
-                                        .textSelection(.enabled)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                }
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .frame(minHeight: 120, maxHeight: 220)
-                    .padding(12)
-                    .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                CommandOutputDisclosure(
+                    entries: actionLogs,
+                    isRunning: actionState.isRunning,
+                    emptyMessage: "Action details will appear here if you choose to inspect Homebrew output."
+                )
                 }
             }
         }
@@ -698,16 +633,6 @@ private struct InstalledPackageDetailView: View {
         }
     }
 
-    private func logColor(for kind: CommandLogKind) -> Color {
-        switch kind {
-        case .system:
-            .secondary
-        case .stdout:
-            .green
-        case .stderr:
-            .orange
-        }
-    }
 }
 
 private struct InstalledPackageActionStatusView: View {
@@ -719,11 +644,12 @@ private struct InstalledPackageActionStatusView: View {
             Text("Run package management actions here using your local Homebrew installation.")
                 .foregroundStyle(.secondary)
         case .running(let progress):
-            Label(
-                "\(progress.command.kind.title) started at \(progress.startedAt.formatted(date: .omitted, time: .standard))",
-                systemImage: "hourglass"
-            )
-            .foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("\(progress.command.kind.title) started at \(progress.startedAt.formatted(date: .omitted, time: .standard))")
+                    .foregroundStyle(.secondary)
+            }
         case .succeeded:
             Label(
                 "The package action completed successfully.",

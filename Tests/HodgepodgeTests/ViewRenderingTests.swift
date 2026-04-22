@@ -170,6 +170,66 @@ final class ViewRenderingTests: XCTestCase {
         XCTAssertNotNil(render(SettingsView(model: model)))
     }
 
+    func testCommandOutputDisclosureRendersEmptyAndPopulatedStates() {
+        XCTAssertNotNil(
+            render(
+                CommandOutputDisclosure(
+                    entries: [],
+                    isRunning: true,
+                    emptyMessage: "No output yet.",
+                    initiallyExpanded: true
+                )
+            )
+        )
+
+        XCTAssertNotNil(
+            render(
+                CommandOutputDisclosure(
+                    entries: [
+                        CommandLogEntry(
+                            id: 1,
+                            kind: .stdout,
+                            text: "Downloading...",
+                            timestamp: Date(timeIntervalSince1970: 1_700_000_000)
+                        )
+                    ],
+                    isRunning: false,
+                    emptyMessage: "No output yet.",
+                    initiallyExpanded: true
+                )
+            )
+        )
+    }
+
+    func testCommandLogConsoleViewRendersAllLogKinds() {
+        XCTAssertNotNil(
+            render(
+                CommandLogConsoleView(
+                    entries: [
+                        CommandLogEntry(
+                            id: 1,
+                            kind: .system,
+                            text: "Preparing install",
+                            timestamp: Date(timeIntervalSince1970: 1_700_000_000)
+                        ),
+                        CommandLogEntry(
+                            id: 2,
+                            kind: .stdout,
+                            text: "Downloading...",
+                            timestamp: Date(timeIntervalSince1970: 1_700_000_001)
+                        ),
+                        CommandLogEntry(
+                            id: 3,
+                            kind: .stderr,
+                            text: "Warning...",
+                            timestamp: Date(timeIntervalSince1970: 1_700_000_002)
+                        )
+                    ]
+                )
+            )
+        )
+    }
+
     func testHodgepodgeCommandsBuildsMenuCommands() {
         let commands = HodgepodgeCommands(model: makeModel())
 
@@ -315,6 +375,57 @@ final class ViewRenderingTests: XCTestCase {
                 CatalogView(
                     viewModel: viewModel,
                     installedPackagesViewModel: makeInstalledPackagesModel()
+                )
+            )
+        )
+    }
+
+    func testCatalogViewRendersInstalledPrimaryActionState() {
+        let package = CatalogPackageSummary.fixture()
+        let detail = CatalogPackageDetail.fixture()
+        let viewModel = makeCatalogModel()
+        let installedPackagesViewModel = makeInstalledPackagesModel()
+        viewModel.packagesState = .loaded([package])
+        viewModel.selectedPackage = package
+        viewModel.detailState = .loaded(detail)
+        installedPackagesViewModel.packagesState = .loaded([
+            InstalledPackage(
+                kind: .formula,
+                slug: package.slug,
+                title: package.title,
+                fullName: "homebrew/core/\(package.slug)",
+                subtitle: package.subtitle,
+                version: package.version,
+                homepage: package.homepage,
+                tap: package.tap,
+                installedVersions: [package.version],
+                installedAt: Date(timeIntervalSince1970: 1_700_000_000),
+                linkedVersion: package.version,
+                isPinned: false,
+                isLinked: true,
+                isLeaf: true,
+                isOutdated: false,
+                isInstalledOnRequest: true,
+                isInstalledAsDependency: false,
+                autoUpdates: false,
+                isDeprecated: false,
+                isDisabled: false,
+                directDependencies: [],
+                buildDependencies: [],
+                testDependencies: [],
+                recommendedDependencies: [],
+                optionalDependencies: [],
+                requirements: [],
+                directRuntimeDependencies: [],
+                runtimeDependencies: []
+            )
+        ])
+
+        XCTAssertNotNil(
+            render(
+                CatalogView(
+                    viewModel: viewModel,
+                    installedPackagesViewModel: installedPackagesViewModel
                 )
             )
         )
@@ -765,6 +876,64 @@ final class ViewRenderingTests: XCTestCase {
                 timestamp: Date(timeIntervalSince1970: 1_001)
             )
         ]
+
+        XCTAssertNotNil(render(BrewfileView(viewModel: viewModel)))
+    }
+
+    func testBrewfileViewRendersIdleLoadingAndFailureStates() {
+        let viewModel = makeBrewfileModel()
+
+        viewModel.documentState = .idle
+        XCTAssertNotNil(render(BrewfileView(viewModel: viewModel)))
+
+        viewModel.documentState = .loading
+        XCTAssertNotNil(render(BrewfileView(viewModel: viewModel)))
+
+        viewModel.documentState = .failed("Broken")
+        XCTAssertNotNil(render(BrewfileView(viewModel: viewModel)))
+    }
+
+    func testBrewfileViewRendersActionDetailsWhenLogsExist() {
+        let document = BrewfileDocument.fixture()
+        let viewModel = makeBrewfileModel()
+        viewModel.documentState = .loaded(document)
+        viewModel.selectedFileURL = document.fileURL
+        viewModel.selectedLine = document.lines.first
+        viewModel.actionState = .succeeded(
+            BrewfileActionProgress(
+                command: BrewfileActionCommand(kind: .install, fileURL: document.fileURL),
+                startedAt: Date(timeIntervalSince1970: 1_000),
+                finishedAt: Date(timeIntervalSince1970: 1_030)
+            ),
+            CommandResult(stdout: "Installed\n", stderr: "", exitCode: 0)
+        )
+        viewModel.actionLogs = [
+            CommandLogEntry(
+                id: 0,
+                kind: .stdout,
+                text: "Installing wget...",
+                timestamp: Date(timeIntervalSince1970: 1_001)
+            )
+        ]
+
+        XCTAssertNotNil(render(BrewfileView(viewModel: viewModel)))
+    }
+
+    func testBrewfileViewRendersLoadedOverviewWhenNoLineIsSelected() {
+        let document = BrewfileDocument.fixture()
+        let viewModel = makeBrewfileModel()
+        viewModel.documentState = .loaded(document)
+        viewModel.selectedFileURL = document.fileURL
+        viewModel.selectedLine = nil
+        viewModel.actionState = .failed(
+            BrewfileActionProgress(
+                command: BrewfileActionCommand(kind: .install, fileURL: document.fileURL),
+                startedAt: Date(timeIntervalSince1970: 1_000),
+                finishedAt: Date(timeIntervalSince1970: 1_020)
+            ),
+            "No matching line"
+        )
+        viewModel.actionLogs = []
 
         XCTAssertNotNil(render(BrewfileView(viewModel: viewModel)))
     }

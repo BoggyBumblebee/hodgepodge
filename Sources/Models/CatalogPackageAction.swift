@@ -2,6 +2,7 @@ import Foundation
 
 enum CatalogPackageActionKind: String, CaseIterable, Codable, Equatable, Identifiable, Sendable {
     case install
+    case uninstall
     case fetch
 
     var id: String { rawValue }
@@ -10,18 +11,25 @@ enum CatalogPackageActionKind: String, CaseIterable, Codable, Equatable, Identif
         switch self {
         case .install:
             "Install"
+        case .uninstall:
+            "Uninstall"
         case .fetch:
             "Fetch"
         }
     }
 
     var requiresConfirmation: Bool {
-        self == .install
+        switch self {
+        case .install, .uninstall:
+            true
+        case .fetch:
+            false
+        }
     }
 
     var affectsHomebrewState: Bool {
         switch self {
-        case .install:
+        case .install, .uninstall:
             true
         case .fetch:
             false
@@ -161,6 +169,14 @@ extension CatalogPackageDetail {
                 command: installCommand,
                 arguments: installCommandArguments
             )
+        case .uninstall:
+            CatalogPackageActionCommand(
+                kind: .uninstall,
+                packageID: packageID,
+                packageTitle: title,
+                command: uninstallCommand,
+                arguments: uninstallCommandArguments
+            )
         case .fetch:
             CatalogPackageActionCommand(
                 kind: .fetch,
@@ -174,6 +190,19 @@ extension CatalogPackageDetail {
 
     private var installCommandArguments: [String] {
         brewCommandArguments(subcommand: "install")
+    }
+
+    private var uninstallCommand: String {
+        var command = "brew uninstall "
+        if kind == .cask {
+            command += "--cask "
+        }
+        command += slug
+        return command
+    }
+
+    private var uninstallCommandArguments: [String] {
+        brewCommandArguments(subcommand: "uninstall")
     }
 
     private var fetchCommandArguments: [String] {

@@ -606,13 +606,13 @@ final class CatalogViewModelTests: XCTestCase {
             ),
             notificationCenter: notificationCenter
         )
-        var notificationCount = 0
+        let notificationExpectation = expectation(description: "install notification posted")
         let observer = notificationCenter.addObserver(
             forName: .homebrewStateDidChange,
             object: nil,
             queue: .main
         ) { _ in
-            notificationCount += 1
+            notificationExpectation.fulfill()
         }
         defer {
             notificationCenter.removeObserver(observer)
@@ -626,7 +626,40 @@ final class CatalogViewModelTests: XCTestCase {
             return false
         }
 
-        XCTAssertEqual(notificationCount, 1)
+        await fulfillment(of: [notificationExpectation], timeout: 1)
+    }
+
+    func testSuccessfulUninstallPostsHomebrewStateChangeNotification() async {
+        let detail = CatalogPackageDetail.fixture()
+        let notificationCenter = NotificationCenter()
+        let viewModel = makeViewModel(
+            commandExecutor: MockBrewCommandExecutor(
+                result: .success(CommandResult(stdout: "Uninstalled\n", stderr: "", exitCode: 0))
+            ),
+            notificationCenter: notificationCenter
+        )
+        let notificationExpectation = expectation(description: "uninstall notification posted")
+        let observer = notificationCenter.addObserver(
+            forName: .homebrewStateDidChange,
+            object: nil,
+            queue: .main
+        ) { _ in
+            notificationExpectation.fulfill()
+        }
+        defer {
+            notificationCenter.removeObserver(observer)
+        }
+
+        viewModel.runAction(.uninstall, for: detail)
+        await waitUntil {
+            if case .succeeded = viewModel.actionState {
+                return true
+            }
+            return false
+        }
+
+        await fulfillment(of: [notificationExpectation], timeout: 1)
+        XCTAssertEqual(viewModel.actionState.command, detail.actionCommand(for: .uninstall))
     }
 
     func testRunActionStoresFailureState() async {

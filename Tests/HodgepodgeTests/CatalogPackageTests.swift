@@ -20,8 +20,10 @@ final class CatalogPackageTests: XCTestCase {
         let caskDetail = CatalogPackageDetail.fixture(kind: .cask, slug: "docker-desktop", title: "Docker Desktop")
 
         XCTAssertEqual(CatalogPackageActionKind.install.title, "Install")
+        XCTAssertEqual(CatalogPackageActionKind.uninstall.title, "Uninstall")
         XCTAssertEqual(CatalogPackageActionKind.fetch.title, "Fetch")
         XCTAssertTrue(CatalogPackageActionKind.install.requiresConfirmation)
+        XCTAssertTrue(CatalogPackageActionKind.uninstall.requiresConfirmation)
         XCTAssertFalse(CatalogPackageActionKind.fetch.requiresConfirmation)
 
         XCTAssertEqual(
@@ -42,6 +44,16 @@ final class CatalogPackageTests: XCTestCase {
                 packageTitle: "Docker Desktop",
                 command: "brew install --cask docker-desktop",
                 arguments: ["install", "--cask", "docker-desktop"]
+            )
+        )
+        XCTAssertEqual(
+            formulaDetail.actionCommand(for: .uninstall),
+            CatalogPackageActionCommand(
+                kind: .uninstall,
+                packageID: "formula:wget",
+                packageTitle: "wget",
+                command: "brew uninstall wget",
+                arguments: ["uninstall", "wget"]
             )
         )
         XCTAssertEqual(caskDetail.packageID, "cask:docker-desktop")

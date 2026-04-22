@@ -215,31 +215,12 @@ struct ServicesView: View {
                     }
                 }
 
-                if !viewModel.cleanupLogs.isEmpty {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 8) {
-                            ForEach(viewModel.cleanupLogs) { entry in
-                                HStack(alignment: .top, spacing: 10) {
-                                    Text(entry.timestamp, format: .dateTime.hour().minute().second())
-                                        .font(.caption2.monospaced())
-                                        .foregroundStyle(.tertiary)
-
-                                    Text(entry.kind.rawValue.uppercased())
-                                        .font(.caption2.weight(.semibold).monospaced())
-                                        .foregroundStyle(.secondary)
-
-                                    Text(entry.text)
-                                        .font(.caption.monospaced())
-                                        .textSelection(.enabled)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                }
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .frame(minHeight: 120, maxHeight: 220)
-                    .padding(12)
-                    .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                if viewModel.cleanupState != .idle || !viewModel.cleanupLogs.isEmpty {
+                    CommandOutputDisclosure(
+                        entries: viewModel.cleanupLogs,
+                        isRunning: viewModel.cleanupState.isRunning,
+                        emptyMessage: "Cleanup details will appear here if you choose to inspect Homebrew output."
+                    )
                 }
             }
         }
@@ -312,11 +293,12 @@ private struct BrewServiceCleanupStatusView: View {
             Text("Remove stale Homebrew service registrations that are no longer in use.")
                 .foregroundStyle(.secondary)
         case .running(let progress):
-            Label(
-                "\(progress.command.kind.title) started at \(progress.startedAt.formatted(date: .omitted, time: .standard))",
-                systemImage: "hourglass"
-            )
-            .foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("\(progress.command.kind.title) started at \(progress.startedAt.formatted(date: .omitted, time: .standard))")
+                    .foregroundStyle(.secondary)
+            }
         case .succeeded:
             Label(
                 "Service cleanup completed successfully.",
@@ -461,26 +443,12 @@ private struct BrewServiceDetailView: View {
     }
 
     private var actionLogCard: some View {
-        BrewServiceCard(title: "Live Output") {
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach(actionLogs) { entry in
-                    HStack(alignment: .top, spacing: 10) {
-                        Text(entry.timestamp, format: .dateTime.hour().minute().second())
-                            .font(.caption.monospaced())
-                            .foregroundStyle(.tertiary)
-
-                        Text(entry.kind.rawValue.uppercased())
-                            .font(.caption.monospaced())
-                            .foregroundStyle(.secondary)
-                            .frame(width: 60, alignment: .leading)
-
-                        Text(entry.text)
-                            .font(.caption.monospaced())
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
-            }
+        BrewServiceCard(title: "Action Details") {
+            CommandOutputDisclosure(
+                entries: actionLogs,
+                isRunning: actionState.isRunning,
+                emptyMessage: "Service details will appear here if you choose to inspect Homebrew output."
+            )
         }
     }
 

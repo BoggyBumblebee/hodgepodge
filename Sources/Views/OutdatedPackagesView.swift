@@ -234,16 +234,12 @@ struct OutdatedPackagesView: View {
                     }
                 }
 
-                if !viewModel.upgradeAllLogs.isEmpty {
-                    ScrollView {
-                        Text(renderedUpgradeAllLogs)
-                            .font(.system(.caption, design: .monospaced))
-                            .frame(maxWidth: .infinity, alignment: .topLeading)
-                            .textSelection(.enabled)
-                            .padding(.vertical, 4)
-                    }
-                    .frame(minHeight: 120, maxHeight: 220, alignment: .topLeading)
-                    .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                if viewModel.upgradeAllState != .idle || !viewModel.upgradeAllLogs.isEmpty {
+                    CommandOutputDisclosure(
+                        entries: viewModel.upgradeAllLogs,
+                        isRunning: viewModel.upgradeAllState.isRunning,
+                        emptyMessage: "Upgrade details will appear here if you choose to inspect Homebrew output."
+                    )
                 }
             }
         }
@@ -306,16 +302,6 @@ struct OutdatedPackagesView: View {
         )
     }
 
-    private var renderedUpgradeAllLogs: String {
-        if viewModel.upgradeAllLogs.isEmpty {
-            return "No command output yet."
-        }
-
-        return viewModel.upgradeAllLogs.map { entry in
-            "[\(entry.timestamp.formatted(date: .omitted, time: .shortened))] \(entry.kind.rawValue.uppercased())  \(entry.text)"
-        }
-        .joined(separator: "\n")
-    }
 }
 
 private struct OutdatedUpgradeAllStatusView: View {
@@ -327,11 +313,12 @@ private struct OutdatedUpgradeAllStatusView: View {
             Text("Upgrade all visible outdated packages from this view in one action.")
                 .foregroundStyle(.secondary)
         case .running(let progress):
-            Label(
-                "Upgrading \(progress.command.packageCount) package\(progress.command.packageCount == 1 ? "" : "s") since \(progress.startedAt.formatted(date: .omitted, time: .standard))",
-                systemImage: "hourglass"
-            )
-            .foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Upgrading \(progress.command.packageCount) package\(progress.command.packageCount == 1 ? "" : "s") since \(progress.startedAt.formatted(date: .omitted, time: .standard))")
+                    .foregroundStyle(.secondary)
+            }
         case .succeeded:
             Label(
                 "All selected packages were upgraded successfully.",
@@ -498,15 +485,11 @@ private struct OutdatedPackageDetailView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                ScrollView {
-                    Text(renderedLogs)
-                        .font(.system(.body, design: .monospaced))
-                        .frame(maxWidth: .infinity, alignment: .topLeading)
-                        .textSelection(.enabled)
-                        .padding(.vertical, 4)
-                }
-                .frame(minHeight: 180, alignment: .topLeading)
-                .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                CommandOutputDisclosure(
+                    entries: actionLogs,
+                    isRunning: actionState.isRunning,
+                    emptyMessage: "Upgrade details will appear here if you choose to inspect Homebrew output."
+                )
 
                 HStack {
                     Spacer()
@@ -529,18 +512,6 @@ private struct OutdatedPackageDetailView: View {
                 .textSelection(.enabled)
         }
     }
-
-    private var renderedLogs: String {
-        if actionLogs.isEmpty {
-            return "No command output yet."
-        }
-
-        return actionLogs.map { entry in
-            "[\(entry.timestamp.formatted(date: .omitted, time: .shortened))] \(entry.kind.rawValue.uppercased())  \(entry.text)"
-        }
-        .joined(separator: "\n")
-    }
-
     private var statusTitle: String {
         switch actionState {
         case .idle:

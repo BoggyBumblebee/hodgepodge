@@ -429,31 +429,12 @@ private struct BrewfileLoadedDetailView: View {
                     }
                 }
 
-                if !actionLogs.isEmpty {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 8) {
-                            ForEach(actionLogs) { entry in
-                                HStack(alignment: .top, spacing: 10) {
-                                    Text(logTimestamp(for: entry.timestamp))
-                                        .font(.caption2.monospaced())
-                                        .foregroundStyle(.tertiary)
-
-                                    Text(label(for: entry.kind))
-                                        .font(.caption2.weight(.semibold).monospaced())
-                                        .foregroundStyle(labelColor(for: entry.kind))
-
-                                    Text(entry.text)
-                                        .font(.caption.monospaced())
-                                        .textSelection(.enabled)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                }
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .frame(minHeight: 140, maxHeight: 240)
-                    .padding(12)
-                    .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                if actionState != .idle || !actionLogs.isEmpty {
+                    CommandOutputDisclosure(
+                        entries: actionLogs,
+                        isRunning: actionState.isRunning,
+                        emptyMessage: "Bundle details will appear here if you choose to inspect Homebrew output."
+                    )
                 }
 
                 if let removeCommand {
@@ -491,33 +472,6 @@ private struct BrewfileLoadedDetailView: View {
         }
     }
 
-    private func logTimestamp(for date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm:ss"
-        return formatter.string(from: date)
-    }
-
-    private func label(for kind: CommandLogKind) -> String {
-        switch kind {
-        case .system:
-            "SYSTEM"
-        case .stdout:
-            "STDOUT"
-        case .stderr:
-            "STDERR"
-        }
-    }
-
-    private func labelColor(for kind: CommandLogKind) -> Color {
-        switch kind {
-        case .system:
-            .secondary
-        case .stdout:
-            .green
-        case .stderr:
-            .orange
-        }
-    }
 }
 
 private struct BrewfileAddEntrySheet: View {
@@ -592,11 +546,12 @@ private struct BrewfileActionStatusView: View {
             Text("Run a bundle check, install, or export action to work with this Brewfile on the current Mac.")
                 .foregroundStyle(.secondary)
         case .running(let progress):
-            Label(
-                "\(progress.command.kind.title) has been running since \(progress.startedAt.formatted(date: .omitted, time: .standard)).",
-                systemImage: "hourglass"
-            )
-            .foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("\(progress.command.kind.title) has been running since \(progress.startedAt.formatted(date: .omitted, time: .standard)).")
+                    .foregroundStyle(.secondary)
+            }
         case .succeeded(let progress, _):
             Label(
                 "\(progress.command.kind.title) completed successfully.",

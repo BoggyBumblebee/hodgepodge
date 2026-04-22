@@ -402,15 +402,11 @@ private struct TapDetailView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                ScrollView {
-                    Text(renderedLogs)
-                        .font(.system(.body, design: .monospaced))
-                        .frame(maxWidth: .infinity, alignment: .topLeading)
-                        .textSelection(.enabled)
-                        .padding(.vertical, 4)
-                }
-                .frame(minHeight: 180, alignment: .topLeading)
-                .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                CommandOutputDisclosure(
+                    entries: actionLogs,
+                    isRunning: actionState.isRunning,
+                    emptyMessage: "Action details will appear here if you choose to inspect Homebrew output."
+                )
 
                 HStack {
                     Spacer()
@@ -442,17 +438,6 @@ private struct TapDetailView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var renderedLogs: String {
-        if actionLogs.isEmpty {
-            return "No command output yet."
-        }
-
-        return actionLogs.map { entry in
-            "[\(entry.timestamp.formatted(date: .omitted, time: .shortened))] \(entry.kind.rawValue.uppercased())  \(entry.text)"
-        }
-        .joined(separator: "\n")
     }
 
     private var statusTitle: String {

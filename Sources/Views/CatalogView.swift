@@ -358,6 +358,14 @@ private struct CatalogDetailView: View {
     @State private var pendingConfirmation: CatalogPackageActionCommand?
     @State private var pendingHistoryClearTarget: ActionHistoryClearTarget?
 
+    private var primaryActionKind: CatalogPackageActionKind {
+        isInstalled ? .uninstall : .install
+    }
+
+    private var primaryActionCommand: CatalogPackageActionCommand {
+        detail.actionCommand(for: primaryActionKind)
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
@@ -511,12 +519,12 @@ private struct CatalogDetailView: View {
     private var actionBlock: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
-                Button(isInstalled ? "Installed" : "Install...") {
-                    beginAction(.install)
+                Button(primaryActionKind == .install ? "Install..." : "Uninstall...") {
+                    beginAction(primaryActionKind)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(hasRunningAction || isInstalled)
-                .accessibilityLabel(isInstalled ? "Package is already installed" : "Install package")
+                .disabled(hasRunningAction)
+                .accessibilityLabel(primaryActionKind == .install ? "Install package" : "Uninstall package")
 
                 Button("Fetch") {
                     beginAction(.fetch)
@@ -540,10 +548,10 @@ private struct CatalogDetailView: View {
                         .accessibilityLabel("Open package download URL")
                 }
 
-                Button("Copy Install Command") {
-                    copyToPasteboard(detail.installCommand)
+                Button(primaryActionKind == .install ? "Copy Install Command" : "Copy Uninstall Command") {
+                    copyToPasteboard(primaryActionCommand.command)
                 }
-                .accessibilityLabel("Copy install command")
+                .accessibilityLabel(primaryActionKind == .install ? "Copy install command" : "Copy uninstall command")
 
                 Button("Copy Fetch Command") {
                     copyToPasteboard(detail.fetchCommand)
@@ -554,7 +562,7 @@ private struct CatalogDetailView: View {
                     .accessibilityLabel("Refresh package details")
             }
 
-            commandBlock(title: "Install", command: detail.installCommand)
+            commandBlock(title: primaryActionKind.title, command: primaryActionCommand.command)
             commandBlock(title: "Fetch", command: detail.fetchCommand)
             actionSummary
             actionHistoryBlock
@@ -620,23 +628,17 @@ private struct CatalogDetailView: View {
                 }
 
                 if actionLogs.isEmpty {
-                    Text("Command output will appear here as Homebrew writes to stdout and stderr.")
-                        .foregroundStyle(.secondary)
+                    CommandOutputDisclosure(
+                        entries: actionLogs,
+                        isRunning: actionState.isRunning,
+                        emptyMessage: "Command details will appear here if you choose to inspect Homebrew output."
+                    )
                 } else {
-                    HStack {
-                        Text("\(actionLogs.count) log \(actionLogs.count == 1 ? "entry" : "entries")")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        if actionState.isRunning {
-                            Label("Streaming live", systemImage: "waveform")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.blue)
-                        }
-                    }
-
-                    ActionLogConsole(entries: actionLogs)
-                        .frame(minHeight: 150, maxHeight: 260)
+                    CommandOutputDisclosure(
+                        entries: actionLogs,
+                        isRunning: actionState.isRunning,
+                        emptyMessage: "Command details will appear here if you choose to inspect Homebrew output."
+                    )
                 }
 
                 if !actionState.isRunning {
@@ -915,10 +917,10 @@ private struct CatalogDetailView: View {
             }
 
             HStack(spacing: 12) {
-                Button(entry.command.kind == .install ? "Install Again..." : "Fetch Again") {
-                    beginAction(entry.command.kind)
-                }
-                .disabled(hasRunningAction)
+                    Button("\(entry.command.kind.title)...") {
+                        beginAction(entry.command.kind)
+                    }
+                    .disabled(hasRunningAction)
 
                 Button("Copy Command") {
                     copyToPasteboard(entry.command.command)
@@ -1014,80 +1016,6 @@ private enum ActionHistoryClearTarget {
             "This removes all saved install and fetch history for \(packageTitle)."
         case .all:
             "This removes all saved install and fetch history across every package."
-        }
-    }
-}
-
-private struct ActionLogConsole: View {
-    let entries: [CatalogPackageActionLogEntry]
-
-    var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 8) {
-                    ForEach(entries) { entry in
-                        HStack(alignment: .firstTextBaseline, spacing: 8) {
-                            Text(entry.timestamp, format: .dateTime.hour().minute().second())
-                                .font(.caption2.monospaced())
-                                .foregroundStyle(.tertiary)
-
-                            Text(label(for: entry.kind))
-                                .font(.caption2.weight(.semibold))
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 3)
-                                .background(labelColor(for: entry.kind).opacity(0.15), in: Capsule())
-                                .foregroundStyle(labelColor(for: entry.kind))
-
-                            Text(entry.text)
-                                .font(.caption.monospaced())
-                                .foregroundStyle(.primary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .textSelection(.enabled)
-                        }
-                        .id(entry.id)
-                    }
-                }
-                .padding(12)
-            }
-            .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .onAppear {
-                scrollToLatest(using: proxy)
-            }
-            .onChange(of: entries.last?.id) { _, _ in
-                scrollToLatest(using: proxy)
-            }
-        }
-    }
-
-    private func scrollToLatest(using proxy: ScrollViewProxy) {
-        guard let latestID = entries.last?.id else {
-            return
-        }
-
-        withAnimation(.easeOut(duration: 0.18)) {
-            proxy.scrollTo(latestID, anchor: .bottom)
-        }
-    }
-
-    private func label(for kind: CatalogPackageActionLogKind) -> String {
-        switch kind {
-        case .system:
-            "SYSTEM"
-        case .stdout:
-            "STDOUT"
-        case .stderr:
-            "STDERR"
-        }
-    }
-
-    private func labelColor(for kind: CatalogPackageActionLogKind) -> Color {
-        switch kind {
-        case .system:
-            .secondary
-        case .stdout:
-            .blue
-        case .stderr:
-            .red
         }
     }
 }
