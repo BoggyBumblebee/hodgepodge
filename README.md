@@ -130,6 +130,7 @@ The current project state already includes:
   - progressive-disclosure command output so long-running brew actions show compact status first and expandable details only when needed
   - adaptive Catalog primary actions so installed packages switch from Install to Uninstall automatically
   - inline command-copy affordances wherever command previews are shown, so command copy stays attached to the command itself instead of extra action buttons
+  - balanced middle/detail pane defaults across the operational sections so list browsing and detail reading follow a cleaner 40/60 split
 - normalize the macOS UI toward Apple's platform conventions, with cleaner layouts, clearer hierarchy, and more consistent controls
 - identify which preferences belong in Settings versus transient per-screen UI state
 - harden Homebrew command and JSON compatibility so Hodgepodge continues working across supported Homebrew releases starting from today's versions

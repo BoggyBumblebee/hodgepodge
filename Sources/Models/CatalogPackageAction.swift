@@ -28,7 +28,11 @@ enum CatalogPackageActionKind: String, CaseIterable, Codable, Equatable, Identif
     }
 
     var affectsHomebrewState: Bool {
-        self != .fetch
+        if case .fetch = self {
+            return false
+        }
+
+        return true
     }
 }
 

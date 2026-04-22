@@ -7,10 +7,10 @@ struct InstalledPackagesView: View {
     var body: some View {
         HSplitView {
             sidebar
-                .frame(minWidth: 420, idealWidth: 500, maxWidth: 560)
+                .frame(minWidth: 420, idealWidth: 520, maxWidth: .infinity)
 
             detail
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .frame(minWidth: 500, idealWidth: 780, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .layoutPriority(1)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

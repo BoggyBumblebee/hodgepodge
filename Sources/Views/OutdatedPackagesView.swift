@@ -7,10 +7,10 @@ struct OutdatedPackagesView: View {
     var body: some View {
         HSplitView {
             sidebar
-                .frame(minWidth: 400, idealWidth: 480, maxWidth: 540)
+                .frame(minWidth: 400, idealWidth: 500, maxWidth: .infinity)
 
             detail
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .frame(minWidth: 500, idealWidth: 760, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .layoutPriority(1)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

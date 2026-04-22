@@ -7,10 +7,10 @@ struct MaintenanceView: View {
     var body: some View {
         HSplitView {
             dashboardPane
-                .frame(minWidth: 480, idealWidth: 620, maxWidth: 760)
+                .frame(minWidth: 480, idealWidth: 520, maxWidth: .infinity)
 
             outputPane
-                .frame(minWidth: 360, idealWidth: 460, maxWidth: .infinity)
+                .frame(minWidth: 420, idealWidth: 780, maxWidth: .infinity)
                 .layoutPriority(1)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
