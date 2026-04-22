@@ -338,12 +338,12 @@ private struct BrewServiceDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 titleBlock
+                actionCard
                 metadataCard
                 locationsCard
                 if let command = service.command {
                     commandCard(command)
                 }
-                actionCard
                 if !actionLogs.isEmpty || actionState != .idle {
                     actionLogCard
                 }

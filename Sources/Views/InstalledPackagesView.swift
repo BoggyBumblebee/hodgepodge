@@ -380,8 +380,6 @@ private struct InstalledPackageDetailView: View {
                 titleBlock
                 metadataCard
                 packageStateCard
-                packageActionsCard
-                actionOutputCard
 
                 if let dependencySnapshot {
                     dependencySummaryCard(snapshot: dependencySnapshot)
@@ -471,6 +469,8 @@ private struct InstalledPackageDetailView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+
+            actionBlock
         }
     }
 
@@ -502,19 +502,25 @@ private struct InstalledPackageDetailView: View {
         }
     }
 
-    private var packageActionsCard: some View {
-        InstalledPackageCard(title: "Package Actions") {
-            VStack(alignment: .leading, spacing: 16) {
-                Text(package.actionDescription)
-                    .foregroundStyle(.secondary)
-
-                HStack(alignment: .top, spacing: 12) {
-                    ForEach(package.availableActionKinds) { action in
-                        actionButton(for: action)
-                    }
+    private var actionBlock: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                ForEach(package.availableActionKinds) { action in
+                    actionButton(for: action)
                 }
 
+                if actionState.isRunning {
+                    Button("Cancel", action: onCancelAction)
+                        .keyboardShortcut(.cancelAction)
+                }
+            }
+
+            if actionState != .idle {
                 InstalledPackageActionStatusView(actionState: actionState)
+            }
+
+            if actionState.command != nil {
+                actionLogBlock
             }
         }
     }
@@ -574,27 +580,6 @@ private struct InstalledPackageDetailView: View {
         }
     }
 
-    @ViewBuilder
-    private var actionOutputCard: some View {
-        if actionState != .idle || !actionLogs.isEmpty {
-            InstalledPackageCard(title: "Action Output") {
-                VStack(alignment: .leading, spacing: 12) {
-                if actionState.isRunning {
-                    Button("Cancel", action: onCancelAction)
-                } else {
-                    Button("Clear Output", action: onClearOutput)
-                }
-
-                CommandOutputDisclosure(
-                    entries: actionLogs,
-                    isRunning: actionState.isRunning,
-                    emptyMessage: "Action details will appear here if you choose to inspect Homebrew output."
-                )
-                }
-            }
-        }
-    }
-
     private func metadataRow(_ title: String, _ value: String) -> some View {
         GridRow {
             Text(title)
@@ -622,6 +607,31 @@ private struct InstalledPackageDetailView: View {
         }
     }
 
+    private var actionLogBlock: some View {
+        InstalledPackageCard(title: "Command Output") {
+            VStack(alignment: .leading, spacing: 12) {
+                if let command = actionState.command {
+                    CommandPreviewField(
+                        title: "Executed Command",
+                        command: command.command,
+                        copyAccessibilityLabel: "Copy executed command"
+                    )
+                }
+
+                CommandOutputDisclosure(
+                    entries: actionLogs,
+                    isRunning: actionState.isRunning,
+                    emptyMessage: "Command details will appear here if you choose to inspect Homebrew output."
+                )
+
+                if !actionState.isRunning {
+                    Button("Clear Output", action: onClearOutput)
+                        .accessibilityLabel("Clear command output")
+                }
+            }
+        }
+    }
+
 }
 
 private struct InstalledPackageActionStatusView: View {
@@ -629,9 +639,6 @@ private struct InstalledPackageActionStatusView: View {
 
     var body: some View {
         switch actionState {
-        case .idle:
-            Text("Run package management actions here using your local Homebrew installation.")
-                .foregroundStyle(.secondary)
         case .running(let progress):
             HStack(spacing: 8) {
                 ProgressView()
@@ -660,6 +667,8 @@ private struct InstalledPackageActionStatusView: View {
                 systemImage: "xmark.circle.fill"
             )
             .foregroundStyle(.secondary)
+        case .idle:
+            EmptyView()
         }
     }
 }

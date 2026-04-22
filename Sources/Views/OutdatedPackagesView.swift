@@ -359,8 +359,10 @@ private struct OutdatedPackageDetailView: View {
             VStack(alignment: .leading, spacing: 20) {
                 titleBlock
                 versionCard
-                upgradeCard
-                actionOutputCard
+                if actionState.command != nil || !actionLogs.isEmpty {
+                    actionLogBlock
+                }
+                upgradeGuidanceCard
             }
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -409,6 +411,8 @@ private struct OutdatedPackageDetailView: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
             }
+
+            actionBlock
         }
     }
 
@@ -425,32 +429,36 @@ private struct OutdatedPackageDetailView: View {
         }
     }
 
-    private var upgradeCard: some View {
+    private var actionBlock: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                Button("Upgrade Now") {
+                    onRunAction(.upgrade, package)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(!package.isUpgradeAvailable || actionState.isRunning)
+                .keyboardShortcut("u", modifiers: [.command, .option])
+
+                if actionState.isRunning {
+                    Button("Cancel", action: onCancelAction)
+                        .keyboardShortcut(.cancelAction)
+                }
+            }
+
+            if actionState != .idle {
+                OutdatedPackageActionStatusView(actionState: actionState)
+            }
+        }
+    }
+
+    private var upgradeGuidanceCard: some View {
         OutdatedPackageCard(title: "Upgrade Guidance") {
             VStack(alignment: .leading, spacing: 12) {
-                Text(package.upgradeReadinessDescription)
-                    .foregroundStyle(.secondary)
-
                 CommandPreviewField(
                     title: "Upgrade Command",
                     command: package.upgradeCommand,
                     copyAccessibilityLabel: "Copy upgrade command"
                 )
-
-                HStack(spacing: 12) {
-                    Button("Upgrade Now") {
-                        onRunAction(.upgrade, package)
-                    }
-                    .disabled(!package.isUpgradeAvailable || actionState.isRunning)
-                    .keyboardShortcut("u", modifiers: [.command, .option])
-
-                    if actionState.isRunning {
-                        Button("Cancel Upgrade") {
-                            onCancelAction()
-                        }
-                        .keyboardShortcut(.cancelAction)
-                    }
-                }
 
                 if let blockedReason = package.upgradeBlockedReason {
                     Label(blockedReason, systemImage: "pin")
@@ -461,29 +469,15 @@ private struct OutdatedPackageDetailView: View {
         }
     }
 
-    private var actionOutputCard: some View {
+    private var actionLogBlock: some View {
         OutdatedPackageCard(title: "Upgrade Output") {
             VStack(alignment: .leading, spacing: 12) {
                 if let progress = actionState.progress {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text(statusTitle)
-                                .font(.headline)
-                            Spacer()
-                            Text("Elapsed \(progress.elapsedTime(), format: .number.precision(.fractionLength(1)))s")
-                                .font(.caption.monospaced())
-                                .foregroundStyle(.secondary)
-                        }
-
-                        CommandPreviewField(
-                            title: "Executed Command",
-                            command: progress.command.command,
-                            copyAccessibilityLabel: "Copy executed upgrade command"
-                        )
-                    }
-                } else {
-                    Text("Run an upgrade from this detail pane to stream Homebrew output here.")
-                        .foregroundStyle(.secondary)
+                    CommandPreviewField(
+                        title: "Executed Command",
+                        command: progress.command.command,
+                        copyAccessibilityLabel: "Copy executed upgrade command"
+                    )
                 }
 
                 CommandOutputDisclosure(
@@ -513,18 +507,43 @@ private struct OutdatedPackageDetailView: View {
                 .textSelection(.enabled)
         }
     }
-    private var statusTitle: String {
+}
+
+private struct OutdatedPackageActionStatusView: View {
+    let actionState: OutdatedPackageActionState
+
+    var body: some View {
         switch actionState {
         case .idle:
-            "Idle"
-        case .running:
-            "Running"
+            EmptyView()
+        case .running(let progress):
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("\(progress.command.kind.title) started at \(progress.startedAt.formatted(date: .omitted, time: .standard))")
+                    .foregroundStyle(.secondary)
+            }
         case .succeeded:
-            "Completed"
-        case .failed:
-            "Failed"
+            Label(
+                "The upgrade completed successfully.",
+                systemImage: "checkmark.circle.fill"
+            )
+            .foregroundStyle(.green)
+        case .failed(_, let message):
+            Label(
+                CommandPresentation.friendlyFailureDescription(
+                    message,
+                    fallback: "Homebrew couldn't complete this upgrade."
+                ),
+                systemImage: "exclamationmark.triangle.fill"
+            )
+            .foregroundStyle(.orange)
         case .cancelled:
-            "Cancelled"
+            Label(
+                "The upgrade was cancelled.",
+                systemImage: "xmark.circle.fill"
+            )
+            .foregroundStyle(.secondary)
         }
     }
 }

@@ -259,10 +259,10 @@ private struct TapDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 titleBlock
+                actionCard
                 metricsCard
                 metadataCard
                 packagePreviewCard
-                actionCard
                 outputCard
             }
             .padding(24)
