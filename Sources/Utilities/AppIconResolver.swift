@@ -40,12 +40,23 @@ enum AppIconResolver {
             return icon
         }
 
+        if let bundledIcon = bundledApplicationIcon(bundle: bundle), bundledIcon.isValid {
+            return bundledIcon
+        }
+
         let workspaceIcon = workspace.icon(forFile: bundle.bundlePath)
         if workspaceIcon.isValid {
             return workspaceIcon
         }
 
-        return bundle.image(named: "AppIcon")
+        return nil
+    }
+
+    @MainActor
+    static func bundledApplicationIcon(
+        bundle: any BundleImageResourceQuerying = Bundle.main
+    ) -> NSImage? {
+        bundle.image(named: "AppBrandIcon") ?? bundle.image(named: "AppIcon")
     }
 }
 

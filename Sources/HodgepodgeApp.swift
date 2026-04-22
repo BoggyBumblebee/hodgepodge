@@ -56,6 +56,9 @@ struct HodgepodgeApp: App {
             )
                 .frame(minWidth: 980, minHeight: 640)
                 .task {
+                    if let icon = AppIconResolver.bundledApplicationIcon() {
+                        NSApplication.shared.applicationIconImage = icon
+                    }
                     model.loadIfNeeded()
                 }
         }
