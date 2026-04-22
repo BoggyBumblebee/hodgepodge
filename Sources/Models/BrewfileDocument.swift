@@ -68,6 +68,76 @@ enum BrewfileEntryKind: String, CaseIterable, Codable, Sendable {
             "questionmark.circle"
         }
     }
+
+    static var addableCases: [BrewfileEntryKind] {
+        allCases.filter(\.supportsBundleAdd)
+    }
+
+    var supportsBundleAdd: Bool {
+        bundleAddFlag != nil || self == .brew
+    }
+
+    var supportsBundleRemove: Bool {
+        bundleRemoveFlag != nil
+    }
+
+    var bundleAddFlag: String? {
+        switch self {
+        case .tap:
+            "--tap"
+        case .brew:
+            nil
+        case .cask:
+            "--cask"
+        case .mas:
+            nil
+        case .vscode:
+            "--vscode"
+        case .go:
+            "--go"
+        case .cargo:
+            "--cargo"
+        case .uv:
+            "--uv"
+        case .flatpak:
+            "--flatpak"
+        case .krew:
+            "--krew"
+        case .npm:
+            "--npm"
+        case .unknown:
+            nil
+        }
+    }
+
+    var bundleRemoveFlag: String? {
+        switch self {
+        case .tap:
+            "--tap"
+        case .brew:
+            "--formula"
+        case .cask:
+            "--cask"
+        case .mas:
+            "--mas"
+        case .vscode:
+            "--vscode"
+        case .go:
+            "--go"
+        case .cargo:
+            "--cargo"
+        case .uv:
+            "--uv"
+        case .flatpak:
+            "--flatpak"
+        case .krew:
+            "--krew"
+        case .npm:
+            "--npm"
+        case .unknown:
+            nil
+        }
+    }
 }
 
 enum BrewfileLineCategory: String, CaseIterable, Identifiable, Sendable {

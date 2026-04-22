@@ -88,12 +88,44 @@ final class BrewfileViewModel: ObservableObject {
         return BrewfileActionCommand(kind: .dump, fileURL: selectedFileURL).command
     }
 
+    var removableSelectedEntry: BrewfileEntry? {
+        guard let entry = selectedLine?.entry,
+              entry.kind.supportsBundleRemove else {
+            return nil
+        }
+
+        return entry
+    }
+
     func actionCommand(for kind: BrewfileActionKind) -> BrewfileActionCommand? {
         guard let selectedFileURL else {
             return nil
         }
 
         return BrewfileActionCommand(kind: kind, fileURL: selectedFileURL)
+    }
+
+    func removeCommandForSelectedEntry() -> BrewfileActionCommand? {
+        guard let selectedFileURL,
+              let entry = removableSelectedEntry else {
+            return nil
+        }
+
+        return BrewfileActionCommand(
+            kind: .remove,
+            fileURL: selectedFileURL,
+            entryName: entry.name,
+            entryKind: entry.kind
+        )
+    }
+
+    func addCommandPreview(for draft: BrewfileEntryDraft) -> String? {
+        guard let selectedFileURL,
+              let command = draft.command(fileURL: selectedFileURL) else {
+            return nil
+        }
+
+        return command.command
     }
 
     func loadIfNeeded() {
@@ -150,6 +182,53 @@ final class BrewfileViewModel: ObservableObject {
             command,
             documentURLForReload: selectedFileURL,
             shouldReloadAfterSuccess: actionKind == .install
+        )
+    }
+
+    func runAddEntry(using draft: BrewfileEntryDraft) {
+        guard let selectedFileURL,
+              let command = draft.command(fileURL: selectedFileURL) else {
+            return
+        }
+
+        runAction(
+            command,
+            documentURLForReload: selectedFileURL,
+            shouldReloadAfterSuccess: true
+        )
+    }
+
+    func runPreparedAction(_ command: BrewfileActionCommand) {
+        guard let selectedFileURL else {
+            return
+        }
+
+        switch command.kind {
+        case .install, .remove:
+            runAction(
+                command,
+                documentURLForReload: selectedFileURL,
+                shouldReloadAfterSuccess: true
+            )
+        case .check, .dump, .add:
+            runAction(
+                command,
+                documentURLForReload: selectedFileURL,
+                shouldReloadAfterSuccess: false
+            )
+        }
+    }
+
+    func runRemoveSelectedEntry() {
+        guard let selectedFileURL,
+              let command = removeCommandForSelectedEntry() else {
+            return
+        }
+
+        runAction(
+            command,
+            documentURLForReload: selectedFileURL,
+            shouldReloadAfterSuccess: true
         )
     }
 

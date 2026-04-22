@@ -259,6 +259,99 @@ final class BrewfileViewModelTests: XCTestCase {
         XCTAssertEqual(loader.loadedURLs, [fileURL])
     }
 
+    func testAddEntryRunsBundleAddAndReloadsDocument() async {
+        let fileURL = makeExistingBrewfileURL()
+        let document = BrewfileDocument.fixture(fileURL: fileURL)
+        let loader = RecordingBrewfileLoader(documents: [fileURL: document])
+        let executor = MockBrewfileCommandExecutor(
+            result: .success(CommandResult(stdout: "Added\n", stderr: "", exitCode: 0))
+        )
+        let viewModel = BrewfileViewModel(
+            loader: loader,
+            selectionStore: MockBrewfileSelectionStore(),
+            picker: MockBrewfilePicker(),
+            dumpDestinationPicker: MockBrewfileDumpDestinationPicker(),
+            commandExecutor: executor
+        )
+        viewModel.selectedFileURL = fileURL
+
+        viewModel.runAddEntry(using: BrewfileEntryDraft(kind: .cask, name: "visual-studio-code"))
+        await waitUntil {
+            if case .succeeded = viewModel.actionState {
+                return viewModel.documentState == .loaded(document)
+            }
+            return false
+        }
+
+        XCTAssertEqual(
+            executor.executedArguments,
+            [["bundle", "add", "--cask", "visual-studio-code", "--file", fileURL.path]]
+        )
+        XCTAssertEqual(loader.loadedURLs, [fileURL])
+    }
+
+    func testRemoveSelectedEntryRunsBundleRemoveAndReloadsDocument() async {
+        let fileURL = makeExistingBrewfileURL()
+        let document = BrewfileDocument.fixture(fileURL: fileURL)
+        let loader = RecordingBrewfileLoader(documents: [fileURL: document])
+        let executor = MockBrewfileCommandExecutor(
+            result: .success(CommandResult(stdout: "Removed\n", stderr: "", exitCode: 0))
+        )
+        let viewModel = BrewfileViewModel(
+            loader: loader,
+            selectionStore: MockBrewfileSelectionStore(),
+            picker: MockBrewfilePicker(),
+            dumpDestinationPicker: MockBrewfileDumpDestinationPicker(),
+            commandExecutor: executor
+        )
+        viewModel.selectedFileURL = fileURL
+        viewModel.documentState = .loaded(document)
+        viewModel.selectedLine = BrewfileLine.fixture(
+            lineNumber: 2,
+            entry: BrewfileEntry.fixture(
+                lineNumber: 2,
+                kind: .brew,
+                name: "wget",
+                rawLine: #"brew "wget""#,
+                options: [:]
+            )
+        )
+
+        viewModel.runRemoveSelectedEntry()
+        await waitUntil {
+            if case .succeeded = viewModel.actionState {
+                return loader.loadedURLs == [fileURL]
+            }
+            return false
+        }
+
+        XCTAssertEqual(
+            executor.executedArguments,
+            [["bundle", "remove", "--formula", "wget", "--file", fileURL.path]]
+        )
+        XCTAssertEqual(loader.loadedURLs, [fileURL])
+    }
+
+    func testRemoveCommandForSelectedEntryIsNilForNonEntryLines() {
+        let viewModel = BrewfileViewModel(
+            loader: MockBrewfileLoader(documents: [:]),
+            selectionStore: MockBrewfileSelectionStore(),
+            picker: MockBrewfilePicker(),
+            dumpDestinationPicker: MockBrewfileDumpDestinationPicker(),
+            commandExecutor: MockBrewfileCommandExecutor()
+        )
+        viewModel.selectedFileURL = URL(fileURLWithPath: "/tmp/Brewfile")
+        viewModel.selectedLine = BrewfileLine.fixture(
+            lineNumber: 3,
+            category: .comment,
+            entry: nil,
+            rawLine: "# desktop apps",
+            commentText: "desktop apps"
+        )
+
+        XCTAssertNil(viewModel.removeCommandForSelectedEntry())
+    }
+
     func testRunActionStoresFailureState() async {
         let fileURL = URL(fileURLWithPath: "/tmp/Brewfile")
         let executor = MockBrewfileCommandExecutor(result: .failure(CommandRunnerError.nonZeroExitCode(.init(stdout: "", stderr: "missing formula", exitCode: 1))))

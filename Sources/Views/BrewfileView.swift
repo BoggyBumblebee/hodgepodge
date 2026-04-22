@@ -3,6 +3,8 @@ import SwiftUI
 struct BrewfileView: View {
     @ObservedObject var viewModel: BrewfileViewModel
     @State private var pendingAction: BrewfileActionCommand?
+    @State private var isPresentingAddEntrySheet = false
+    @State private var addEntryDraft = BrewfileEntryDraft()
 
     var body: some View {
         HSplitView {
@@ -16,6 +18,21 @@ struct BrewfileView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task {
             viewModel.loadIfNeeded()
+        }
+        .sheet(isPresented: $isPresentingAddEntrySheet) {
+            BrewfileAddEntrySheet(
+                draft: $addEntryDraft,
+                commandPreview: viewModel.addCommandPreview(for: addEntryDraft),
+                onAdd: {
+                    viewModel.runAddEntry(using: addEntryDraft)
+                    isPresentingAddEntrySheet = false
+                    addEntryDraft = BrewfileEntryDraft()
+                },
+                onCancel: {
+                    isPresentingAddEntrySheet = false
+                    addEntryDraft = BrewfileEntryDraft()
+                }
+            )
         }
         .confirmationDialog(
             pendingAction?.confirmationTitle ?? "Confirm Brewfile Action",
@@ -31,7 +48,7 @@ struct BrewfileView: View {
         ) {
             if let pendingAction {
                 Button(pendingAction.kind.actionLabel) {
-                    viewModel.runAction(pendingAction.kind)
+                    viewModel.runPreparedAction(pendingAction)
                     self.pendingAction = nil
                 }
             }
@@ -227,10 +244,16 @@ struct BrewfileView: View {
                 selectedLine: viewModel.selectedLine,
                 checkCommand: viewModel.actionCommand(for: .check),
                 installCommand: viewModel.actionCommand(for: .install),
+                removeCommand: viewModel.removeCommandForSelectedEntry(),
                 dumpCommandPreview: viewModel.dumpCommandPreview,
                 actionState: viewModel.actionState,
                 actionLogs: viewModel.actionLogs,
                 onRunAction: handleAction,
+                onPresentAddEntry: {
+                    addEntryDraft = BrewfileEntryDraft()
+                    isPresentingAddEntrySheet = true
+                },
+                onConfirmRemoveSelectedEntry: handleRemoveSelectedEntry,
                 onCancelAction: viewModel.cancelAction,
                 onClearOutput: viewModel.clearActionOutput
             )
@@ -259,6 +282,14 @@ struct BrewfileView: View {
             viewModel.runAction(kind)
         }
     }
+
+    private func handleRemoveSelectedEntry() {
+        guard let command = viewModel.removeCommandForSelectedEntry() else {
+            return
+        }
+
+        pendingAction = command
+    }
 }
 
 private struct BrewfileLoadedDetailView: View {
@@ -266,10 +297,13 @@ private struct BrewfileLoadedDetailView: View {
     let selectedLine: BrewfileLine?
     let checkCommand: BrewfileActionCommand?
     let installCommand: BrewfileActionCommand?
+    let removeCommand: BrewfileActionCommand?
     let dumpCommandPreview: String
     let actionState: BrewfileActionState
     let actionLogs: [CommandLogEntry]
     let onRunAction: (BrewfileActionKind) -> Void
+    let onPresentAddEntry: () -> Void
+    let onConfirmRemoveSelectedEntry: () -> Void
     let onCancelAction: () -> Void
     let onClearOutput: () -> Void
 
@@ -381,6 +415,16 @@ private struct BrewfileLoadedDetailView: View {
                     }
                     .disabled(actionState.isRunning)
 
+                    Button(BrewfileActionKind.add.actionLabel) {
+                        onPresentAddEntry()
+                    }
+                    .disabled(actionState.isRunning)
+
+                    Button(BrewfileActionKind.remove.actionLabel) {
+                        onConfirmRemoveSelectedEntry()
+                    }
+                    .disabled(removeCommand == nil || actionState.isRunning)
+
                     if actionState.isRunning {
                         Button("Cancel", action: onCancelAction)
                     } else {
@@ -414,6 +458,18 @@ private struct BrewfileLoadedDetailView: View {
                     .frame(minHeight: 140, maxHeight: 240)
                     .padding(12)
                     .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+
+                if let removeCommand {
+                    Divider()
+
+                    Label(BrewfileActionKind.remove.subtitle, systemImage: BrewfileActionKind.remove.systemImageName)
+                        .foregroundStyle(.secondary)
+
+                    Text(removeCommand.command)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
                 }
             }
         }
@@ -464,6 +520,69 @@ private struct BrewfileLoadedDetailView: View {
             .green
         case .stderr:
             .orange
+        }
+    }
+}
+
+private struct BrewfileAddEntrySheet: View {
+    @Binding var draft: BrewfileEntryDraft
+    let commandPreview: String?
+    let onAdd: () -> Void
+    let onCancel: () -> Void
+    @FocusState private var isNameFieldFocused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Add Brewfile Entry")
+                .font(.title2.bold())
+
+            Text("Use Homebrew Bundle to append a supported dependency entry to the selected Brewfile.")
+                .foregroundStyle(.secondary)
+
+            Picker("Entry Type", selection: $draft.kind) {
+                ForEach(BrewfileEntryKind.addableCases, id: \.self) { kind in
+                    Text(kind.title).tag(kind)
+                }
+            }
+
+            TextField("Entry Name", text: $draft.name)
+                .textFieldStyle(.roundedBorder)
+                .focused($isNameFieldFocused)
+                .accessibilityLabel("Entry Name")
+
+            if let commandPreview {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Command Preview")
+                        .font(.headline)
+
+                    Text(commandPreview)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+            } else {
+                Text("Enter a supported entry name to preview the Homebrew command.")
+                    .foregroundStyle(.secondary)
+            }
+
+            Text("Mac App Store entries aren't included here because `brew bundle add` doesn't currently support `--mas`.")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+
+            HStack {
+                Spacer()
+
+                Button("Cancel", action: onCancel)
+
+                Button("Add Entry", action: onAdd)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(!draft.isValid)
+            }
+        }
+        .padding(24)
+        .frame(minWidth: 460)
+        .task {
+            isNameFieldFocused = true
         }
     }
 }
