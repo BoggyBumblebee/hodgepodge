@@ -60,7 +60,7 @@ The current project state already includes:
 - command history for catalog actions
 - completion notifications for long-running Homebrew actions
 - a dedicated Settings window for launch, notification, Brewfile, and history preferences
-- bundled help documentation and app icon resources
+- comprehensive bundled help documentation and app icon resources
 
 ## Roadmap
 

@@ -10,30 +10,352 @@
     <main class="page">
       <header class="hero" id="top">
         <p class="eyebrow">Hodgepodge Help</p>
-        <h1>Manage Homebrew with confidence.</h1>
+        <h1>Use Homebrew with a clearer, safer macOS interface.</h1>
         <p class="lede">
-          Hodgepodge is a native macOS app for browsing Homebrew packages, checking local state, and running
-          common maintenance tasks without losing the transparency of the underlying `brew` commands.
+          Hodgepodge is a native macOS utility for browsing packages, understanding local Homebrew state,
+          running common package and service actions, working with Brewfiles, and reviewing maintenance tasks
+          without hiding the underlying <code>brew</code> commands.
+        </p>
+        <p class="lede">
+          The app is designed as a single main window with a separate Settings window. It is not a document app,
+          and it manages the Homebrew installation on the current Mac.
         </p>
       </header>
+
+      <nav class="toc" aria-label="Help topics">
+        <h2>Contents</h2>
+        <div class="toc-grid">
+          <a href="#quick-start">Quick Start</a>
+          <a href="#window-layout">Window Layout</a>
+          <a href="#about-brew">About Brew</a>
+          <a href="#catalog">Catalog</a>
+          <a href="#catalog-analytics">Catalog Analytics</a>
+          <a href="#installed">Installed</a>
+          <a href="#outdated">Outdated</a>
+          <a href="#services">Services</a>
+          <a href="#taps">Taps</a>
+          <a href="#brewfile">Brewfile</a>
+          <a href="#maintenance">Maintenance</a>
+          <a href="#settings">Settings</a>
+          <a href="#commands-and-safety">Commands and Safety</a>
+          <a href="#tips">Tips</a>
+          <a href="#troubleshooting">Troubleshooting</a>
+        </div>
+      </nav>
 
       <section id="quick-start">
         <h2>Quick Start</h2>
         <ol>
-          <li>Open the Overview screen to confirm Hodgepodge detected your Homebrew installation correctly.</li>
-          <li>Use Refresh Homebrew to reload the executable path, version, prefix, cellar, repository, and tap count.</li>
-          <li>Open other sections from the sidebar as they become available in later phases.</li>
+          <li>Open <strong>About Brew</strong> first to confirm Hodgepodge has detected your Homebrew installation.</li>
+          <li>Open <strong>Catalog</strong> to browse formulae and casks from the hosted Homebrew API.</li>
+          <li>Use <strong>Installed</strong> to inspect what is on this Mac and to perform most package actions.</li>
+          <li>Use <strong>Outdated</strong> when you want to review or upgrade packages with newer versions available.</li>
+          <li>Open <strong>Settings</strong> to choose launch, notification, Brewfile, and history behavior.</li>
         </ol>
+        <p>
+          If you prefer keyboard access, the Help menu includes entries for this guide, Quick Start, and
+          Troubleshooting.
+        </p>
+      </section>
+
+      <section id="window-layout">
+        <h2>Window Layout</h2>
+        <div class="card-grid">
+          <article class="card">
+            <h3>Sidebar</h3>
+            <p>
+              The sidebar contains the main sections of the app. Choosing a section changes the main content area
+              without opening a new document window.
+            </p>
+          </article>
+          <article class="card">
+            <h3>Center List</h3>
+            <p>
+              Most sections use the center column as a searchable, sortable list. Selecting an item loads its
+              details in the right-hand panel.
+            </p>
+          </article>
+          <article class="card">
+            <h3>Detail Panel</h3>
+            <p>
+              The right-hand panel is where most actions happen. Hodgepodge keeps primary buttons near the top,
+              with metadata, command previews, and output lower down.
+            </p>
+          </article>
+        </div>
+        <ul>
+          <li>Toolbar controls are section-specific and usually include search, refresh, filter, or sort actions.</li>
+          <li>Inline copy icons copy the exact underlying <code>brew</code> command where a command preview is shown.</li>
+          <li>Command output is hidden by default and can be expanded when you need technical detail.</li>
+        </ul>
+      </section>
+
+      <section id="about-brew">
+        <h2>About Brew</h2>
+        <p>
+          <strong>About Brew</strong> is the installation overview. Use it to confirm that Hodgepodge has located
+          the Homebrew executable, repository, prefix, cellar, version, and related installation metadata.
+        </p>
+        <ul>
+          <li>Use <strong>Refresh Homebrew</strong> if the installation details look stale.</li>
+          <li>Use the help buttons there as a quick route into this bundled guide.</li>
+          <li>If Hodgepodge cannot locate Homebrew, start troubleshooting here before using the other sections.</li>
+        </ul>
+      </section>
+
+      <section id="catalog">
+        <h2>Catalog</h2>
+        <p>
+          <strong>Catalog</strong> is the hosted package browser. It shows formulae and casks from the public
+          Homebrew API, not just what is installed on this Mac.
+        </p>
+        <div class="card-grid">
+          <article class="card">
+            <h3>What it is for</h3>
+            <ul>
+              <li>Discovering packages</li>
+              <li>Reviewing package detail and metadata</li>
+              <li>Installing or fetching packages</li>
+              <li>Favoriting packages and saving searches</li>
+            </ul>
+          </article>
+          <article class="card">
+            <h3>What to look for</h3>
+            <ul>
+              <li>Package name, type, and install state</li>
+              <li>Homepage and download icons in the header</li>
+              <li>Primary action button that changes based on local state</li>
+              <li>Command history for package actions</li>
+            </ul>
+          </article>
+        </div>
+        <p>
+          If a package is already installed, the primary button changes from <strong>Install</strong> to
+          <strong>Uninstall</strong>. Catalog also stays in sync with local state updates from other sections.
+        </p>
+      </section>
+
+      <section id="catalog-analytics">
+        <h2>Catalog Analytics</h2>
+        <p>
+          <strong>Catalog Analytics</strong> shows leaderboards based on Homebrew's public analytics data,
+          including top installs and common build errors.
+        </p>
+        <ul>
+          <li>Use the period control to switch between the available reporting windows.</li>
+          <li>Installed items are marked and can take you directly to <strong>Installed</strong>.</li>
+          <li>Non-installed items take you to <strong>Catalog</strong> and select the relevant package.</li>
+        </ul>
+      </section>
+
+      <section id="installed">
+        <h2>Installed</h2>
+        <p>
+          <strong>Installed</strong> is the main local inventory view. It reads your installed formulae and casks
+          from Homebrew's local JSON output and presents package state, dependency information, and most package
+          actions.
+        </p>
+        <div class="card-grid">
+          <article class="card">
+            <h3>Use it for</h3>
+            <ul>
+              <li>Reviewing installed formulae and casks</li>
+              <li>Filtering by package state, including favorites</li>
+              <li>Exploring dependency trees and dependents</li>
+              <li>Uninstall, reinstall, link, unlink, pin, and unpin</li>
+            </ul>
+          </article>
+          <article class="card">
+            <h3>Brewfile support</h3>
+            <p>
+              You can generate a Brewfile from the installed inventory here. The default export scope is controlled
+              by Settings.
+            </p>
+          </article>
+        </div>
+        <p>
+          When package state changes here, related sections such as Catalog, Outdated, and Services refresh to stay
+          in sync.
+        </p>
+      </section>
+
+      <section id="outdated">
+        <h2>Outdated</h2>
+        <p>
+          <strong>Outdated</strong> shows installed packages that have a newer version available. Use it to review
+          upgrade opportunities before running them.
+        </p>
+        <ul>
+          <li>Use <strong>Upgrade Now</strong> for a single package.</li>
+          <li>Use <strong>Upgrade All</strong> to act on the currently visible upgradeable list.</li>
+          <li>Pinned packages are shown clearly and cannot be upgraded until unpinned.</li>
+        </ul>
+      </section>
+
+      <section id="services">
+        <h2>Services</h2>
+        <p>
+          <strong>Services</strong> is for Homebrew-managed background services. It combines service list and detail
+          data so you can see status and run service actions from one place.
+        </p>
+        <ul>
+          <li>Start, stop, restart, and kill individual services.</li>
+          <li>Run service cleanup when needed.</li>
+          <li>Use the list to review status, user, and other service metadata.</li>
+        </ul>
+      </section>
+
+      <section id="taps">
+        <h2>Taps</h2>
+        <p>
+          <strong>Taps</strong> lists installed Homebrew taps and shows tap metadata, paths, remotes, and package
+          counts.
+        </p>
+        <ul>
+          <li>Search or sort the currently installed taps.</li>
+          <li>Add a new tap from the toolbar flow.</li>
+          <li>Untap an existing tap from the detail header.</li>
+          <li>Use <strong>Force untap</strong> only when you understand the implications.</li>
+        </ul>
+      </section>
+
+      <section id="brewfile">
+        <h2>Brewfile</h2>
+        <p>
+          <strong>Brewfile</strong> is the bundle-management section. It can open an existing Brewfile, inspect its
+          entries, validate it, install from it, export one, and add or remove supported entries.
+        </p>
+        <div class="card-grid">
+          <article class="card">
+            <h3>Main tasks</h3>
+            <ul>
+              <li>Choose or reopen a Brewfile</li>
+              <li>Run <code>brew bundle check</code></li>
+              <li>Run <code>brew bundle install</code></li>
+              <li>Export or dump a Brewfile</li>
+            </ul>
+          </article>
+          <article class="card">
+            <h3>Good to know</h3>
+            <ul>
+              <li>The selected Brewfile can be restored on launch if that preference is enabled.</li>
+              <li>Entry add and remove actions use Homebrew's own bundle commands rather than hand-editing the file.</li>
+              <li>Unsupported bundle entry kinds remain visible, even when no add action exists for them.</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section id="maintenance">
+        <h2>Maintenance</h2>
+        <p>
+          <strong>Maintenance</strong> centralizes common upkeep commands so you can review the state of Homebrew and
+          run maintenance tasks without dropping straight to Terminal first.
+        </p>
+        <ul>
+          <li>Review configuration and doctor output.</li>
+          <li>Inspect cleanup and autoremove dry runs.</li>
+          <li>Run update, cleanup, autoremove, doctor, and config actions.</li>
+        </ul>
+      </section>
+
+      <section id="settings">
+        <h2>Settings</h2>
+        <p>
+          Hodgepodge uses a dedicated macOS Settings window for app-wide preferences. Open it from the standard app
+          menu just like other native macOS applications.
+        </p>
+        <div class="card-grid">
+          <article class="card">
+            <h3>General</h3>
+            <ul>
+              <li>Choose the default launch section.</li>
+              <li>Control whether the last selected Brewfile is restored.</li>
+            </ul>
+          </article>
+          <article class="card">
+            <h3>Notifications</h3>
+            <ul>
+              <li>Enable or disable completion notifications.</li>
+              <li>Choose whether to notify for all actions or only long-running actions.</li>
+              <li>Choose which categories can raise notifications.</li>
+            </ul>
+          </article>
+          <article class="card">
+            <h3>Brewfile and History</h3>
+            <ul>
+              <li>Set the default Brewfile export scope for the Installed section.</li>
+              <li>Set Catalog command-history retention.</li>
+            </ul>
+          </article>
+        </div>
+        <p>
+          Per-screen state such as search text, filters, selection, and temporary command-output expansion is kept
+          out of Settings on purpose.
+        </p>
+      </section>
+
+      <section id="commands-and-safety">
+        <h2>Commands and Safety</h2>
+        <p>
+          Hodgepodge aims to stay transparent to the underlying Homebrew CLI. Where actions are available, the app
+          can show you the exact command it intends to run.
+        </p>
+        <ul>
+          <li>Primary actions are placed near the top of the detail area for the selected item.</li>
+          <li>Potentially destructive actions are typically confirmed before execution.</li>
+          <li>Raw command output is available, but hidden by default to keep the UI calmer.</li>
+          <li>Command history is stored for Catalog actions and can be reviewed later.</li>
+        </ul>
+      </section>
+
+      <section id="tips">
+        <h2>Tips</h2>
+        <ul>
+          <li>Use favorites and saved searches in Catalog to keep frequently used packages close.</li>
+          <li>Use Installed when you need package state and dependency context, not just package metadata.</li>
+          <li>Use Outdated when you want a cleaner upgrade-focused list than the full Installed inventory.</li>
+          <li>If a command result looks too minimal, expand the command details area to inspect the underlying output.</li>
+          <li>Use About Brew first when something feels generally wrong with the app's Homebrew view.</li>
+        </ul>
       </section>
 
       <section id="troubleshooting">
         <h2>Troubleshooting</h2>
-        <ul>
-          <li>If Homebrew is not detected, install it first or make sure `brew` exists at `/opt/homebrew/bin/brew` or `/usr/local/bin/brew`.</li>
-          <li>If Help does not open, confirm the bundle contains `Help/index.html` and `help.css`.</li>
-          <li>If the app icon looks wrong, rebuild the app and confirm `Assets.car` is present in the final bundle.</li>
-        </ul>
+        <div class="card-grid">
+          <article class="card">
+            <h3>Homebrew is not detected</h3>
+            <ul>
+              <li>Confirm Homebrew is installed on this Mac.</li>
+              <li>Confirm <code>brew</code> exists at a standard location such as <code>/opt/homebrew/bin/brew</code> or <code>/usr/local/bin/brew</code>.</li>
+              <li>Return to About Brew and use Refresh Homebrew.</li>
+            </ul>
+          </article>
+          <article class="card">
+            <h3>A section looks stale</h3>
+            <ul>
+              <li>Use the section refresh control or Command-R.</li>
+              <li>If you just changed package state elsewhere, reopen the section or trigger another refresh.</li>
+              <li>Make sure the underlying Homebrew command actually completed successfully.</li>
+            </ul>
+          </article>
+          <article class="card">
+            <h3>Help does not open</h3>
+            <ul>
+              <li>Confirm the app bundle contains <code>Help/index.html</code> and <code>Help/help.css</code>.</li>
+              <li>Rebuild the app if the resources appear to be missing.</li>
+            </ul>
+          </article>
+        </div>
+        <p>
+          If a command succeeds in Terminal but fails in Hodgepodge, inspect the command details in the app and
+          compare the exact command and output with your terminal run.
+        </p>
       </section>
+
+      <footer class="footer">
+        <a href="#top">Back to top</a>
+      </footer>
     </main>
   </body>
 </html>
