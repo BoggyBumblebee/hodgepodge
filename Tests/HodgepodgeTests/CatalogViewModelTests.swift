@@ -258,6 +258,161 @@ final class CatalogViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.detailState, .idle)
     }
 
+    func testLoadIfNeededLoadsAnalyticsSnapshot() async {
+        let snapshot = CatalogAnalyticsSnapshot(
+            period: .days30,
+            leaderboards: [
+                CatalogAnalyticsLeaderboard(
+                    kind: .formulaInstalls,
+                    period: .days30,
+                    startDate: "2026-03-01",
+                    endDate: "2026-03-30",
+                    totalItems: 10,
+                    totalCount: "12,345",
+                    items: [
+                        CatalogAnalyticsItem(
+                            kind: .formula,
+                            slug: "wget",
+                            rank: 1,
+                            count: "1,200",
+                            percent: "9.72"
+                        )
+                    ]
+                )
+            ]
+        )
+        let viewModel = makeViewModel(
+            apiClient: MockCatalogAPIClient(
+                packages: .success([]),
+                details: [:],
+                analytics: .success(snapshot)
+            )
+        )
+
+        viewModel.loadIfNeeded()
+        await waitUntil {
+            viewModel.analyticsState == .loaded(snapshot)
+        }
+
+        XCTAssertEqual(viewModel.currentAnalyticsSnapshot, snapshot)
+    }
+
+    func testSetAnalyticsPeriodUsesCacheOnSecondSelection() async {
+        let days30 = CatalogAnalyticsSnapshot(
+            period: .days30,
+            leaderboards: [
+                CatalogAnalyticsLeaderboard(
+                    kind: .formulaInstalls,
+                    period: .days30,
+                    startDate: "2026-03-01",
+                    endDate: "2026-03-30",
+                    totalItems: 10,
+                    totalCount: "12,345",
+                    items: []
+                )
+            ]
+        )
+        let days90 = CatalogAnalyticsSnapshot(
+            period: .days90,
+            leaderboards: [
+                CatalogAnalyticsLeaderboard(
+                    kind: .formulaInstalls,
+                    period: .days90,
+                    startDate: "2026-01-01",
+                    endDate: "2026-03-30",
+                    totalItems: 25,
+                    totalCount: "48,000",
+                    items: []
+                )
+            ]
+        )
+        let apiClient = MockCatalogAPIClient(
+            packages: .success([]),
+            details: [:],
+            analyticsByPeriod: [
+                .days30: .success(days30),
+                .days90: .success(days90)
+            ]
+        )
+        let viewModel = makeViewModel(apiClient: apiClient)
+
+        viewModel.loadAnalyticsIfNeeded()
+        await waitUntil {
+            viewModel.analyticsState == .loaded(days30)
+        }
+
+        viewModel.setAnalyticsPeriod(.days90)
+        await waitUntil {
+            viewModel.analyticsState == .loaded(days90)
+        }
+
+        viewModel.setAnalyticsPeriod(.days30)
+        XCTAssertEqual(viewModel.analyticsState, .loaded(days30))
+        XCTAssertEqual(apiClient.fetchAnalyticsCallCount, 2)
+    }
+
+    func testOpenAnalyticsItemInCatalogSelectsMatchingLoadedPackage() async {
+        let package = CatalogPackageSummary.fixture()
+        let detail = CatalogPackageDetail.fixture()
+        let analyticsItem = CatalogAnalyticsItem(
+            kind: .formula,
+            slug: package.slug,
+            rank: 1,
+            count: "1,200",
+            percent: "9.72"
+        )
+        let apiClient = MockCatalogAPIClient(
+            packages: .success([package]),
+            details: [package.id: .success(detail)]
+        )
+        let viewModel = makeViewModel(apiClient: apiClient)
+        viewModel.packagesState = .loaded([package])
+
+        viewModel.openAnalyticsItemInCatalog(analyticsItem)
+        await waitUntil {
+            viewModel.selectedPackage == package && viewModel.detailState == .loaded(detail)
+        }
+
+        XCTAssertEqual(viewModel.selectedPackage, package)
+        XCTAssertEqual(viewModel.detailState, .loaded(detail))
+        XCTAssertEqual(viewModel.searchText, package.slug)
+        XCTAssertEqual(viewModel.scope, .formula)
+        XCTAssertTrue(viewModel.activeFilters.isEmpty)
+    }
+
+    func testOpenAnalyticsItemInCatalogLoadsCatalogWhenNeeded() async {
+        let package = CatalogPackageSummary.fixture()
+        let detail = CatalogPackageDetail.fixture()
+        let analyticsItem = CatalogAnalyticsItem(
+            kind: .formula,
+            slug: package.slug,
+            rank: 1,
+            count: "1,200",
+            percent: "9.72"
+        )
+        let apiClient = MockCatalogAPIClient(
+            packages: .success([package]),
+            details: [package.id: .success(detail)]
+        )
+        let viewModel = makeViewModel(apiClient: apiClient)
+        viewModel.searchText = "old"
+        viewModel.scope = .cask
+        viewModel.activeFilters = [.favorites]
+
+        viewModel.openAnalyticsItemInCatalog(analyticsItem)
+        await waitUntil {
+            viewModel.selectedPackage == package && viewModel.detailState == .loaded(detail)
+        }
+
+        XCTAssertEqual(viewModel.packagesState, .loaded([package]))
+        XCTAssertEqual(viewModel.selectedPackage, package)
+        XCTAssertEqual(viewModel.detailState, .loaded(detail))
+        XCTAssertEqual(viewModel.searchText, package.slug)
+        XCTAssertEqual(viewModel.scope, .formula)
+        XCTAssertTrue(viewModel.activeFilters.isEmpty)
+        XCTAssertEqual(apiClient.fetchCatalogCallCount, 1)
+    }
+
     func testInitLoadsPersistedFavoritesAndSavedSearches() {
         let package = CatalogPackageSummary.fixture()
         let savedSearch = CatalogSavedSearch(
@@ -754,6 +909,10 @@ private final class CyclingCatalogAPIClient: HomebrewAPIClienting, @unchecked Se
         defer { fetchDetailCallCount += 1 }
         return details[min(fetchDetailCallCount, details.count - 1)]
     }
+
+    func fetchAnalytics(period: CatalogAnalyticsPeriod) async throws -> CatalogAnalyticsSnapshot {
+        .empty(for: period)
+    }
 }
 
 private struct MockBrewCommandExecutor: BrewCommandExecuting, Sendable {
@@ -822,15 +981,22 @@ private final class MockCatalogActionHistoryExporter: CatalogActionHistoryExport
 private final class MockCatalogAPIClient: HomebrewAPIClienting, @unchecked Sendable {
     let packages: Result<[CatalogPackageSummary], Error>
     let details: [String: Result<CatalogPackageDetail, Error>]
+    private let analyticsResult: Result<CatalogAnalyticsSnapshot, Error>?
+    private let analyticsResultsByPeriod: [CatalogAnalyticsPeriod: Result<CatalogAnalyticsSnapshot, Error>]
     private(set) var fetchCatalogCallCount = 0
     private(set) var fetchDetailCallCount = 0
+    private(set) var fetchAnalyticsCallCount = 0
 
     init(
         packages: Result<[CatalogPackageSummary], Error>,
-        details: [String: Result<CatalogPackageDetail, Error>]
+        details: [String: Result<CatalogPackageDetail, Error>],
+        analytics: Result<CatalogAnalyticsSnapshot, Error>? = nil,
+        analyticsByPeriod: [CatalogAnalyticsPeriod: Result<CatalogAnalyticsSnapshot, Error>] = [:]
     ) {
         self.packages = packages
         self.details = details
+        analyticsResult = analytics
+        analyticsResultsByPeriod = analyticsByPeriod
     }
 
     func fetchCatalog() async throws -> [CatalogPackageSummary] {
@@ -846,5 +1012,19 @@ private final class MockCatalogAPIClient: HomebrewAPIClienting, @unchecked Senda
         }
 
         return try result.get()
+    }
+
+    func fetchAnalytics(period: CatalogAnalyticsPeriod) async throws -> CatalogAnalyticsSnapshot {
+        fetchAnalyticsCallCount += 1
+
+        if let result = analyticsResultsByPeriod[period] {
+            return try result.get()
+        }
+
+        if let analyticsResult {
+            return try analyticsResult.get()
+        }
+
+        return .empty(for: period)
     }
 }

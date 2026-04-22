@@ -153,7 +153,28 @@ final class InstalledPackagesViewModel: ObservableObject {
         refreshPackages()
     }
 
+    func isInstalled(_ analyticsItem: CatalogAnalyticsItem) -> Bool {
+        installedPackage(for: analyticsItem) != nil
+    }
+
+    func openAnalyticsItem(_ analyticsItem: CatalogAnalyticsItem) {
+        searchText = analyticsItem.slug
+        scope = analyticsItem.kind == .formula ? .formula : .cask
+        activeFilters.removeAll()
+
+        if let package = installedPackage(for: analyticsItem) {
+            selectedPackage = package
+            return
+        }
+
+        refreshPackages(selecting: analyticsItem)
+    }
+
     func refreshPackages() {
+        refreshPackages(selecting: nil)
+    }
+
+    private func refreshPackages(selecting analyticsItem: CatalogAnalyticsItem?) {
         packagesState = .loading
 
         Task { @MainActor [provider] in
@@ -161,7 +182,10 @@ final class InstalledPackagesViewModel: ObservableObject {
                 let packages = try await provider.fetchInstalledPackages()
                 packagesState = .loaded(packages)
 
-                if let selectedPackage,
+                if let analyticsItem,
+                   let package = installedPackage(for: analyticsItem, in: packages) {
+                    selectedPackage = package
+                } else if let selectedPackage,
                    let refreshedSelection = packages.first(where: { $0.id == selectedPackage.id }) {
                     self.selectedPackage = refreshedSelection
                 } else {
@@ -347,6 +371,23 @@ final class InstalledPackagesViewModel: ObservableObject {
             case .autoUpdates:
                 package.autoUpdates
             }
+        }
+    }
+
+    private func installedPackage(for analyticsItem: CatalogAnalyticsItem) -> InstalledPackage? {
+        guard case .loaded(let packages) = packagesState else {
+            return nil
+        }
+
+        return installedPackage(for: analyticsItem, in: packages)
+    }
+
+    private func installedPackage(
+        for analyticsItem: CatalogAnalyticsItem,
+        in packages: [InstalledPackage]
+    ) -> InstalledPackage? {
+        packages.first { package in
+            package.kind == analyticsItem.kind && package.slug == analyticsItem.slug
         }
     }
 

@@ -3,6 +3,7 @@ import AppKit
 enum AppSection: String, CaseIterable, Identifiable {
     case overview
     case catalog
+    case catalogAnalytics
     case installed
     case outdated
     case services
@@ -20,6 +21,8 @@ enum AppSection: String, CaseIterable, Identifiable {
             "Overview"
         case .catalog:
             "Catalog"
+        case .catalogAnalytics:
+            "Catalog Analytics"
         case .installed:
             "Installed"
         case .outdated:
@@ -45,6 +48,8 @@ enum AppSection: String, CaseIterable, Identifiable {
             "square.grid.2x2"
         case .catalog:
             "books.vertical"
+        case .catalogAnalytics:
+            "chart.bar.xaxis"
         case .installed:
             "shippingbox"
         case .outdated:

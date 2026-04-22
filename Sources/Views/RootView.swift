@@ -32,6 +32,19 @@ struct RootView: View {
             OverviewView(model: model)
         case .catalog:
             CatalogView(viewModel: catalogModel)
+        case .catalogAnalytics:
+            CatalogAnalyticsView(
+                viewModel: catalogModel,
+                installedPackagesViewModel: installedPackagesModel,
+                openInstalledPackage: { item in
+                    model.selectedSection = .installed
+                    installedPackagesModel.openAnalyticsItem(item)
+                },
+                openPackageInCatalog: { item in
+                    model.selectedSection = .catalog
+                    catalogModel.openAnalyticsItemInCatalog(item)
+                }
+            )
         case .installed:
             InstalledPackagesView(viewModel: installedPackagesModel)
         case .outdated:

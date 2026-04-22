@@ -17,7 +17,7 @@ struct CatalogView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task {
-            viewModel.loadIfNeeded()
+            viewModel.loadCatalogIfNeeded()
         }
         .sheet(isPresented: $isPresentingSaveSearch) {
             CatalogSavedSearchSheet(
@@ -1058,7 +1058,7 @@ private struct ActionLogConsole: View {
     }
 }
 
-private struct DetailCard<Content: View>: View {
+struct DetailCard<Content: View>: View {
     let title: String?
     let content: Content
 

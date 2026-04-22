@@ -4,6 +4,8 @@ import Foundation
 final class CatalogViewModel: ObservableObject {
     @Published var packagesState: CatalogPackagesLoadState = .idle
     @Published var detailState: CatalogDetailLoadState = .idle
+    @Published var analyticsState: CatalogAnalyticsLoadState = .idle
+    @Published var analyticsPeriod: CatalogAnalyticsPeriod = .days30
     @Published var actionState: CatalogPackageActionState = .idle
     @Published var actionLogs: [CatalogPackageActionLogEntry] = []
     @Published var actionHistory: [CatalogPackageActionHistoryEntry] = []
@@ -21,6 +23,8 @@ final class CatalogViewModel: ObservableObject {
     private let actionHistoryExporter: any CatalogActionHistoryExporting
     private let preferencesStore: any CatalogPreferencesStoring
     private var detailCache: [String: CatalogPackageDetail] = [:]
+    private var analyticsCache: [CatalogAnalyticsPeriod: CatalogAnalyticsSnapshot] = [:]
+    private var analyticsTask: Task<Void, Never>?
     private var actionTask: Task<Void, Never>?
     private var favoritesObserver: FavoritePackageIDsObserver?
     private var logBuffer = CommandLogBuffer()
@@ -53,6 +57,7 @@ final class CatalogViewModel: ObservableObject {
     }
 
     deinit {
+        analyticsTask?.cancel()
         actionTask?.cancel()
     }
 
@@ -99,7 +104,25 @@ final class CatalogViewModel: ObservableObject {
         actionState.isRunning
     }
 
+    var currentAnalyticsSnapshot: CatalogAnalyticsSnapshot? {
+        guard case .loaded(let snapshot) = analyticsState else {
+            return nil
+        }
+
+        return snapshot
+    }
+
     func loadIfNeeded() {
+        if case .idle = packagesState {
+            refreshCatalog()
+        }
+
+        if case .idle = analyticsState {
+            loadAnalyticsIfNeeded()
+        }
+    }
+
+    func loadCatalogIfNeeded() {
         guard case .idle = packagesState else {
             return
         }
@@ -107,7 +130,72 @@ final class CatalogViewModel: ObservableObject {
         refreshCatalog()
     }
 
+    func loadAnalyticsIfNeeded() {
+        if let cached = analyticsCache[analyticsPeriod] {
+            analyticsState = .loaded(cached)
+            return
+        }
+
+        refreshAnalytics()
+    }
+
+    func setAnalyticsPeriod(_ period: CatalogAnalyticsPeriod) {
+        guard analyticsPeriod != period else {
+            return
+        }
+
+        analyticsPeriod = period
+        loadAnalyticsIfNeeded()
+    }
+
+    func refreshAnalytics() {
+        let requestedPeriod = analyticsPeriod
+        analyticsTask?.cancel()
+        analyticsTask = nil
+        analyticsState = .loading(requestedPeriod)
+
+        analyticsTask = Task { @MainActor [apiClient] in
+            defer { analyticsTask = nil }
+
+            do {
+                let snapshot = try await apiClient.fetchAnalytics(period: requestedPeriod)
+                analyticsCache[requestedPeriod] = snapshot
+
+                guard analyticsPeriod == requestedPeriod else {
+                    return
+                }
+
+                analyticsState = .loaded(snapshot)
+            } catch is CancellationError {
+                return
+            } catch {
+                guard analyticsPeriod == requestedPeriod else {
+                    return
+                }
+
+                analyticsState = .failed(requestedPeriod, error.localizedDescription)
+            }
+        }
+    }
+
     func refreshCatalog() {
+        refreshCatalog(selecting: nil)
+    }
+
+    func openAnalyticsItemInCatalog(_ analyticsItem: CatalogAnalyticsItem) {
+        searchText = analyticsItem.slug
+        scope = analyticsItem.kind == .formula ? .formula : .cask
+        activeFilters.removeAll()
+
+        if let package = packageSummary(for: analyticsItem) {
+            selectPackage(package)
+            return
+        }
+
+        refreshCatalog(selecting: analyticsItem)
+    }
+
+    private func refreshCatalog(selecting analyticsItem: CatalogAnalyticsItem?) {
         packagesState = .loading
 
         Task { @MainActor [apiClient] in
@@ -115,7 +203,11 @@ final class CatalogViewModel: ObservableObject {
                 let packages = try await apiClient.fetchCatalog()
                 packagesState = .loaded(packages)
 
-                if let selectedPackage, packages.contains(selectedPackage) {
+                if let analyticsItem,
+                   let package = packageSummary(for: analyticsItem, in: packages) {
+                    selectedPackage = package
+                    await loadDetail(for: package)
+                } else if let selectedPackage, packages.contains(selectedPackage) {
                     await loadDetail(for: selectedPackage)
                 } else {
                     let replacement = packages.first
@@ -461,6 +553,23 @@ final class CatalogViewModel: ObservableObject {
     private func existingSavedSearch(named name: String) -> CatalogSavedSearch? {
         savedSearches.first {
             $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame
+        }
+    }
+
+    private func packageSummary(for analyticsItem: CatalogAnalyticsItem) -> CatalogPackageSummary? {
+        guard case .loaded(let packages) = packagesState else {
+            return nil
+        }
+
+        return packageSummary(for: analyticsItem, in: packages)
+    }
+
+    private func packageSummary(
+        for analyticsItem: CatalogAnalyticsItem,
+        in packages: [CatalogPackageSummary]
+    ) -> CatalogPackageSummary? {
+        return packages.first { package in
+            package.kind == analyticsItem.kind && package.slug == analyticsItem.slug
         }
     }
 

@@ -316,6 +316,68 @@ final class InstalledPackagesViewModelTests: XCTestCase {
         }
     }
 
+    func testOpenAnalyticsItemSelectsMatchingLoadedInstalledPackage() {
+        let package = makePackage(slug: "wget", title: "wget")
+        let analyticsItem = CatalogAnalyticsItem(
+            kind: .formula,
+            slug: "wget",
+            rank: 1,
+            count: "1,200",
+            percent: "9.72"
+        )
+        let viewModel = InstalledPackagesViewModel(
+            provider: MockInstalledPackagesProvider(result: .success([package])),
+            commandExecutor: MockInstalledPackagesCommandExecutor(),
+            destinationPicker: MockBrewfileDumpDestinationPicker()
+        )
+        viewModel.packagesState = .loaded([package])
+
+        viewModel.openAnalyticsItem(analyticsItem)
+
+        XCTAssertEqual(viewModel.selectedPackage, package)
+        XCTAssertEqual(viewModel.searchText, "wget")
+        XCTAssertEqual(viewModel.scope, .formula)
+        XCTAssertTrue(viewModel.activeFilters.isEmpty)
+        XCTAssertTrue(viewModel.isInstalled(analyticsItem))
+    }
+
+    func testOpenAnalyticsItemLoadsInstalledPackagesWhenNeeded() async {
+        let package = makePackage(
+            kind: .cask,
+            slug: "docker-desktop",
+            title: "Docker Desktop"
+        )
+        let analyticsItem = CatalogAnalyticsItem(
+            kind: .cask,
+            slug: "docker-desktop",
+            rank: 1,
+            count: "900",
+            percent: "20.00"
+        )
+        let provider = CountingInstalledPackagesProvider(result: .success([package]))
+        let viewModel = InstalledPackagesViewModel(
+            provider: provider,
+            commandExecutor: MockInstalledPackagesCommandExecutor(),
+            destinationPicker: MockBrewfileDumpDestinationPicker()
+        )
+        viewModel.searchText = "old"
+        viewModel.scope = .formula
+        viewModel.activeFilters = [.favorites]
+
+        viewModel.openAnalyticsItem(analyticsItem)
+        await waitUntil {
+            viewModel.selectedPackage == package
+        }
+
+        XCTAssertEqual(provider.fetchCallCount, 1)
+        XCTAssertEqual(viewModel.packagesState, .loaded([package]))
+        XCTAssertEqual(viewModel.selectedPackage, package)
+        XCTAssertEqual(viewModel.searchText, "docker-desktop")
+        XCTAssertEqual(viewModel.scope, .cask)
+        XCTAssertTrue(viewModel.activeFilters.isEmpty)
+        XCTAssertTrue(viewModel.isInstalled(analyticsItem))
+    }
+
     func testGenerateBrewfileUsesDestinationPickerAndRunsDumpForScope() async {
         let destinationURL = URL(fileURLWithPath: "/tmp/Brewfile-formulae")
         let executor = MockInstalledPackagesCommandExecutor(

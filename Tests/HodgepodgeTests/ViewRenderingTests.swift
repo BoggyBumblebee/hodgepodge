@@ -56,6 +56,20 @@ final class ViewRenderingTests: XCTestCase {
             )
         ))
 
+        model.selectedSection = .catalogAnalytics
+        XCTAssertNotNil(render(
+            RootView(
+                model: model,
+                catalogModel: catalogModel,
+                installedPackagesModel: installedPackagesModel,
+                outdatedPackagesModel: outdatedPackagesModel,
+                servicesModel: servicesModel,
+                maintenanceModel: maintenanceModel,
+                tapsModel: tapsModel,
+                brewfileModel: brewfileModel
+            )
+        ))
+
         model.selectedSection = .installed
         XCTAssertNotNil(render(
             RootView(
@@ -210,6 +224,47 @@ final class ViewRenderingTests: XCTestCase {
                 sortOption: .tap
             )
         ]
+        viewModel.analyticsState = .loaded(
+            CatalogAnalyticsSnapshot(
+                period: .days30,
+                leaderboards: [
+                    CatalogAnalyticsLeaderboard(
+                        kind: .formulaInstalls,
+                        period: .days30,
+                        startDate: "2026-03-01",
+                        endDate: "2026-03-30",
+                        totalItems: 10,
+                        totalCount: "12,345",
+                        items: [
+                            CatalogAnalyticsItem(
+                                kind: .formula,
+                                slug: "wget",
+                                rank: 1,
+                                count: "1,200",
+                                percent: "9.72"
+                            )
+                        ]
+                    ),
+                    CatalogAnalyticsLeaderboard(
+                        kind: .caskInstalls,
+                        period: .days30,
+                        startDate: "2026-03-01",
+                        endDate: "2026-03-30",
+                        totalItems: 8,
+                        totalCount: "4,500",
+                        items: [
+                            CatalogAnalyticsItem(
+                                kind: .cask,
+                                slug: "docker-desktop",
+                                rank: 1,
+                                count: "900",
+                                percent: "20.00"
+                            )
+                        ]
+                    )
+                ]
+            )
+        )
         viewModel.selectedPackage = package
         viewModel.detailState = .loaded(detail)
         let command = detail.actionCommand(for: .fetch)
@@ -245,6 +300,80 @@ final class ViewRenderingTests: XCTestCase {
         ]
 
         XCTAssertNotNil(render(CatalogView(viewModel: viewModel)))
+    }
+
+    func testCatalogAnalyticsViewRendersLoadedState() {
+        let package = CatalogPackageSummary.fixture()
+        let viewModel = makeCatalogModel()
+        let installedPackagesViewModel = makeInstalledPackagesModel()
+        viewModel.packagesState = .loaded([package])
+        installedPackagesViewModel.packagesState = .loaded([
+            InstalledPackage(
+                kind: .formula,
+                slug: package.slug,
+                title: package.title,
+                fullName: package.slug,
+                subtitle: package.subtitle,
+                version: package.version,
+                homepage: package.homepage,
+                tap: package.tap,
+                installedVersions: [package.version],
+                installedAt: Date(timeIntervalSince1970: 1_700_000_000),
+                linkedVersion: package.version,
+                isPinned: false,
+                isLinked: true,
+                isLeaf: true,
+                isOutdated: false,
+                isInstalledOnRequest: true,
+                isInstalledAsDependency: false,
+                autoUpdates: false,
+                isDeprecated: false,
+                isDisabled: false,
+                directDependencies: [],
+                buildDependencies: [],
+                testDependencies: [],
+                recommendedDependencies: [],
+                optionalDependencies: [],
+                requirements: [],
+                directRuntimeDependencies: [],
+                runtimeDependencies: []
+            )
+        ])
+        viewModel.analyticsState = .loaded(
+            CatalogAnalyticsSnapshot(
+                period: .days30,
+                leaderboards: [
+                    CatalogAnalyticsLeaderboard(
+                        kind: .formulaInstalls,
+                        period: .days30,
+                        startDate: "2026-03-01",
+                        endDate: "2026-03-30",
+                        totalItems: 10,
+                        totalCount: "12,345",
+                        items: [
+                            CatalogAnalyticsItem(
+                                kind: .formula,
+                                slug: package.slug,
+                                rank: 1,
+                                count: "1,200",
+                                percent: "9.72"
+                            )
+                        ]
+                    )
+                ]
+            )
+        )
+
+        XCTAssertNotNil(
+            render(
+                CatalogAnalyticsView(
+                    viewModel: viewModel,
+                    installedPackagesViewModel: installedPackagesViewModel,
+                    openInstalledPackage: { _ in },
+                    openPackageInCatalog: { _ in }
+                )
+            )
+        )
     }
 
     func testInstalledPackagesViewRendersLoadedState() {
@@ -638,6 +767,10 @@ private struct ViewTestCatalogAPIClient: HomebrewAPIClienting, Sendable {
             artifactSections: [],
             analytics: []
         )
+    }
+
+    func fetchAnalytics(period: CatalogAnalyticsPeriod) async throws -> CatalogAnalyticsSnapshot {
+        .empty(for: period)
     }
 }
 

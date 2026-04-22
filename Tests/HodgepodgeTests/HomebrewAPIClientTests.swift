@@ -415,6 +415,106 @@ final class HomebrewAPIClientTests: XCTestCase {
         }
     }
 
+    func testFetchAnalyticsBuildsLeaderboards() async throws {
+        let client = makeClient { request in
+            switch request.url?.path {
+            case "/api/analytics/install/30d.json":
+                return .ok(
+                    """
+                    {
+                      "total_items": 23688,
+                      "start_date": "2026-03-11",
+                      "end_date": "2026-04-10",
+                      "total_count": 27519687,
+                      "items": [
+                        {
+                          "number": 1,
+                          "formula": "wget",
+                          "count": "28,165",
+                          "percent": "0.10"
+                        }
+                      ]
+                    }
+                    """
+                )
+            case "/api/analytics/install-on-request/30d.json":
+                return .ok(
+                    """
+                    {
+                      "total_items": 21000,
+                      "start_date": "2026-03-11",
+                      "end_date": "2026-04-10",
+                      "total_count": 12000000,
+                      "items": [
+                        {
+                          "number": 1,
+                          "formula": "curl",
+                          "count": "18,100",
+                          "percent": "0.15"
+                        }
+                      ]
+                    }
+                    """
+                )
+            case "/api/analytics/cask-install/30d.json":
+                return .ok(
+                    """
+                    {
+                      "total_items": 6777,
+                      "start_date": "2026-03-11",
+                      "end_date": "2026-04-10",
+                      "total_count": 2298449,
+                      "items": [
+                        {
+                          "number": 1,
+                          "cask": "docker-desktop",
+                          "count": "7,320",
+                          "percent": "0.32"
+                        }
+                      ]
+                    }
+                    """
+                )
+            case "/api/analytics/build-error/30d.json":
+                return .ok(
+                    """
+                    {
+                      "total_items": 1400,
+                      "start_date": "2026-03-11",
+                      "end_date": "2026-04-10",
+                      "total_count": 9000,
+                      "items": [
+                        {
+                          "number": 1,
+                          "formula": "ffmpeg",
+                          "count": "140",
+                          "percent": "1.56"
+                        }
+                      ]
+                    }
+                    """
+                )
+            default:
+                return .notFound
+            }
+        }
+
+        let snapshot = try await client.fetchAnalytics(period: .days30)
+
+        XCTAssertEqual(snapshot.period, .days30)
+        XCTAssertEqual(snapshot.leaderboards.map(\.kind), [
+            .formulaInstalls,
+            .formulaInstallsOnRequest,
+            .caskInstalls,
+            .buildErrors
+        ])
+        XCTAssertEqual(snapshot.leaderboards[0].totalCount, "27,519,687")
+        XCTAssertEqual(snapshot.leaderboards[0].items.first?.id, "formula:wget")
+        XCTAssertEqual(snapshot.leaderboards[1].items.first?.slug, "curl")
+        XCTAssertEqual(snapshot.leaderboards[2].items.first?.id, "cask:docker-desktop")
+        XCTAssertEqual(snapshot.leaderboards[3].items.first?.count, "140")
+    }
+
     private func makeClient(handler: @escaping @Sendable (URLRequest) -> MockURLProtocol.Response) -> HomebrewAPIClient {
         MockURLProtocol.handler = handler
 

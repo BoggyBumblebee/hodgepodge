@@ -50,6 +50,7 @@ The current project state already includes:
 
 - Homebrew detection and an Overview screen with installation metadata
 - hosted formula and cask catalog browsing with rich detail views
+- a dedicated Catalog Analytics screen for hosted Homebrew analytics leaderboards
 - installed package inventory, outdated packages, package-state filters, and dependency navigation
 - safe action flows for install, fetch, upgrade, service control, and maintenance commands
 - tap management
@@ -112,10 +113,10 @@ The current project state already includes:
 
 - completed:
   - command history for catalog actions
+  - a dedicated Catalog Analytics screen powered by the public Homebrew API
   - shared favorites across catalog and installed packages
   - saved searches for the catalog
 - still to do:
-  - analytics
   - notifications
 
 ## Contributing

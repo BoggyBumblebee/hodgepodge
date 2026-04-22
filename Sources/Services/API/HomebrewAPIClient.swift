@@ -3,6 +3,7 @@ import Foundation
 protocol HomebrewAPIClienting: Sendable {
     func fetchCatalog() async throws -> [CatalogPackageSummary]
     func fetchDetail(for package: CatalogPackageSummary) async throws -> CatalogPackageDetail
+    func fetchAnalytics(period: CatalogAnalyticsPeriod) async throws -> CatalogAnalyticsSnapshot
 }
 
 enum HomebrewAPIClientError: LocalizedError, Equatable {
@@ -62,6 +63,47 @@ struct HomebrewAPIClient: HomebrewAPIClienting, @unchecked Sendable {
         }
     }
 
+    func fetchAnalytics(period: CatalogAnalyticsPeriod) async throws -> CatalogAnalyticsSnapshot {
+        async let formulaInstalls: AnalyticsLeaderboardResponse = fetchJSON(
+            path: "analytics/install/\(period.rawValue).json"
+        )
+        async let formulaInstallsOnRequest: AnalyticsLeaderboardResponse = fetchJSON(
+            path: "analytics/install-on-request/\(period.rawValue).json"
+        )
+        async let caskInstalls: AnalyticsLeaderboardResponse = fetchJSON(
+            path: "analytics/cask-install/\(period.rawValue).json"
+        )
+        async let buildErrors: AnalyticsLeaderboardResponse = fetchJSON(
+            path: "analytics/build-error/\(period.rawValue).json"
+        )
+
+        return CatalogAnalyticsSnapshot(
+            period: period,
+            leaderboards: [
+                Self.makeAnalyticsLeaderboard(
+                    kind: .formulaInstalls,
+                    period: period,
+                    response: try await formulaInstalls
+                ),
+                Self.makeAnalyticsLeaderboard(
+                    kind: .formulaInstallsOnRequest,
+                    period: period,
+                    response: try await formulaInstallsOnRequest
+                ),
+                Self.makeAnalyticsLeaderboard(
+                    kind: .caskInstalls,
+                    period: period,
+                    response: try await caskInstalls
+                ),
+                Self.makeAnalyticsLeaderboard(
+                    kind: .buildErrors,
+                    period: period,
+                    response: try await buildErrors
+                )
+            ]
+        )
+    }
+
     private func fetchJSON<Response: Decodable>(path: String) async throws -> Response {
         let url = baseURL.appendingPathComponent(path)
         let (data, response) = try await session.data(from: url)
@@ -90,6 +132,30 @@ struct HomebrewAPIClient: HomebrewAPIClienting, @unchecked Sendable {
 
         return hostURL.appendingPathComponent(apiPathComponent)
     }
+}
+
+private struct AnalyticsLeaderboardResponse: Decodable {
+    let totalItems: Int
+    let startDate: String
+    let endDate: String
+    let totalCount: Int
+    let items: [AnalyticsLeaderboardItemResponse]
+
+    private enum CodingKeys: String, CodingKey {
+        case totalItems = "total_items"
+        case startDate = "start_date"
+        case endDate = "end_date"
+        case totalCount = "total_count"
+        case items
+    }
+}
+
+private struct AnalyticsLeaderboardItemResponse: Decodable {
+    let number: Int?
+    let formula: String?
+    let cask: String?
+    let count: String
+    let percent: String?
 }
 
 private struct FormulaSummaryResponse: Decodable {
@@ -747,4 +813,52 @@ private extension CatalogPackageDetail {
         formatter.numberStyle = .decimal
         return formatter
     }()
+}
+
+private extension HomebrewAPIClient {
+    static let analyticsNumberFormatter: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        return formatter
+    }()
+
+    static func makeAnalyticsLeaderboard(
+        kind: CatalogAnalyticsLeaderboardKind,
+        period: CatalogAnalyticsPeriod,
+        response: AnalyticsLeaderboardResponse
+    ) -> CatalogAnalyticsLeaderboard {
+        CatalogAnalyticsLeaderboard(
+            kind: kind,
+            period: period,
+            startDate: response.startDate,
+            endDate: response.endDate,
+            totalItems: response.totalItems,
+            totalCount: analyticsNumberFormatter.string(
+                from: NSNumber(value: response.totalCount)
+            ) ?? "\(response.totalCount)",
+            items: response.items.compactMap { item in
+                makeAnalyticsItem(kind: kind, response: item)
+            }
+        )
+    }
+
+    static func makeAnalyticsItem(
+        kind: CatalogAnalyticsLeaderboardKind,
+        response: AnalyticsLeaderboardItemResponse
+    ) -> CatalogAnalyticsItem? {
+        let packageKind: CatalogPackageKind = kind == .caskInstalls ? .cask : .formula
+        let slug = response.cask ?? response.formula
+
+        guard let slug, !slug.isEmpty else {
+            return nil
+        }
+
+        return CatalogAnalyticsItem(
+            kind: packageKind,
+            slug: slug,
+            rank: response.number ?? 0,
+            count: response.count,
+            percent: response.percent
+        )
+    }
 }
