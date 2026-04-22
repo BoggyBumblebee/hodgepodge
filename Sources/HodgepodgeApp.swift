@@ -8,6 +8,8 @@ struct HodgepodgeApp: App {
     @StateObject private var outdatedPackagesModel = OutdatedPackagesViewModel.live()
     @StateObject private var servicesModel = ServicesViewModel.live()
     @StateObject private var maintenanceModel = MaintenanceViewModel.live()
+    @StateObject private var tapsModel = TapsViewModel.live()
+    @StateObject private var brewfileModel = BrewfileViewModel.live()
 
     var body: some Scene {
         WindowGroup {
@@ -17,7 +19,9 @@ struct HodgepodgeApp: App {
                 installedPackagesModel: installedPackagesModel,
                 outdatedPackagesModel: outdatedPackagesModel,
                 servicesModel: servicesModel,
-                maintenanceModel: maintenanceModel
+                maintenanceModel: maintenanceModel,
+                tapsModel: tapsModel,
+                brewfileModel: brewfileModel
             )
                 .frame(minWidth: 980, minHeight: 640)
                 .task {

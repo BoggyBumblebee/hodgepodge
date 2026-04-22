@@ -458,11 +458,11 @@ private struct CatalogDetailView: View {
                 color: .blue,
                 isRunning: true
             )
-        case .succeeded(let progress, let result):
+        case .succeeded(let progress, _):
             actionStatusCard(
                 progress: progress,
                 title: "\(progress.command.kind.title) completed.",
-                detail: "Homebrew exited with code \(result.exitCode).",
+                detail: "Homebrew completed the action successfully.",
                 systemImage: "checkmark.circle.fill",
                 color: .green,
                 isRunning: false
@@ -471,7 +471,10 @@ private struct CatalogDetailView: View {
             actionStatusCard(
                 progress: progress,
                 title: "\(progress.command.kind.title) failed.",
-                detail: message,
+                detail: CommandPresentation.friendlyFailureDescription(
+                    message,
+                    fallback: "Homebrew couldn't complete this action."
+                ),
                 systemImage: "xmark.octagon.fill",
                 color: .red,
                 isRunning: false

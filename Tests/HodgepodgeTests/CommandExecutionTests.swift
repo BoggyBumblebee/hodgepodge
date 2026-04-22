@@ -21,4 +21,31 @@ final class CommandExecutionTests: XCTestCase {
 
         XCTAssertTrue(buffer.entries.isEmpty)
     }
+
+    func testFriendlyFailureDescriptionUsesFallbackForGenericCommandFailures() {
+        XCTAssertEqual(
+            CommandPresentation.friendlyFailureDescription(
+                "The command failed with exit code 1.",
+                fallback: "The action couldn't complete."
+            ),
+            "The action couldn't complete."
+        )
+        XCTAssertEqual(
+            CommandPresentation.friendlyFailureDescription(
+                CommandRunnerError.unreadablePipe.localizedDescription,
+                fallback: "The action couldn't complete."
+            ),
+            "The action couldn't complete."
+        )
+    }
+
+    func testFriendlyFailureDescriptionKeepsUsefulMessages() {
+        XCTAssertEqual(
+            CommandPresentation.friendlyFailureDescription(
+                "Already installed",
+                fallback: "The action couldn't complete."
+            ),
+            "Already installed"
+        )
+    }
 }

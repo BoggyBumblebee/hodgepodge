@@ -25,6 +25,8 @@ struct OutdatedPackageActionCommand: Equatable, Sendable {
     let kind: OutdatedPackageActionKind
     let packageID: String
     let packageTitle: String
+    let packageCount: Int
+    let isBulkAction: Bool
     let arguments: [String]
 
     var command: String {
@@ -32,11 +34,43 @@ struct OutdatedPackageActionCommand: Equatable, Sendable {
     }
 
     var confirmationTitle: String {
-        "\(kind.title) \(packageTitle)?"
+        if isBulkAction {
+            return packageCount == 1 ? "\(kind.title) 1 Package?" : "\(kind.title) All \(packageCount) Packages?"
+        }
+
+        return "\(kind.title) \(packageTitle)?"
     }
 
     var confirmationMessage: String {
-        "Hodgepodge will run `\(command)` using your local Homebrew installation."
+        if isBulkAction {
+            let packageSummary = packageCount == 1 ? "the visible outdated package" : "the \(packageCount) visible outdated packages"
+            return "Hodgepodge will run `\(command)` to upgrade \(packageSummary) using your local Homebrew installation."
+        }
+
+        return "Hodgepodge will run `\(command)` using your local Homebrew installation."
+    }
+
+    static func upgradeAll(packages: [OutdatedPackage]) -> OutdatedPackageActionCommand? {
+        let eligiblePackages = packages.filter(\.isUpgradeAvailable)
+        guard !eligiblePackages.isEmpty else {
+            return nil
+        }
+
+        let packageCount = eligiblePackages.count
+        let packageTitle = if packageCount == 1 {
+            eligiblePackages[0].title
+        } else {
+            "\(packageCount) Packages"
+        }
+
+        return OutdatedPackageActionCommand(
+            kind: .upgrade,
+            packageID: "__bulk_upgrade_all__",
+            packageTitle: packageTitle,
+            packageCount: packageCount,
+            isBulkAction: true,
+            arguments: ["upgrade"] + eligiblePackages.map(\.slug)
+        )
     }
 }
 
@@ -140,6 +174,8 @@ struct OutdatedPackage: Identifiable, Equatable, Hashable, Sendable {
             kind: kind,
             packageID: id,
             packageTitle: title,
+            packageCount: 1,
+            isBulkAction: false,
             arguments: upgradeCommandArguments
         )
     }

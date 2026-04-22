@@ -65,6 +65,50 @@ final class OutdatedPackagesViewModel: ObservableObject {
         actionState.isRunning
     }
 
+    var upgradeAllCommand: OutdatedPackageActionCommand? {
+        OutdatedPackageActionCommand.upgradeAll(packages: filteredPackages)
+    }
+
+    var upgradeAllDescription: String {
+        let visiblePackages = filteredPackages
+        let upgradeableCount = visiblePackages.filter(\.isUpgradeAvailable).count
+        let blockedCount = visiblePackages.count - upgradeableCount
+
+        guard !visiblePackages.isEmpty else {
+            return "There are no visible outdated packages to upgrade right now."
+        }
+
+        if upgradeableCount == 0 {
+            return blockedCount == 1
+                ? "The visible outdated package is pinned and can't be upgraded until it is unpinned."
+                : "All visible outdated packages are pinned and need to be unpinned before upgrading."
+        }
+
+        if blockedCount == 0 {
+            return upgradeableCount == 1
+                ? "Upgrade the visible outdated package in one step."
+                : "Upgrade all \(upgradeableCount) visible outdated packages in one step."
+        }
+
+        return "Upgrade \(upgradeableCount) visible outdated package\(upgradeableCount == 1 ? "" : "s"). \(blockedCount) pinned package\(blockedCount == 1 ? "" : "s") will be skipped."
+    }
+
+    var upgradeAllLogs: [CommandLogEntry] {
+        guard actionState.command?.isBulkAction == true else {
+            return []
+        }
+
+        return actionLogs
+    }
+
+    var upgradeAllState: OutdatedPackageActionState {
+        guard actionState.command?.isBulkAction == true else {
+            return .idle
+        }
+
+        return actionState
+    }
+
     func loadIfNeeded() {
         guard case .idle = packagesState else {
             return
@@ -115,36 +159,15 @@ final class OutdatedPackagesViewModel: ObservableObject {
             return
         }
 
-        let command = package.actionCommand(for: actionKind)
-        let progress = OutdatedPackageActionProgress(command: command, startedAt: Date())
+        runAction(package.actionCommand(for: actionKind), fallbackSelection: package)
+    }
 
-        actionTask?.cancel()
-        actionTask = nil
-        resetActionOutput()
-        actionState = .running(progress)
-        appendLog(.system, "Preparing \(actionKind.title.lowercased()) for \(package.title).")
-
-        actionTask = Task { @MainActor [commandExecutor] in
-            do {
-                let result = try await commandExecutor.execute(arguments: command.arguments) { [weak self] kind, text in
-                    self?.appendLog(kind, text)
-                }
-                flushPendingLogs()
-                appendLog(.system, "\(actionKind.title) finished with exit code \(result.exitCode).")
-                actionState = .succeeded(progress.finished(at: Date()), result)
-                reloadPackagesAfterAction(preservingSelection: package)
-            } catch is CancellationError {
-                flushPendingLogs()
-                appendLog(.system, "\(actionKind.title) cancelled.")
-                actionState = .cancelled(progress.finished(at: Date()))
-            } catch {
-                flushPendingLogs()
-                appendLog(.system, error.localizedDescription)
-                actionState = .failed(progress.finished(at: Date()), error.localizedDescription)
-            }
-
-            actionTask = nil
+    func runUpgradeAll() {
+        guard let command = upgradeAllCommand else {
+            return
         }
+
+        runAction(command, fallbackSelection: nil)
     }
 
     func cancelAction() {
@@ -219,20 +242,67 @@ final class OutdatedPackagesViewModel: ObservableObject {
         packages.sorted(by: sorter(for: sortOption)).first
     }
 
-    private func reloadPackagesAfterAction(preservingSelection package: OutdatedPackage) {
+    private func reloadPackagesAfterAction(
+        preservingSelectionID: String?,
+        fallbackSelection: OutdatedPackage?
+    ) {
         Task { @MainActor [provider] in
             do {
                 let packages = try await provider.fetchOutdatedPackages()
                 packagesState = .loaded(packages)
 
-                if let refreshedSelection = packages.first(where: { $0.id == package.id }) {
+                if let preservingSelectionID,
+                   let refreshedSelection = packages.first(where: { $0.id == preservingSelectionID }) {
                     selectedPackage = refreshedSelection
                 } else {
-                    selectedPackage = package
+                    selectedPackage = fallbackSelection ?? defaultSelection(from: packages)
                 }
             } catch {
                 appendLog(.system, error.localizedDescription)
             }
+        }
+    }
+
+    private func runAction(
+        _ command: OutdatedPackageActionCommand,
+        fallbackSelection: OutdatedPackage?
+    ) {
+        let progress = OutdatedPackageActionProgress(command: command, startedAt: Date())
+
+        actionTask?.cancel()
+        actionTask = nil
+        resetActionOutput()
+        actionState = .running(progress)
+
+        if command.isBulkAction {
+            appendLog(.system, "Preparing \(command.kind.title.lowercased()) for \(command.packageCount) package\(command.packageCount == 1 ? "" : "s").")
+        } else {
+            appendLog(.system, "Preparing \(command.kind.title.lowercased()) for \(command.packageTitle).")
+        }
+
+        actionTask = Task { @MainActor [commandExecutor] in
+            do {
+                let result = try await commandExecutor.execute(arguments: command.arguments) { [weak self] kind, text in
+                    self?.appendLog(kind, text)
+                }
+                flushPendingLogs()
+                appendLog(.system, "\(command.kind.title) finished with exit code \(result.exitCode).")
+                actionState = .succeeded(progress.finished(at: Date()), result)
+                reloadPackagesAfterAction(
+                    preservingSelectionID: fallbackSelection?.id,
+                    fallbackSelection: fallbackSelection
+                )
+            } catch is CancellationError {
+                flushPendingLogs()
+                appendLog(.system, "\(command.kind.title) cancelled.")
+                actionState = .cancelled(progress.finished(at: Date()))
+            } catch {
+                flushPendingLogs()
+                appendLog(.system, error.localizedDescription)
+                actionState = .failed(progress.finished(at: Date()), error.localizedDescription)
+            }
+
+            actionTask = nil
         }
     }
 

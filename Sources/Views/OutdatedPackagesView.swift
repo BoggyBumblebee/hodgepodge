@@ -29,11 +29,14 @@ struct OutdatedPackagesView: View {
             ),
             titleVisibility: .visible
         ) {
-            if let pendingAction,
-               let package = viewModel.selectedPackage,
-               package.id == pendingAction.packageID {
+            if let pendingAction {
                 Button(pendingAction.kind.title) {
-                    viewModel.runAction(pendingAction.kind, for: package)
+                    if pendingAction.isBulkAction {
+                        viewModel.runUpgradeAll()
+                    } else if let package = viewModel.selectedPackage,
+                              package.id == pendingAction.packageID {
+                        viewModel.runAction(pendingAction.kind, for: package)
+                    }
                     self.pendingAction = nil
                 }
             }
@@ -65,6 +68,8 @@ struct OutdatedPackagesView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             case .loaded:
+                upgradeAllCard
+
                 List(viewModel.filteredPackages, selection: $viewModel.selectedPackage) { package in
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(alignment: .top) {
@@ -192,6 +197,60 @@ struct OutdatedPackagesView: View {
         }
     }
 
+    private var upgradeAllCard: some View {
+        GroupBox("Upgrade All") {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(viewModel.upgradeAllDescription)
+                    .foregroundStyle(.secondary)
+
+                if let command = viewModel.upgradeAllCommand {
+                    Text(command.command)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                } else {
+                    Text("No upgrade command is available for the current view.")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+
+                OutdatedUpgradeAllStatusView(actionState: viewModel.upgradeAllState)
+
+                HStack(spacing: 12) {
+                    Button("Upgrade All") {
+                        pendingAction = viewModel.upgradeAllCommand
+                    }
+                    .disabled(viewModel.upgradeAllCommand == nil || viewModel.hasRunningAction)
+                    .keyboardShortcut("u", modifiers: [.command, .shift])
+
+                    if viewModel.upgradeAllState.isRunning {
+                        Button("Cancel Upgrade") {
+                            viewModel.cancelAction()
+                        }
+                        .keyboardShortcut(.cancelAction)
+                    } else {
+                        Button("Clear Output") {
+                            viewModel.clearActionOutput()
+                        }
+                        .disabled(viewModel.upgradeAllLogs.isEmpty && viewModel.upgradeAllState == .idle)
+                    }
+                }
+
+                if !viewModel.upgradeAllLogs.isEmpty {
+                    ScrollView {
+                        Text(renderedUpgradeAllLogs)
+                            .font(.system(.caption, design: .monospaced))
+                            .frame(maxWidth: .infinity, alignment: .topLeading)
+                            .textSelection(.enabled)
+                            .padding(.vertical, 4)
+                    }
+                    .frame(minHeight: 120, maxHeight: 220, alignment: .topLeading)
+                    .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+            }
+        }
+    }
+
     @ViewBuilder
     private var detail: some View {
         switch viewModel.packagesState {
@@ -247,6 +306,56 @@ struct OutdatedPackagesView: View {
                 }
             }
         )
+    }
+
+    private var renderedUpgradeAllLogs: String {
+        if viewModel.upgradeAllLogs.isEmpty {
+            return "No command output yet."
+        }
+
+        return viewModel.upgradeAllLogs.map { entry in
+            "[\(entry.timestamp.formatted(date: .omitted, time: .shortened))] \(entry.kind.rawValue.uppercased())  \(entry.text)"
+        }
+        .joined(separator: "\n")
+    }
+}
+
+private struct OutdatedUpgradeAllStatusView: View {
+    let actionState: OutdatedPackageActionState
+
+    var body: some View {
+        switch actionState {
+        case .idle:
+            Text("Upgrade all visible outdated packages from this view in one action.")
+                .foregroundStyle(.secondary)
+        case .running(let progress):
+            Label(
+                "Upgrading \(progress.command.packageCount) package\(progress.command.packageCount == 1 ? "" : "s") since \(progress.startedAt.formatted(date: .omitted, time: .standard))",
+                systemImage: "hourglass"
+            )
+            .foregroundStyle(.secondary)
+        case .succeeded:
+            Label(
+                "All selected packages were upgraded successfully.",
+                systemImage: "checkmark.circle.fill"
+            )
+            .foregroundStyle(.green)
+        case .failed(_, let message):
+            Label(
+                CommandPresentation.friendlyFailureDescription(
+                    message,
+                    fallback: "Homebrew couldn't complete the bulk upgrade."
+                ),
+                systemImage: "exclamationmark.triangle.fill"
+            )
+            .foregroundStyle(.orange)
+        case .cancelled:
+            Label(
+                "The bulk upgrade was cancelled.",
+                systemImage: "xmark.circle.fill"
+            )
+            .foregroundStyle(.secondary)
+        }
     }
 }
 

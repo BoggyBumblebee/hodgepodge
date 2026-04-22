@@ -174,6 +174,124 @@ extension BrewService {
     }
 }
 
+extension BrewTap {
+    static func fixture(
+        name: String = "keith/formulae",
+        user: String? = "keith",
+        repo: String? = "formulae",
+        repository: String? = "formulae",
+        path: String = "/opt/homebrew/Library/Taps/keith/homebrew-formulae",
+        isOfficial: Bool = false,
+        formulaNames: [String] = ["keith/formulae/xcpretty", "keith/formulae/tag"],
+        caskTokens: [String] = ["keith/formulae/conductor"],
+        formulaFiles: [String] = ["/opt/homebrew/Library/Taps/keith/homebrew-formulae/Formula/xcpretty.rb"],
+        caskFiles: [String] = ["/opt/homebrew/Library/Taps/keith/homebrew-formulae/Casks/conductor.rb"],
+        commandFiles: [String] = [],
+        remote: String? = "https://github.com/keith/homebrew-formulae",
+        customRemote: Bool = false,
+        isPrivate: Bool = false,
+        head: String? = "53e818b82fdd581e6e0c84ff51c1e8cc02e19c98",
+        lastCommit: String? = "6 weeks ago",
+        branch: String? = "master"
+    ) -> BrewTap {
+        BrewTap(
+            name: name,
+            user: user,
+            repo: repo,
+            repository: repository,
+            path: path,
+            isOfficial: isOfficial,
+            formulaNames: formulaNames,
+            caskTokens: caskTokens,
+            formulaFiles: formulaFiles,
+            caskFiles: caskFiles,
+            commandFiles: commandFiles,
+            remote: remote,
+            customRemote: customRemote,
+            isPrivate: isPrivate,
+            head: head,
+            lastCommit: lastCommit,
+            branch: branch
+        )
+    }
+}
+
+extension BrewfileEntry {
+    static func fixture(
+        lineNumber: Int = 1,
+        kind: BrewfileEntryKind = .brew,
+        name: String = "wget",
+        rawLine: String = #"brew "wget", restart_service: true"#,
+        options: [String: String] = ["restart_service": "true"],
+        inlineComment: String? = nil
+    ) -> BrewfileEntry {
+        BrewfileEntry(
+            lineNumber: lineNumber,
+            kind: kind,
+            name: name,
+            rawLine: rawLine,
+            options: options,
+            inlineComment: inlineComment
+        )
+    }
+}
+
+extension BrewfileLine {
+    static func fixture(
+        lineNumber: Int = 1,
+        category: BrewfileLineCategory = .entry,
+        entry: BrewfileEntry? = .fixture(),
+        rawLine: String? = nil,
+        commentText: String? = nil
+    ) -> BrewfileLine {
+        BrewfileLine(
+            lineNumber: lineNumber,
+            category: category,
+            entry: category == .entry ? entry : nil,
+            rawLine: rawLine ?? entry?.rawLine ?? "# comment",
+            commentText: commentText
+        )
+    }
+}
+
+extension BrewfileDocument {
+    static func fixture(
+        fileURL: URL = URL(fileURLWithPath: "/tmp/Brewfile"),
+        lines: [BrewfileLine] = [
+            .fixture(
+                lineNumber: 1,
+                entry: .fixture(lineNumber: 1, kind: .tap, name: "homebrew/cask", rawLine: #"tap "homebrew/cask""#, options: [:])
+            ),
+            .fixture(
+                lineNumber: 2,
+                entry: .fixture(lineNumber: 2, kind: .brew, name: "wget", rawLine: #"brew "wget", restart_service: true"#, options: ["restart_service": "true"])
+            ),
+            .fixture(
+                lineNumber: 3,
+                category: .comment,
+                entry: nil,
+                rawLine: "# desktop apps",
+                commentText: "desktop apps"
+            ),
+            .fixture(
+                lineNumber: 4,
+                category: .unknown,
+                entry: nil,
+                rawLine: "brewfile_command something"
+            )
+        ],
+        loadedAt: Date = Date(timeIntervalSince1970: 1_700_000_000),
+        modifiedAt: Date? = Date(timeIntervalSince1970: 1_700_000_120)
+    ) -> BrewfileDocument {
+        BrewfileDocument(
+            fileURL: fileURL,
+            lines: lines,
+            loadedAt: loadedAt,
+            modifiedAt: modifiedAt
+        )
+    }
+}
+
 extension BrewConfigSnapshot {
     static func fixture(
         values: [String: String] = [

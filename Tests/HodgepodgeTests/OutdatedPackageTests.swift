@@ -52,6 +52,19 @@ final class OutdatedPackageTests: XCTestCase {
         XCTAssertEqual(pinned.upgradeBlockedReason, "Pinned at 1.24.5. Unpin before upgrading.")
     }
 
+    func testUpgradeAllCommandIncludesOnlyUpgradeablePackages() {
+        let formula = OutdatedPackage.fixture(slug: "wget", title: "wget")
+        let cask = OutdatedPackage.fixture(kind: .cask, slug: "docker-desktop", title: "Docker Desktop")
+        let pinned = OutdatedPackage.fixture(slug: "python@3.12", isPinned: true, pinnedVersion: "3.12.4")
+
+        let command = OutdatedPackageActionCommand.upgradeAll(packages: [formula, cask, pinned])
+
+        XCTAssertEqual(command?.arguments, ["upgrade", "wget", "docker-desktop"])
+        XCTAssertEqual(command?.packageCount, 2)
+        XCTAssertEqual(command?.packageID, "__bulk_upgrade_all__")
+        XCTAssertEqual(command?.confirmationTitle, "Upgrade All 2 Packages?")
+    }
+
     func testOutdatedPackageFilterAndSortTitlesAreStable() {
         XCTAssertEqual(OutdatedPackageFilterOption.pinned.title, "Pinned")
         XCTAssertEqual(OutdatedPackageSortOption.name.title, "Name")

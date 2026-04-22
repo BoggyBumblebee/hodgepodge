@@ -38,10 +38,16 @@ enum CommandRunnerError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .nonZeroExitCode(let result):
-            if result.stderr.isEmpty {
+            let message = if result.stderr.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+            } else {
+                result.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+
+            if message.isEmpty {
                 return "The command failed with exit code \(result.exitCode)."
             }
-            return result.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+            return message
         case .unreadablePipe:
             return "The command output could not be read."
         }

@@ -70,10 +70,13 @@ enum CatalogPackageActionHistoryOutcome: Codable, Equatable, Sendable {
 
     var detail: String {
         switch self {
-        case .succeeded(let exitCode):
-            "Exit code \(exitCode)"
+        case .succeeded:
+            "Completed successfully"
         case .failed(let message):
-            message
+            CommandPresentation.friendlyFailureDescription(
+                message,
+                fallback: "Homebrew couldn't complete this action."
+            )
         case .cancelled:
             "Stopped before completion"
         }

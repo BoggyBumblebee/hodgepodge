@@ -25,6 +25,8 @@ final class ViewRenderingTests: XCTestCase {
         let outdatedPackagesModel = makeOutdatedPackagesModel()
         let servicesModel = makeServicesModel()
         let maintenanceModel = makeMaintenanceModel()
+        let tapsModel = makeTapsModel()
+        let brewfileModel = makeBrewfileModel()
 
         model.selectedSection = .overview
         XCTAssertNotNil(render(
@@ -34,7 +36,9 @@ final class ViewRenderingTests: XCTestCase {
                 installedPackagesModel: installedPackagesModel,
                 outdatedPackagesModel: outdatedPackagesModel,
                 servicesModel: servicesModel,
-                maintenanceModel: maintenanceModel
+                maintenanceModel: maintenanceModel,
+                tapsModel: tapsModel,
+                brewfileModel: brewfileModel
             )
         ))
 
@@ -46,7 +50,9 @@ final class ViewRenderingTests: XCTestCase {
                 installedPackagesModel: installedPackagesModel,
                 outdatedPackagesModel: outdatedPackagesModel,
                 servicesModel: servicesModel,
-                maintenanceModel: maintenanceModel
+                maintenanceModel: maintenanceModel,
+                tapsModel: tapsModel,
+                brewfileModel: brewfileModel
             )
         ))
 
@@ -58,7 +64,9 @@ final class ViewRenderingTests: XCTestCase {
                 installedPackagesModel: installedPackagesModel,
                 outdatedPackagesModel: outdatedPackagesModel,
                 servicesModel: servicesModel,
-                maintenanceModel: maintenanceModel
+                maintenanceModel: maintenanceModel,
+                tapsModel: tapsModel,
+                brewfileModel: brewfileModel
             )
         ))
 
@@ -70,7 +78,9 @@ final class ViewRenderingTests: XCTestCase {
                 installedPackagesModel: installedPackagesModel,
                 outdatedPackagesModel: outdatedPackagesModel,
                 servicesModel: servicesModel,
-                maintenanceModel: maintenanceModel
+                maintenanceModel: maintenanceModel,
+                tapsModel: tapsModel,
+                brewfileModel: brewfileModel
             )
         ))
 
@@ -82,7 +92,37 @@ final class ViewRenderingTests: XCTestCase {
                 installedPackagesModel: installedPackagesModel,
                 outdatedPackagesModel: outdatedPackagesModel,
                 servicesModel: servicesModel,
-                maintenanceModel: maintenanceModel
+                maintenanceModel: maintenanceModel,
+                tapsModel: tapsModel,
+                brewfileModel: brewfileModel
+            )
+        ))
+
+        model.selectedSection = .taps
+        XCTAssertNotNil(render(
+            RootView(
+                model: model,
+                catalogModel: catalogModel,
+                installedPackagesModel: installedPackagesModel,
+                outdatedPackagesModel: outdatedPackagesModel,
+                servicesModel: servicesModel,
+                maintenanceModel: maintenanceModel,
+                tapsModel: tapsModel,
+                brewfileModel: brewfileModel
+            )
+        ))
+
+        model.selectedSection = .brewfile
+        XCTAssertNotNil(render(
+            RootView(
+                model: model,
+                catalogModel: catalogModel,
+                installedPackagesModel: installedPackagesModel,
+                outdatedPackagesModel: outdatedPackagesModel,
+                servicesModel: servicesModel,
+                maintenanceModel: maintenanceModel,
+                tapsModel: tapsModel,
+                brewfileModel: brewfileModel
             )
         ))
 
@@ -94,7 +134,9 @@ final class ViewRenderingTests: XCTestCase {
                 installedPackagesModel: installedPackagesModel,
                 outdatedPackagesModel: outdatedPackagesModel,
                 servicesModel: servicesModel,
-                maintenanceModel: maintenanceModel
+                maintenanceModel: maintenanceModel,
+                tapsModel: tapsModel,
+                brewfileModel: brewfileModel
             )
         ))
     }
@@ -228,6 +270,24 @@ final class ViewRenderingTests: XCTestCase {
         let viewModel = makeInstalledPackagesModel()
         viewModel.packagesState = .loaded([package])
         viewModel.selectedPackage = package
+        let exportCommand = InstalledPackagesBrewfileExportCommand(
+            scope: .formula,
+            destinationURL: URL(fileURLWithPath: "/tmp/Brewfile-formulae")
+        )
+        viewModel.exportState = .running(
+            InstalledPackagesBrewfileExportProgress(
+                command: exportCommand,
+                startedAt: Date(timeIntervalSince1970: 1_000)
+            )
+        )
+        viewModel.exportLogs = [
+            CommandLogEntry(
+                id: 0,
+                kind: .stdout,
+                text: "Dumping Brewfile...",
+                timestamp: Date(timeIntervalSince1970: 1_001)
+            )
+        ]
 
         XCTAssertNotNil(render(InstalledPackagesView(viewModel: viewModel)))
     }
@@ -257,6 +317,49 @@ final class ViewRenderingTests: XCTestCase {
                 id: 0,
                 kind: .stdout,
                 text: "Pouring...",
+                timestamp: Date(timeIntervalSince1970: 1_001)
+            )
+        ]
+
+        XCTAssertNotNil(render(OutdatedPackagesView(viewModel: viewModel)))
+    }
+
+    func testOutdatedPackagesViewRendersBulkUpgradeState() {
+        let first = OutdatedPackage(
+            kind: .formula,
+            slug: "wget",
+            title: "wget",
+            fullName: "homebrew/core/wget",
+            installedVersions: ["1.24.5"],
+            currentVersion: "1.25.0",
+            isPinned: false,
+            pinnedVersion: nil
+        )
+        let second = OutdatedPackage(
+            kind: .cask,
+            slug: "docker-desktop",
+            title: "Docker Desktop",
+            fullName: "homebrew/cask/docker-desktop",
+            installedVersions: ["4.67.0"],
+            currentVersion: "4.68.0",
+            isPinned: false,
+            pinnedVersion: nil
+        )
+        let viewModel = makeOutdatedPackagesModel()
+        viewModel.packagesState = .loaded([first, second])
+        viewModel.selectedPackage = first
+        let command = OutdatedPackageActionCommand.upgradeAll(packages: [first, second])!
+        viewModel.actionState = .running(
+            OutdatedPackageActionProgress(
+                command: command,
+                startedAt: Date(timeIntervalSince1970: 1_000)
+            )
+        )
+        viewModel.actionLogs = [
+            CommandLogEntry(
+                id: 0,
+                kind: .stdout,
+                text: "Upgrading visible packages...",
                 timestamp: Date(timeIntervalSince1970: 1_001)
             )
         ]
@@ -309,6 +412,62 @@ final class ViewRenderingTests: XCTestCase {
         XCTAssertNotNil(render(MaintenanceView(viewModel: viewModel)))
     }
 
+    func testTapsViewRendersLoadedState() {
+        let tap = BrewTap.fixture(
+            name: "timescale/tap",
+            remote: "https://github.com/timescale/homebrew-tap",
+            customRemote: true,
+            isPrivate: false,
+            lastCommit: "2 hours ago",
+            branch: "main"
+        )
+        let viewModel = makeTapsModel()
+        viewModel.tapsState = .loaded([tap])
+        viewModel.selectedTap = tap
+        viewModel.addTapName = "timescale/tap"
+        viewModel.actionState = .running(
+            BrewTapActionProgress(
+                command: .add(name: tap.name, remoteURL: tap.remote),
+                startedAt: Date(timeIntervalSince1970: 1_000)
+            )
+        )
+        viewModel.actionLogs = [
+            CommandLogEntry(
+                id: 0,
+                kind: .stdout,
+                text: "Cloning...",
+                timestamp: Date(timeIntervalSince1970: 1_001)
+            )
+        ]
+
+        XCTAssertNotNil(render(TapsView(viewModel: viewModel)))
+    }
+
+    func testBrewfileViewRendersLoadedState() {
+        let document = BrewfileDocument.fixture()
+        let viewModel = makeBrewfileModel()
+        viewModel.documentState = .loaded(document)
+        viewModel.selectedFileURL = document.fileURL
+        viewModel.selectedLine = document.lines.first
+        let command = BrewfileActionCommand(kind: .check, fileURL: document.fileURL)
+        viewModel.actionState = .running(
+            BrewfileActionProgress(
+                command: command,
+                startedAt: Date(timeIntervalSince1970: 1_000)
+            )
+        )
+        viewModel.actionLogs = [
+            CommandLogEntry(
+                id: 0,
+                kind: .system,
+                text: "Preparing bundle check.",
+                timestamp: Date(timeIntervalSince1970: 1_001)
+            )
+        ]
+
+        XCTAssertNotNil(render(BrewfileView(viewModel: viewModel)))
+    }
+
     private func makeModel() -> AppModel {
         AppModel(
             brewLocator: ViewTestBrewLocator(),
@@ -329,7 +488,9 @@ final class ViewRenderingTests: XCTestCase {
 
     private func makeInstalledPackagesModel() -> InstalledPackagesViewModel {
         InstalledPackagesViewModel(
-            provider: ViewTestInstalledPackagesProvider()
+            provider: ViewTestInstalledPackagesProvider(),
+            commandExecutor: ViewTestInstalledPackagesCommandExecutor(),
+            destinationPicker: ViewTestBrewfileDumpDestinationPicker()
         )
     }
 
@@ -351,6 +512,23 @@ final class ViewRenderingTests: XCTestCase {
         MaintenanceViewModel(
             provider: ViewTestBrewMaintenanceProvider(),
             commandExecutor: ViewTestMaintenanceCommandExecutor()
+        )
+    }
+
+    private func makeTapsModel() -> TapsViewModel {
+        TapsViewModel(
+            provider: ViewTestBrewTapsProvider(),
+            commandExecutor: ViewTestTapsCommandExecutor()
+        )
+    }
+
+    private func makeBrewfileModel() -> BrewfileViewModel {
+        BrewfileViewModel(
+            loader: ViewTestBrewfileLoader(),
+            selectionStore: ViewTestBrewfileSelectionStore(),
+            picker: ViewTestBrewfilePicker(),
+            dumpDestinationPicker: ViewTestBrewfileDumpDestinationPicker(),
+            commandExecutor: ViewTestBrewfileCommandExecutor()
         )
     }
 
@@ -495,5 +673,71 @@ private struct ViewTestMaintenanceCommandExecutor: BrewCommandExecuting {
         onLog: @escaping @MainActor @Sendable (CatalogPackageActionLogKind, String) -> Void
     ) async throws -> CommandResult {
         CommandResult(stdout: "", stderr: "", exitCode: 0)
+    }
+}
+
+private struct ViewTestBrewTapsProvider: BrewTapsProviding {
+    func fetchTaps() async throws -> [BrewTap] {
+        []
+    }
+}
+
+private struct ViewTestTapsCommandExecutor: BrewCommandExecuting {
+    func execute(
+        arguments: [String],
+        onLog: @escaping @MainActor @Sendable (CatalogPackageActionLogKind, String) -> Void
+    ) async throws -> CommandResult {
+        CommandResult(stdout: "", stderr: "", exitCode: 0)
+    }
+}
+
+private struct ViewTestBrewfileLoader: BrewfileDocumentLoading {
+    func loadDocument(at fileURL: URL) throws -> BrewfileDocument {
+        .fixture(fileURL: fileURL)
+    }
+}
+
+private struct ViewTestBrewfileSelectionStore: BrewfileSelectionStoring {
+    func loadSelection() -> URL? {
+        nil
+    }
+
+    func saveSelection(_ url: URL?) {}
+}
+
+private struct ViewTestBrewfilePicker: BrewfilePicking {
+    @MainActor
+    func pickBrewfile(startingDirectory: URL?) -> URL? {
+        nil
+    }
+}
+
+private struct ViewTestBrewfileCommandExecutor: BrewCommandExecuting {
+    func execute(
+        arguments: [String],
+        onLog: @escaping @MainActor @Sendable (CatalogPackageActionLogKind, String) -> Void
+    ) async throws -> CommandResult {
+        await onLog(.system, "Using Homebrew at /opt/homebrew/bin/brew")
+        return CommandResult(stdout: "", stderr: "", exitCode: 0)
+    }
+}
+
+private struct ViewTestInstalledPackagesCommandExecutor: BrewCommandExecuting {
+    func execute(
+        arguments: [String],
+        onLog: @escaping @MainActor @Sendable (CatalogPackageActionLogKind, String) -> Void
+    ) async throws -> CommandResult {
+        await onLog(.system, "Using Homebrew at /opt/homebrew/bin/brew")
+        return CommandResult(stdout: "", stderr: "", exitCode: 0)
+    }
+}
+
+@MainActor
+private struct ViewTestBrewfileDumpDestinationPicker: BrewfileDumpDestinationPicking {
+    func chooseDestination(
+        suggestedFileName: String,
+        startingDirectory: URL?
+    ) -> URL? {
+        nil
     }
 }

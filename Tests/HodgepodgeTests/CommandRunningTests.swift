@@ -71,4 +71,16 @@ final class CommandRunningTests: XCTestCase {
             XCTFail("Unexpected error: \(error)")
         }
     }
+
+    func testNonZeroExitCodeErrorDescriptionFallsBackToStdout() {
+        let error = CommandRunnerError.nonZeroExitCode(
+            CommandResult(
+                stdout: "bundle check failed",
+                stderr: "",
+                exitCode: 1
+            )
+        )
+
+        XCTAssertEqual(error.errorDescription, "bundle check failed")
+    }
 }

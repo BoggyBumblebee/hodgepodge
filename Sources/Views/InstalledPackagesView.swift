@@ -21,6 +21,7 @@ struct InstalledPackagesView: View {
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 16) {
             header
+            exportCard
 
             switch viewModel.packagesState {
             case .idle, .loading:
@@ -158,6 +159,64 @@ struct InstalledPackagesView: View {
         }
     }
 
+    private var exportCard: some View {
+        GroupBox("Generate Brewfile") {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(viewModel.exportDescription)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+
+                Text(viewModel.exportCommandPreview)
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+
+                InstalledPackagesExportStatusView(exportState: viewModel.exportState)
+
+                HStack(spacing: 12) {
+                    Button("Generate Brewfile") {
+                        viewModel.generateBrewfile()
+                    }
+                    .disabled(viewModel.hasRunningExport)
+
+                    if viewModel.hasRunningExport {
+                        Button("Cancel", action: viewModel.cancelExport)
+                    } else {
+                        Button("Clear Output", action: viewModel.clearExportOutput)
+                            .disabled(viewModel.exportState == .idle && viewModel.exportLogs.isEmpty)
+                    }
+                }
+
+                if !viewModel.exportLogs.isEmpty {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(viewModel.exportLogs) { entry in
+                                HStack(alignment: .top, spacing: 10) {
+                                    Text(logTimestamp(for: entry.timestamp))
+                                        .font(.caption2.monospaced())
+                                        .foregroundStyle(.tertiary)
+
+                                    Text(logLabel(for: entry.kind))
+                                        .font(.caption2.weight(.semibold).monospaced())
+                                        .foregroundStyle(logColor(for: entry.kind))
+
+                                    Text(entry.text)
+                                        .font(.caption.monospaced())
+                                        .textSelection(.enabled)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(minHeight: 120, maxHeight: 220)
+                    .padding(12)
+                    .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+            }
+        }
+    }
+
     @ViewBuilder
     private var detail: some View {
         switch viewModel.packagesState {
@@ -201,6 +260,73 @@ struct InstalledPackagesView: View {
                 }
             }
         )
+    }
+
+    private func logTimestamp(for date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm:ss"
+        return formatter.string(from: date)
+    }
+
+    private func logLabel(for kind: CommandLogKind) -> String {
+        switch kind {
+        case .system:
+            "SYSTEM"
+        case .stdout:
+            "STDOUT"
+        case .stderr:
+            "STDERR"
+        }
+    }
+
+    private func logColor(for kind: CommandLogKind) -> Color {
+        switch kind {
+        case .system:
+            .secondary
+        case .stdout:
+            .green
+        case .stderr:
+            .orange
+        }
+    }
+}
+
+private struct InstalledPackagesExportStatusView: View {
+    let exportState: InstalledPackagesBrewfileExportState
+
+    var body: some View {
+        switch exportState {
+        case .idle:
+            Text("Use Homebrew's `bundle dump` command to export the currently selected Installed scope.")
+                .foregroundStyle(.secondary)
+        case .running(let progress):
+            Label(
+                "Generating since \(progress.startedAt.formatted(date: .omitted, time: .standard))",
+                systemImage: "hourglass"
+            )
+            .foregroundStyle(.secondary)
+        case .succeeded:
+            Label(
+                "Brewfile generated successfully.",
+                systemImage: "checkmark.circle.fill"
+            )
+            .foregroundStyle(.green)
+        case .failed(_, let message):
+            Label(
+                CommandPresentation.friendlyFailureDescription(
+                    message,
+                    fallback: "Brewfile generation couldn't complete."
+                ),
+                systemImage: "exclamationmark.triangle.fill"
+            )
+            .foregroundStyle(.orange)
+        case .cancelled:
+            Label(
+                "Brewfile generation was cancelled.",
+                systemImage: "xmark.circle.fill"
+            )
+            .foregroundStyle(.secondary)
+        }
     }
 }
 

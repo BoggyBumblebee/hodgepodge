@@ -223,6 +223,86 @@ final class OutdatedPackagesViewModelTests: XCTestCase {
         }
     }
 
+    func testUpgradeAllCommandReflectsCurrentVisibleUpgradeablePackages() {
+        let packages = [
+            OutdatedPackage.fixture(
+                slug: "wget",
+                title: "wget",
+                fullName: "homebrew/core/wget",
+                installedVersions: ["1.24.5"],
+                currentVersion: "1.25.0"
+            ),
+            OutdatedPackage.fixture(
+                kind: .cask,
+                slug: "docker-desktop",
+                title: "Docker Desktop",
+                fullName: "docker-desktop",
+                installedVersions: ["4.67.0"],
+                currentVersion: "4.68.0"
+            ),
+            OutdatedPackage.fixture(
+                slug: "python@3.12",
+                title: "python@3.12",
+                fullName: "homebrew/core/python@3.12",
+                installedVersions: ["3.12.4"],
+                currentVersion: "3.12.5",
+                isPinned: true,
+                pinnedVersion: "3.12.4"
+            )
+        ]
+        let viewModel = OutdatedPackagesViewModel(
+            provider: MockOutdatedPackagesProvider(result: .success(packages)),
+            commandExecutor: MockOutdatedBrewCommandExecutor()
+        )
+        viewModel.packagesState = .loaded(packages)
+
+        XCTAssertEqual(viewModel.upgradeAllCommand?.arguments, ["upgrade", "docker-desktop", "wget"])
+        XCTAssertEqual(
+            viewModel.upgradeAllDescription,
+            "Upgrade 2 visible outdated packages. 1 pinned package will be skipped."
+        )
+
+        viewModel.scope = .formula
+
+        XCTAssertEqual(viewModel.upgradeAllCommand?.arguments, ["upgrade", "wget"])
+    }
+
+    func testRunUpgradeAllStoresSuccessStateAndRefreshesPackages() async {
+        let first = OutdatedPackage.fixture(slug: "wget", title: "wget", currentVersion: "1.25.0")
+        let second = OutdatedPackage.fixture(kind: .cask, slug: "docker-desktop", title: "Docker Desktop", currentVersion: "4.68.0")
+        let refreshed = OutdatedPackage.fixture(slug: "wget", title: "wget", currentVersion: "1.25.1")
+        let provider = CyclingOutdatedPackagesProvider(results: [[refreshed]])
+        let executor = MockOutdatedBrewCommandExecutor(
+            result: .success(CommandResult(stdout: "Upgraded\n", stderr: "", exitCode: 0)),
+            chunks: [.init(stream: .stdout, text: "Upgrading visible packages...\n")]
+        )
+        let viewModel = OutdatedPackagesViewModel(
+            provider: provider,
+            commandExecutor: executor
+        )
+        viewModel.packagesState = .loaded([first, second])
+        viewModel.selectedPackage = second
+
+        viewModel.runUpgradeAll()
+        await waitUntil {
+            if case .succeeded = viewModel.upgradeAllState {
+                return true
+            }
+            return false
+        }
+        await waitUntil {
+            if case .loaded(let packages) = viewModel.packagesState {
+                return packages == [refreshed]
+            }
+            return false
+        }
+
+        XCTAssertEqual(executor.arguments, ["upgrade", "docker-desktop", "wget"])
+        XCTAssertEqual(viewModel.selectedPackage, refreshed)
+        XCTAssertEqual(viewModel.upgradeAllLogs.map(\.text).first, "Preparing upgrade for 2 packages.")
+        XCTAssertTrue(viewModel.upgradeAllLogs.contains(where: { $0.text == "Upgrading visible packages..." }))
+    }
+
     func testPinnedPackageDoesNotStartUpgradeAction() async {
         let package = OutdatedPackage.fixture(isPinned: true, pinnedVersion: "1.24.5")
         let executor = MockOutdatedBrewCommandExecutor()

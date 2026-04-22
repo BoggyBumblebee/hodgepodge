@@ -3,6 +3,8 @@ import Foundation
 @MainActor
 final class InstalledPackagesViewModel: ObservableObject {
     @Published var packagesState: InstalledPackagesLoadState = .idle
+    @Published var exportState: InstalledPackagesBrewfileExportState = .idle
+    @Published var exportLogs: [CommandLogEntry] = []
     @Published var searchText = ""
     @Published var scope: CatalogScope = .all
     @Published var activeFilters: Set<InstalledPackageFilterOption> = []
@@ -10,9 +12,26 @@ final class InstalledPackagesViewModel: ObservableObject {
     @Published var selectedPackage: InstalledPackage?
 
     private let provider: any InstalledPackagesProviding
+    private let commandExecutor: any BrewCommandExecuting
+    private let destinationPicker: any BrewfileDumpDestinationPicking
+    private let fileManager: FileManager
+    private var exportTask: Task<Void, Never>?
+    private var logBuffer = CommandLogBuffer()
 
-    init(provider: any InstalledPackagesProviding) {
+    init(
+        provider: any InstalledPackagesProviding,
+        commandExecutor: any BrewCommandExecuting,
+        destinationPicker: any BrewfileDumpDestinationPicking,
+        fileManager: FileManager = .default
+    ) {
         self.provider = provider
+        self.commandExecutor = commandExecutor
+        self.destinationPicker = destinationPicker
+        self.fileManager = fileManager
+    }
+
+    deinit {
+        exportTask?.cancel()
     }
 
     var filteredPackages: [InstalledPackage] {
@@ -60,6 +79,19 @@ final class InstalledPackagesViewModel: ObservableObject {
             InstalledPackageStateCount(title: "Leaves", count: packages.filter(\.isLeaf).count),
             InstalledPackageStateCount(title: "Pinned", count: packages.filter(\.isPinned).count)
         ]
+    }
+
+    var hasRunningExport: Bool {
+        exportState.isRunning
+    }
+
+    var exportCommandPreview: String {
+        exportCommand(for: URL(fileURLWithPath: "/<selected-path>")).command
+    }
+
+    var exportDescription: String {
+        exportCommand(for: fileManager.homeDirectoryForCurrentUser.appendingPathComponent("Brewfile"))
+            .scopeDescription
     }
 
     func dependencySnapshot(for package: InstalledPackage) -> InstalledPackageDependencySnapshot? {
@@ -123,6 +155,64 @@ final class InstalledPackagesViewModel: ObservableObject {
 
     func isFilterActive(_ filter: InstalledPackageFilterOption) -> Bool {
         activeFilters.contains(filter)
+    }
+
+    func generateBrewfile() {
+        let commandTemplate = exportCommand(
+            for: fileManager.homeDirectoryForCurrentUser.appendingPathComponent("Brewfile")
+        )
+        let startingDirectory = fileManager.homeDirectoryForCurrentUser
+
+        guard let destinationURL = destinationPicker.chooseDestination(
+            suggestedFileName: commandTemplate.suggestedFileName,
+            startingDirectory: startingDirectory
+        ) else {
+            return
+        }
+
+        let command = exportCommand(for: destinationURL)
+        let progress = InstalledPackagesBrewfileExportProgress(
+            command: command,
+            startedAt: Date()
+        )
+
+        exportTask?.cancel()
+        exportTask = nil
+        resetExportOutput()
+        exportState = .running(progress)
+        appendExportLog(.system, "Preparing Brewfile export for the current \(scope.title.lowercased()) scope.")
+
+        exportTask = Task { @MainActor [commandExecutor] in
+            do {
+                let result = try await commandExecutor.execute(arguments: command.arguments) { [weak self] kind, text in
+                    self?.appendExportLog(kind, text)
+                }
+                flushPendingExportLogs()
+                appendExportLog(.system, "Generated Brewfile at \(destinationURL.path).")
+                exportState = .succeeded(progress.finished(at: Date()), result)
+            } catch is CancellationError {
+                flushPendingExportLogs()
+                appendExportLog(.system, "Brewfile export cancelled.")
+                exportState = .cancelled(progress.finished(at: Date()))
+            } catch {
+                flushPendingExportLogs()
+                appendExportLog(.system, error.localizedDescription)
+                exportState = .failed(progress.finished(at: Date()), error.localizedDescription)
+            }
+
+            exportTask = nil
+        }
+    }
+
+    func cancelExport() {
+        exportTask?.cancel()
+    }
+
+    func clearExportOutput() {
+        exportTask?.cancel()
+        exportTask = nil
+        resetExportOutput()
+        exportState = .idle
     }
 
     private func matchesActiveFilters(for package: InstalledPackage) -> Bool {
@@ -194,18 +284,46 @@ final class InstalledPackagesViewModel: ObservableObject {
         }
         return fallback
     }
+
+    private func exportCommand(for destinationURL: URL) -> InstalledPackagesBrewfileExportCommand {
+        InstalledPackagesBrewfileExportCommand(
+            scope: scope,
+            destinationURL: destinationURL
+        )
+    }
+
+    private func resetExportOutput() {
+        logBuffer.reset()
+        exportLogs = []
+    }
+
+    private func appendExportLog(_ kind: CommandLogKind, _ text: String, timestamp: Date = Date()) {
+        logBuffer.append(kind, text, timestamp: timestamp)
+        exportLogs = logBuffer.entries
+    }
+
+    private func flushPendingExportLogs() {
+        logBuffer.flush()
+        exportLogs = logBuffer.entries
+    }
 }
 
 extension InstalledPackagesViewModel {
     static func live() -> InstalledPackagesViewModel {
         let runner = ProcessCommandRunner()
         let brewLocator = BrewLocator(runner: runner)
+        let commandExecutor = BrewCommandExecutor(
+            brewLocator: brewLocator,
+            runner: runner
+        )
 
         return InstalledPackagesViewModel(
             provider: BrewInstalledPackagesProvider(
                 brewLocator: brewLocator,
                 runner: runner
-            )
+            ),
+            commandExecutor: commandExecutor,
+            destinationPicker: BrewfileDumpDestinationPicker()
         )
     }
 }

@@ -125,3 +125,32 @@ struct CommandLogBuffer: Equatable, Sendable {
         nextIdentifier += 1
     }
 }
+
+enum CommandPresentation {
+    static func friendlyFailureDescription(
+        _ technicalMessage: String,
+        fallback: String
+    ) -> String {
+        let trimmed = technicalMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return fallback
+        }
+
+        if isGenericFailureMessage(trimmed) {
+            return fallback
+        }
+
+        return trimmed
+    }
+
+    private static func isGenericFailureMessage(_ message: String) -> Bool {
+        if message == CommandRunnerError.unreadablePipe.localizedDescription {
+            return true
+        }
+
+        return message.range(
+            of: #"^The command failed with exit code \d+\.$"#,
+            options: .regularExpression
+        ) != nil
+    }
+}

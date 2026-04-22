@@ -391,10 +391,13 @@ private struct BrewServiceDetailView: View {
             "Use these controls to start, stop, or restart the selected Homebrew service."
         case .running(let progress):
             "\(progress.command.kind.title) is running. Elapsed \(progress.elapsedTime().formatted(.number.precision(.fractionLength(1))))s."
-        case .succeeded(let progress, let result):
-            "\(progress.command.kind.title) completed with exit code \(result.exitCode)."
+        case .succeeded(let progress, _):
+            "\(progress.command.kind.title) completed successfully."
         case .failed(_, let message):
-            message
+            CommandPresentation.friendlyFailureDescription(
+                message,
+                fallback: "The service action couldn't complete."
+            )
         case .cancelled:
             "The service action was cancelled."
         }

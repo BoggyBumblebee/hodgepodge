@@ -20,7 +20,9 @@ final class InstalledPackagesViewModelTests: XCTestCase {
             )
         ]
         let viewModel = InstalledPackagesViewModel(
-            provider: MockInstalledPackagesProvider(result: .success(packages))
+            provider: MockInstalledPackagesProvider(result: .success(packages)),
+            commandExecutor: MockInstalledPackagesCommandExecutor(),
+            destinationPicker: MockBrewfileDumpDestinationPicker()
         )
 
         viewModel.loadIfNeeded()
@@ -60,7 +62,9 @@ final class InstalledPackagesViewModelTests: XCTestCase {
             )
         ]
         let viewModel = InstalledPackagesViewModel(
-            provider: MockInstalledPackagesProvider(result: .success(packages))
+            provider: MockInstalledPackagesProvider(result: .success(packages)),
+            commandExecutor: MockInstalledPackagesCommandExecutor(),
+            destinationPicker: MockBrewfileDumpDestinationPicker()
         )
         viewModel.packagesState = .loaded(packages)
 
@@ -87,7 +91,9 @@ final class InstalledPackagesViewModelTests: XCTestCase {
         let viewModel = InstalledPackagesViewModel(
             provider: MockInstalledPackagesProvider(
                 result: .failure(HomebrewAPIClientError.requestFailed(503))
-            )
+            ),
+            commandExecutor: MockInstalledPackagesCommandExecutor(),
+            destinationPicker: MockBrewfileDumpDestinationPicker()
         )
 
         viewModel.refreshPackages()
@@ -104,7 +110,9 @@ final class InstalledPackagesViewModelTests: XCTestCase {
 
     func testToggleAndClearFiltersUpdateState() {
         let viewModel = InstalledPackagesViewModel(
-            provider: MockInstalledPackagesProvider(result: .success([]))
+            provider: MockInstalledPackagesProvider(result: .success([])),
+            commandExecutor: MockInstalledPackagesCommandExecutor(),
+            destinationPicker: MockBrewfileDumpDestinationPicker()
         )
 
         XCTAssertFalse(viewModel.isFilterActive(.pinned))
@@ -125,7 +133,11 @@ final class InstalledPackagesViewModelTests: XCTestCase {
         let provider = CountingInstalledPackagesProvider(
             result: .success([makePackage()])
         )
-        let viewModel = InstalledPackagesViewModel(provider: provider)
+        let viewModel = InstalledPackagesViewModel(
+            provider: provider,
+            commandExecutor: MockInstalledPackagesCommandExecutor(),
+            destinationPicker: MockBrewfileDumpDestinationPicker()
+        )
         viewModel.packagesState = .loaded([makePackage()])
 
         viewModel.loadIfNeeded()
@@ -148,7 +160,11 @@ final class InstalledPackagesViewModelTests: XCTestCase {
             installedAt: Date(timeIntervalSince1970: 200)
         )
         let provider = CyclingInstalledPackagesProvider(results: [[original], [refreshed]])
-        let viewModel = InstalledPackagesViewModel(provider: provider)
+        let viewModel = InstalledPackagesViewModel(
+            provider: provider,
+            commandExecutor: MockInstalledPackagesCommandExecutor(),
+            destinationPicker: MockBrewfileDumpDestinationPicker()
+        )
 
         viewModel.loadIfNeeded()
         await waitUntil {
@@ -170,7 +186,9 @@ final class InstalledPackagesViewModelTests: XCTestCase {
             makePackage(kind: .cask, slug: "docker-desktop", title: "Docker Desktop", autoUpdates: true)
         ]
         let viewModel = InstalledPackagesViewModel(
-            provider: MockInstalledPackagesProvider(result: .success(packages))
+            provider: MockInstalledPackagesProvider(result: .success(packages)),
+            commandExecutor: MockInstalledPackagesCommandExecutor(),
+            destinationPicker: MockBrewfileDumpDestinationPicker()
         )
         viewModel.packagesState = .loaded(packages)
 
@@ -206,7 +224,9 @@ final class InstalledPackagesViewModelTests: XCTestCase {
             )
         ]
         let viewModel = InstalledPackagesViewModel(
-            provider: MockInstalledPackagesProvider(result: .success(packages))
+            provider: MockInstalledPackagesProvider(result: .success(packages)),
+            commandExecutor: MockInstalledPackagesCommandExecutor(),
+            destinationPicker: MockBrewfileDumpDestinationPicker()
         )
         viewModel.packagesState = .loaded(packages)
 
@@ -231,7 +251,9 @@ final class InstalledPackagesViewModelTests: XCTestCase {
             makePackage(slug: "openssl@3", title: "openssl@3")
         ]
         let viewModel = InstalledPackagesViewModel(
-            provider: MockInstalledPackagesProvider(result: .success(packages))
+            provider: MockInstalledPackagesProvider(result: .success(packages)),
+            commandExecutor: MockInstalledPackagesCommandExecutor(),
+            destinationPicker: MockBrewfileDumpDestinationPicker()
         )
         viewModel.packagesState = .loaded(packages)
         viewModel.selectedPackage = packages[0]
@@ -239,6 +261,79 @@ final class InstalledPackagesViewModelTests: XCTestCase {
         viewModel.selectPackage(id: packages[1].id)
 
         XCTAssertEqual(viewModel.selectedPackage, packages[1])
+    }
+
+    func testGenerateBrewfileUsesDestinationPickerAndRunsDumpForScope() async {
+        let destinationURL = URL(fileURLWithPath: "/tmp/Brewfile-formulae")
+        let executor = MockInstalledPackagesCommandExecutor(
+            result: .success(CommandResult(stdout: "", stderr: "", exitCode: 0))
+        )
+        let picker = MockBrewfileDumpDestinationPicker(result: destinationURL)
+        let viewModel = InstalledPackagesViewModel(
+            provider: MockInstalledPackagesProvider(result: .success([makePackage()])),
+            commandExecutor: executor,
+            destinationPicker: picker
+        )
+        viewModel.scope = .formula
+
+        viewModel.generateBrewfile()
+        await waitUntil {
+            if case .succeeded = viewModel.exportState {
+                return true
+            }
+            return false
+        }
+
+        XCTAssertEqual(picker.suggestedFileNames, ["Brewfile-formulae"])
+        XCTAssertEqual(
+            executor.executedArguments,
+            [["bundle", "dump", "--file", "/tmp/Brewfile-formulae", "--force", "--formula"]]
+        )
+        XCTAssertFalse(viewModel.exportLogs.isEmpty)
+    }
+
+    func testGenerateBrewfileDoesNothingWhenDestinationPickerCancels() async {
+        let executor = MockInstalledPackagesCommandExecutor()
+        let viewModel = InstalledPackagesViewModel(
+            provider: MockInstalledPackagesProvider(result: .success([])),
+            commandExecutor: executor,
+            destinationPicker: MockBrewfileDumpDestinationPicker(result: nil)
+        )
+
+        viewModel.generateBrewfile()
+        await Task.yield()
+
+        XCTAssertEqual(viewModel.exportState, .idle)
+        XCTAssertTrue(executor.executedArguments.isEmpty)
+    }
+
+    func testClearExportOutputResetsExportState() {
+        let destinationURL = URL(fileURLWithPath: "/tmp/Brewfile")
+        let viewModel = InstalledPackagesViewModel(
+            provider: MockInstalledPackagesProvider(result: .success([])),
+            commandExecutor: MockInstalledPackagesCommandExecutor(),
+            destinationPicker: MockBrewfileDumpDestinationPicker(result: destinationURL)
+        )
+        let command = InstalledPackagesBrewfileExportCommand(scope: .all, destinationURL: destinationURL)
+        viewModel.exportState = .running(
+            InstalledPackagesBrewfileExportProgress(
+                command: command,
+                startedAt: Date(timeIntervalSince1970: 1_000)
+            )
+        )
+        viewModel.exportLogs = [
+            CommandLogEntry(
+                id: 0,
+                kind: .system,
+                text: "Generating Brewfile",
+                timestamp: Date(timeIntervalSince1970: 1_001)
+            )
+        ]
+
+        viewModel.clearExportOutput()
+
+        XCTAssertEqual(viewModel.exportState, .idle)
+        XCTAssertTrue(viewModel.exportLogs.isEmpty)
     }
 
     private func waitUntil(
@@ -359,5 +454,42 @@ private final class CyclingInstalledPackagesProvider: InstalledPackagesProviding
     func fetchInstalledPackages() async throws -> [InstalledPackage] {
         defer { fetchCallCount += 1 }
         return results[min(fetchCallCount, results.count - 1)]
+    }
+}
+
+private final class MockInstalledPackagesCommandExecutor: BrewCommandExecuting, @unchecked Sendable {
+    let result: Result<CommandResult, Error>
+    private(set) var executedArguments: [[String]] = []
+
+    init(result: Result<CommandResult, Error> = .success(CommandResult(stdout: "", stderr: "", exitCode: 0))) {
+        self.result = result
+    }
+
+    func execute(
+        arguments: [String],
+        onLog: @escaping @MainActor @Sendable (CatalogPackageActionLogKind, String) -> Void
+    ) async throws -> CommandResult {
+        executedArguments.append(arguments)
+        await onLog(.system, "Using Homebrew at /opt/homebrew/bin/brew")
+        await onLog(.stdout, "Dumping Brewfile...\n")
+        return try result.get()
+    }
+}
+
+@MainActor
+private final class MockBrewfileDumpDestinationPicker: BrewfileDumpDestinationPicking, @unchecked Sendable {
+    let result: URL?
+    private(set) var suggestedFileNames: [String] = []
+
+    init(result: URL? = nil) {
+        self.result = result
+    }
+
+    func chooseDestination(
+        suggestedFileName: String,
+        startingDirectory: URL?
+    ) -> URL? {
+        suggestedFileNames.append(suggestedFileName)
+        return result
     }
 }

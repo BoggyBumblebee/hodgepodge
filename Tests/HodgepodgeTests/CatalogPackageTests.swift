@@ -75,12 +75,16 @@ final class CatalogPackageTests: XCTestCase {
         )
 
         XCTAssertEqual(CatalogPackageActionHistoryOutcome.succeeded(0).title, "Completed")
-        XCTAssertEqual(CatalogPackageActionHistoryOutcome.succeeded(0).detail, "Exit code 0")
+        XCTAssertEqual(CatalogPackageActionHistoryOutcome.succeeded(0).detail, "Completed successfully")
         XCTAssertEqual(CatalogPackageActionHistoryOutcome.cancelled.title, "Cancelled")
         XCTAssertEqual(CatalogPackageActionHistoryOutcome.cancelled.detail, "Stopped before completion")
         XCTAssertEqual(entry.duration, 135, accuracy: 0.001)
         XCTAssertEqual(entry.outcome.title, "Failed")
         XCTAssertEqual(entry.outcome.detail, "Already installed")
+        XCTAssertEqual(
+            CatalogPackageActionHistoryOutcome.failed("The command failed with exit code 1.").detail,
+            "Homebrew couldn't complete this action."
+        )
     }
 
     func testMetadataDetailsIncludeOptionalValuesWhenPresent() {
