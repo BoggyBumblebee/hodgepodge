@@ -94,6 +94,42 @@ final class ServicesViewModelTests: XCTestCase {
         XCTAssertNil(viewModel.selectedService)
     }
 
+    func testHomebrewStateChangeRefreshesLoadedServices() async {
+        let initial = BrewService.fixture(name: "postgresql@17")
+        let refreshed = BrewService.fixture(
+            name: "grafana",
+            serviceName: "homebrew.mxcl.grafana",
+            status: "none",
+            isRunning: false,
+            isLoaded: false,
+            pid: nil,
+            user: nil,
+            file: "/opt/homebrew/opt/grafana/homebrew.mxcl.grafana.plist",
+            isRegistered: false
+        )
+        let provider = CyclingBrewServicesProvider(results: [[refreshed]])
+        let notificationCenter = NotificationCenter()
+        let viewModel = ServicesViewModel(
+            provider: provider,
+            commandExecutor: MockBrewCommandExecutor(),
+            notificationCenter: notificationCenter
+        )
+        viewModel.servicesState = .loaded([initial])
+        viewModel.selectedService = initial
+
+        notificationCenter.post(name: .homebrewStateDidChange, object: nil)
+
+        await waitUntil {
+            if case .loaded(let services) = viewModel.servicesState {
+                return services == [refreshed]
+            }
+            return false
+        }
+
+        XCTAssertEqual(viewModel.selectedService, refreshed)
+        XCTAssertEqual(provider.fetchCallCount, 1)
+    }
+
     func testRunActionStoresSuccessStateAndRefreshesSelection() async {
         let initial = BrewService.fixture(name: "postgresql@17")
         let refreshed = BrewService.fixture(

@@ -21,16 +21,21 @@ final class ServicesViewModel: ObservableObject {
     private let commandExecutor: any BrewCommandExecuting
     private let notificationScheduler: any CommandNotificationScheduling
     private var actionTask: Task<Void, Never>?
+    private var homebrewStateObserver: HomebrewStateObserver?
     private var logBuffer = CommandLogBuffer()
 
     init(
         provider: any BrewServicesProviding,
         commandExecutor: any BrewCommandExecuting,
-        notificationScheduler: any CommandNotificationScheduling = NullCommandNotificationScheduler()
+        notificationScheduler: any CommandNotificationScheduling = NullCommandNotificationScheduler(),
+        notificationCenter: NotificationCenter = .default
     ) {
         self.provider = provider
         self.commandExecutor = commandExecutor
         self.notificationScheduler = notificationScheduler
+        homebrewStateObserver = HomebrewStateObserver(notificationCenter: notificationCenter) { [weak self] _ in
+            self?.handleHomebrewStateChange()
+        }
     }
 
     deinit {
@@ -424,6 +429,19 @@ final class ServicesViewModel: ObservableObject {
         }
 
         return "\(command.displayName) couldn’t be completed."
+    }
+
+    private func handleHomebrewStateChange() {
+        guard !hasRunningAction else {
+            return
+        }
+
+        switch servicesState {
+        case .idle, .loading:
+            return
+        case .loaded, .failed:
+            refreshServices()
+        }
     }
 }
 
