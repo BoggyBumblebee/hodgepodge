@@ -71,6 +71,7 @@ struct ProcessCommandRunner: CommandRunning {
 
                 process.executableURL = URL(fileURLWithPath: executable)
                 process.arguments = arguments
+                process.environment = CommandEnvironment.normalized(for: executable)
                 process.standardOutput = stdoutPipe
                 process.standardError = stderrPipe
 
@@ -221,6 +222,64 @@ struct ProcessCommandRunner: CommandRunning {
         } catch {
             return .unreadablePipe
         }
+    }
+}
+
+enum CommandEnvironment {
+    static func normalized(
+        for executable: String,
+        baseEnvironment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> [String: String] {
+        var environment = baseEnvironment
+        environment["PATH"] = normalizedPath(
+            basePath: baseEnvironment["PATH"] ?? "",
+            preferredEntries: preferredPathEntries(for: executable)
+        )
+        return environment
+    }
+
+    private static func preferredPathEntries(for executable: String) -> [String] {
+        let executableURL = URL(fileURLWithPath: executable)
+        let executableName = executableURL.lastPathComponent
+
+        guard executableName == "brew" else {
+            return []
+        }
+
+        let binDirectoryURL = executableURL.deletingLastPathComponent()
+        if executable.contains("/"), binDirectoryURL.lastPathComponent == "bin" {
+            let prefixURL = binDirectoryURL.deletingLastPathComponent()
+            return [
+                prefixURL.appendingPathComponent("bin").path,
+                prefixURL.appendingPathComponent("sbin").path
+            ]
+        }
+
+        return [
+            "/opt/homebrew/bin",
+            "/opt/homebrew/sbin",
+            "/usr/local/bin",
+            "/usr/local/sbin"
+        ]
+    }
+
+    private static func normalizedPath(
+        basePath: String,
+        preferredEntries: [String]
+    ) -> String {
+        var seen = Set<String>()
+        var entries: [String] = []
+
+        for entry in preferredEntries + basePath.split(separator: ":").map(String.init) {
+            let trimmedEntry = entry.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmedEntry.isEmpty, seen.insert(trimmedEntry).inserted else {
+                continue
+            }
+
+            entries.append(trimmedEntry)
+        }
+
+        return entries.joined(separator: ":")
     }
 }
 

@@ -3,6 +3,8 @@ import XCTest
 
 @MainActor
 final class CommandRunningTests: XCTestCase {
+    private let fileManager = FileManager.default
+
     func testProcessCommandRunnerCapturesSuccessfulOutput() async throws {
         let runner = ProcessCommandRunner()
 
@@ -91,5 +93,50 @@ final class CommandRunningTests: XCTestCase {
         )
 
         XCTAssertEqual(error.errorDescription, "bundle check failed")
+    }
+
+    func testProcessCommandRunnerNormalizesPathForBrewExecutables() async throws {
+        let runner = ProcessCommandRunner()
+        let rootURL = fileManager.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let binURL = rootURL.appendingPathComponent("bin", isDirectory: true)
+        let sbinURL = rootURL.appendingPathComponent("sbin", isDirectory: true)
+        let brewURL = binURL.appendingPathComponent("brew")
+
+        try fileManager.createDirectory(at: binURL, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: sbinURL, withIntermediateDirectories: true)
+        try """
+        #!/bin/sh
+        printf '%s' "$PATH"
+        """.write(to: brewURL, atomically: true, encoding: .utf8)
+        try fileManager.setAttributes(
+            [.posixPermissions: 0o755],
+            ofItemAtPath: brewURL.path
+        )
+
+        defer {
+            try? fileManager.removeItem(at: rootURL)
+        }
+
+        let result = try await runner.run(executable: brewURL.path, arguments: [])
+        let pathEntries = result.stdout
+            .split(separator: ":")
+            .map(String.init)
+
+        XCTAssertGreaterThanOrEqual(pathEntries.count, 2)
+        XCTAssertEqual(pathEntries[0], binURL.path)
+        XCTAssertEqual(pathEntries[1], sbinURL.path)
+    }
+
+    func testCommandEnvironmentNormalizesNamedBrewExecutables() {
+        let environment = CommandEnvironment.normalized(
+            for: "brew",
+            baseEnvironment: ["PATH": "/usr/bin:/bin"]
+        )
+
+        XCTAssertEqual(
+            environment["PATH"],
+            "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/local/sbin:/usr/bin:/bin"
+        )
     }
 }
