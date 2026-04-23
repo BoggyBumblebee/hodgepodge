@@ -39,6 +39,6 @@ jobs:
           python3 Scripts/xcresult-to-sonar-test-execution.py BuildArtifacts/Hodgepodge.xcresult BuildArtifacts/sonar-test-execution.xml
 
       - name: SonarCloud scan
-        uses: SonarSource/sonarqube-scan-action@v5
+        uses: SonarSource/sonarqube-scan-action@v6
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
