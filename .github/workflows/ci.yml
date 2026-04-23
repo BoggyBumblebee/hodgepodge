@@ -36,6 +36,7 @@ jobs:
           mkdir -p BuildArtifacts
           xcrun xccov view --report BuildArtifacts/Hodgepodge.xcresult > BuildArtifacts/coverage.txt
           Scripts/xccov-to-sonar-generic.sh BuildArtifacts/Hodgepodge.xcresult BuildArtifacts/sonar-generic-coverage.xml
+          python3 Scripts/xcresult-to-sonar-test-execution.py BuildArtifacts/Hodgepodge.xcresult BuildArtifacts/sonar-test-execution.xml
 
       - name: Upload test artifacts
         if: always()
@@ -46,3 +47,4 @@ jobs:
             BuildArtifacts/Hodgepodge.xcresult
             BuildArtifacts/coverage.txt
             BuildArtifacts/sonar-generic-coverage.xml
+            BuildArtifacts/sonar-test-execution.xml

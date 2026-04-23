@@ -34,7 +34,9 @@ jobs:
             test CODE_SIGNING_ALLOWED=NO
 
       - name: Convert coverage for SonarCloud
-        run: Scripts/xccov-to-sonar-generic.sh BuildArtifacts/Hodgepodge.xcresult BuildArtifacts/sonar-generic-coverage.xml
+        run: |
+          Scripts/xccov-to-sonar-generic.sh BuildArtifacts/Hodgepodge.xcresult BuildArtifacts/sonar-generic-coverage.xml
+          python3 Scripts/xcresult-to-sonar-test-execution.py BuildArtifacts/Hodgepodge.xcresult BuildArtifacts/sonar-test-execution.xml
 
       - name: SonarCloud scan
         uses: SonarSource/sonarqube-scan-action@v5
