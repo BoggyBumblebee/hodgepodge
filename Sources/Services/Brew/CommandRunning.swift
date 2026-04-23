@@ -255,12 +255,7 @@ enum CommandEnvironment {
             ]
         }
 
-        return [
-            "/opt/homebrew/bin",
-            "/opt/homebrew/sbin",
-            "/usr/local/bin",
-            "/usr/local/sbin"
-        ]
+        return fallbackBrewPathEntries
     }
 
     private static func normalizedPath(
@@ -280,6 +275,19 @@ enum CommandEnvironment {
         }
 
         return entries.joined(separator: ":")
+    }
+
+    private static var fallbackBrewPathEntries: [String] {
+        [
+            path(components: ["opt", "homebrew", "bin"]),
+            path(components: ["opt", "homebrew", "sbin"]),
+            path(components: ["usr", "local", "bin"]),
+            path(components: ["usr", "local", "sbin"])
+        ]
+    }
+
+    private static func path(components: [String]) -> String {
+        NSString.path(withComponents: ["/"] + components)
     }
 }
 
