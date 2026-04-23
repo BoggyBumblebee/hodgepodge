@@ -35,31 +35,43 @@ struct BrewfileDocumentLoader: BrewfileDocumentLoading {
         }
 
         if let comment = parseComment(trimmedLine) {
-            return BrewfileLine(
+            return makeLine(
                 lineNumber: lineNumber,
                 category: .comment,
-                entry: nil,
                 rawLine: rawLine,
                 commentText: comment
             )
         }
 
         if let entry = parseEntry(from: rawLine, lineNumber: lineNumber) {
-            return BrewfileLine(
+            return makeLine(
                 lineNumber: lineNumber,
                 category: .entry,
                 entry: entry,
-                rawLine: rawLine,
-                commentText: nil
+                rawLine: rawLine
             )
         }
 
-        return BrewfileLine(
+        return makeLine(
             lineNumber: lineNumber,
             category: .unknown,
-            entry: nil,
+            rawLine: rawLine
+        )
+    }
+
+    private func makeLine(
+        lineNumber: Int,
+        category: BrewfileLineCategory,
+        entry: BrewfileEntry? = nil,
+        rawLine: String,
+        commentText: String? = nil
+    ) -> BrewfileLine {
+        BrewfileLine(
+            lineNumber: lineNumber,
+            category: category,
+            entry: entry,
             rawLine: rawLine,
-            commentText: nil
+            commentText: commentText
         )
     }
 
@@ -203,42 +215,16 @@ struct BrewfileDocumentLoader: BrewfileDocumentLoading {
     private func splitTopLevelCSV(_ text: String) -> [String] {
         var parts: [String] = []
         var current = ""
-        var inSingleQuotes = false
-        var inDoubleQuotes = false
-        var bracketDepth = 0
-        var braceDepth = 0
-        var parenthesisDepth = 0
-        var previousCharacter: Character?
 
-        for character in text {
-            switch character {
-            case "'" where !inDoubleQuotes && previousCharacter != "\\":
-                inSingleQuotes.toggle()
-            case "\"" where !inSingleQuotes && previousCharacter != "\\":
-                inDoubleQuotes.toggle()
-            case "[" where !inSingleQuotes && !inDoubleQuotes:
-                bracketDepth += 1
-            case "]" where !inSingleQuotes && !inDoubleQuotes:
-                bracketDepth = max(0, bracketDepth - 1)
-            case "{" where !inSingleQuotes && !inDoubleQuotes:
-                braceDepth += 1
-            case "}" where !inSingleQuotes && !inDoubleQuotes:
-                braceDepth = max(0, braceDepth - 1)
-            case "(" where !inSingleQuotes && !inDoubleQuotes:
-                parenthesisDepth += 1
-            case ")" where !inSingleQuotes && !inDoubleQuotes:
-                parenthesisDepth = max(0, parenthesisDepth - 1)
-            case "," where !inSingleQuotes && !inDoubleQuotes && bracketDepth == 0 && braceDepth == 0 && parenthesisDepth == 0:
+        scanTopLevel(in: text) { _, character, state in
+            if character == ",", state.isAtTopLevel {
                 parts.append(current)
                 current.removeAll(keepingCapacity: true)
-                previousCharacter = character
-                continue
-            default:
-                break
+                return false
             }
 
             current.append(character)
-            previousCharacter = character
+            return false
         }
 
         if !current.isEmpty {
@@ -249,42 +235,75 @@ struct BrewfileDocumentLoader: BrewfileDocumentLoading {
     }
 
     private func firstTopLevelColon(in text: String) -> String.Index? {
-        var inSingleQuotes = false
-        var inDoubleQuotes = false
-        var bracketDepth = 0
-        var braceDepth = 0
-        var parenthesisDepth = 0
-        var previousCharacter: Character?
+        var separatorIndex: String.Index?
+
+        scanTopLevel(in: text) { index, character, state in
+            if character == ":", state.isAtTopLevel {
+                separatorIndex = index
+                return true
+            }
+
+            return false
+        }
+
+        return separatorIndex
+    }
+
+    private func scanTopLevel(
+        in text: String,
+        _ visitor: (String.Index, Character, TopLevelParserState) -> Bool
+    ) {
+        var state = TopLevelParserState()
 
         for index in text.indices {
             let character = text[index]
+            state.consume(character)
 
-            switch character {
-            case "'" where !inDoubleQuotes && previousCharacter != "\\":
-                inSingleQuotes.toggle()
-            case "\"" where !inSingleQuotes && previousCharacter != "\\":
-                inDoubleQuotes.toggle()
-            case "[" where !inSingleQuotes && !inDoubleQuotes:
-                bracketDepth += 1
-            case "]" where !inSingleQuotes && !inDoubleQuotes:
-                bracketDepth = max(0, bracketDepth - 1)
-            case "{" where !inSingleQuotes && !inDoubleQuotes:
-                braceDepth += 1
-            case "}" where !inSingleQuotes && !inDoubleQuotes:
-                braceDepth = max(0, braceDepth - 1)
-            case "(" where !inSingleQuotes && !inDoubleQuotes:
-                parenthesisDepth += 1
-            case ")" where !inSingleQuotes && !inDoubleQuotes:
-                parenthesisDepth = max(0, parenthesisDepth - 1)
-            case ":" where !inSingleQuotes && !inDoubleQuotes && bracketDepth == 0 && braceDepth == 0 && parenthesisDepth == 0:
-                return index
-            default:
-                break
+            if visitor(index, character, state) {
+                return
             }
+        }
+    }
+}
 
-            previousCharacter = character
+private struct TopLevelParserState {
+    private(set) var inSingleQuotes = false
+    private(set) var inDoubleQuotes = false
+    private(set) var bracketDepth = 0
+    private(set) var braceDepth = 0
+    private(set) var parenthesisDepth = 0
+    private var previousCharacter: Character?
+
+    var isAtTopLevel: Bool {
+        !inSingleQuotes &&
+        !inDoubleQuotes &&
+        bracketDepth == 0 &&
+        braceDepth == 0 &&
+        parenthesisDepth == 0
+    }
+
+    mutating func consume(_ character: Character) {
+        switch character {
+        case "'" where !inDoubleQuotes && previousCharacter != "\\":
+            inSingleQuotes.toggle()
+        case "\"" where !inSingleQuotes && previousCharacter != "\\":
+            inDoubleQuotes.toggle()
+        case "[" where !inSingleQuotes && !inDoubleQuotes:
+            bracketDepth += 1
+        case "]" where !inSingleQuotes && !inDoubleQuotes:
+            bracketDepth = max(0, bracketDepth - 1)
+        case "{" where !inSingleQuotes && !inDoubleQuotes:
+            braceDepth += 1
+        case "}" where !inSingleQuotes && !inDoubleQuotes:
+            braceDepth = max(0, braceDepth - 1)
+        case "(" where !inSingleQuotes && !inDoubleQuotes:
+            parenthesisDepth += 1
+        case ")" where !inSingleQuotes && !inDoubleQuotes:
+            parenthesisDepth = max(0, parenthesisDepth - 1)
+        default:
+            break
         }
 
-        return nil
+        previousCharacter = character
     }
 }

@@ -92,14 +92,7 @@ final class TapsViewModel: ObservableObject {
         Task { @MainActor [provider] in
             do {
                 let taps = try await provider.fetchTaps()
-                tapsState = .loaded(taps)
-
-                if let selectedTap,
-                   let refreshedSelection = taps.first(where: { $0.id == selectedTap.id }) {
-                    self.selectedTap = refreshedSelection
-                } else {
-                    selectedTap = defaultSelection(from: taps)
-                }
+                applyLoadedTaps(taps, selection: selectionPreservingCurrentTap(from: taps))
             } catch {
                 tapsState = .failed(error.localizedDescription)
                 selectedTap = nil
@@ -151,7 +144,7 @@ final class TapsViewModel: ObservableObject {
     }
 
     func actionState(for tap: BrewTap) -> BrewTapActionState {
-        guard actionState.command?.tapName == tap.name else {
+        guard isShowingActionDetails(for: tap) else {
             return .idle
         }
 
@@ -159,7 +152,7 @@ final class TapsViewModel: ObservableObject {
     }
 
     func actionLogs(for tap: BrewTap) -> [CommandLogEntry] {
-        guard actionState.command?.tapName == tap.name else {
+        guard isShowingActionDetails(for: tap) else {
             return []
         }
 
@@ -191,26 +184,20 @@ final class TapsViewModel: ObservableObject {
                 let result = try await commandExecutor.execute(arguments: command.arguments) { [weak self] kind, text in
                     self?.appendLog(kind, text)
                 }
-                flushPendingLogs()
-                appendLog(.system, "\(command.kind.title) finished with exit code \(result.exitCode).")
                 let completedProgress = progress.finished(at: Date())
-                actionState = .succeeded(completedProgress, result)
+                storeSucceededAction(command: command, progress: completedProgress, result: result)
                 await notifyActionSucceeded(command: command, elapsedTime: completedProgress.elapsedTime())
                 reloadTapsAfterAction(
                     command: command,
                     preservingSelectionID: preservingSelectionID
                 )
             } catch is CancellationError {
-                flushPendingLogs()
-                appendLog(.system, "\(command.kind.title) cancelled.")
                 let completedProgress = progress.finished(at: Date())
-                actionState = .cancelled(completedProgress)
+                storeCancelledAction(command: command, progress: completedProgress)
                 await notifyActionCancelled(command: command, elapsedTime: completedProgress.elapsedTime())
             } catch {
-                flushPendingLogs()
-                appendLog(.system, error.localizedDescription)
                 let completedProgress = progress.finished(at: Date())
-                actionState = .failed(completedProgress, error.localizedDescription)
+                storeFailedAction(progress: completedProgress, error: error)
                 await notifyActionFailed(command: command, error: error, elapsedTime: completedProgress.elapsedTime())
             }
 
@@ -225,23 +212,15 @@ final class TapsViewModel: ObservableObject {
         Task { @MainActor [provider] in
             do {
                 let taps = try await provider.fetchTaps()
-                tapsState = .loaded(taps)
-
-                switch command {
-                case .add(let name, _):
-                    selectedTap = taps.first(where: { $0.name == name }) ?? defaultSelection(from: taps)
-                    addTapName = ""
-                    addTapRemoteURL = ""
-                case .untap(let name, _):
-                    if preservingSelectionID == name {
-                        selectedTap = defaultSelection(from: taps)
-                    } else if let preservingSelectionID,
-                              let preserved = taps.first(where: { $0.id == preservingSelectionID }) {
-                        selectedTap = preserved
-                    } else {
-                        selectedTap = defaultSelection(from: taps)
-                    }
-                }
+                applyLoadedTaps(
+                    taps,
+                    selection: selectionAfterAction(
+                        command: command,
+                        preservingSelectionID: preservingSelectionID,
+                        taps: taps
+                    )
+                )
+                clearAddTapDraftIfNeeded(for: command)
             } catch {
                 appendLog(.system, error.localizedDescription)
             }
@@ -291,6 +270,49 @@ final class TapsViewModel: ObservableObject {
         taps.sorted(by: sorter(for: sortOption)).first
     }
 
+    private func selectionPreservingCurrentTap(from taps: [BrewTap]) -> BrewTap? {
+        if let selectedTap,
+           let refreshedSelection = taps.first(where: { $0.id == selectedTap.id }) {
+            return refreshedSelection
+        }
+
+        return defaultSelection(from: taps)
+    }
+
+    private func selectionAfterAction(
+        command: BrewTapActionCommand,
+        preservingSelectionID: String?,
+        taps: [BrewTap]
+    ) -> BrewTap? {
+        switch command {
+        case .add(let name, _):
+            return taps.first(where: { $0.name == name }) ?? defaultSelection(from: taps)
+        case .untap(let name, _):
+            if preservingSelectionID == name {
+                return defaultSelection(from: taps)
+            }
+            if let preservingSelectionID,
+               let preserved = taps.first(where: { $0.id == preservingSelectionID }) {
+                return preserved
+            }
+            return defaultSelection(from: taps)
+        }
+    }
+
+    private func applyLoadedTaps(_ taps: [BrewTap], selection: BrewTap?) {
+        tapsState = .loaded(taps)
+        selectedTap = selection
+    }
+
+    private func clearAddTapDraftIfNeeded(for command: BrewTapActionCommand) {
+        guard case .add = command else {
+            return
+        }
+
+        addTapName = ""
+        addTapRemoteURL = ""
+    }
+
     private static func compare(_ lhs: String, _ rhs: String, fallback: Bool) -> Bool {
         let result = lhs.localizedCaseInsensitiveCompare(rhs)
         if result != .orderedSame {
@@ -312,6 +334,38 @@ final class TapsViewModel: ObservableObject {
     private func flushPendingLogs() {
         logBuffer.flush()
         actionLogs = logBuffer.entries
+    }
+
+    private func isShowingActionDetails(for tap: BrewTap) -> Bool {
+        actionState.command?.tapName == tap.name
+    }
+
+    private func storeSucceededAction(
+        command: BrewTapActionCommand,
+        progress: BrewTapActionProgress,
+        result: CommandResult
+    ) {
+        flushPendingLogs()
+        appendLog(.system, "\(command.kind.title) finished with exit code \(result.exitCode).")
+        actionState = .succeeded(progress, result)
+    }
+
+    private func storeCancelledAction(
+        command: BrewTapActionCommand,
+        progress: BrewTapActionProgress
+    ) {
+        flushPendingLogs()
+        appendLog(.system, "\(command.kind.title) cancelled.")
+        actionState = .cancelled(progress)
+    }
+
+    private func storeFailedAction(
+        progress: BrewTapActionProgress,
+        error: Error
+    ) {
+        flushPendingLogs()
+        appendLog(.system, error.localizedDescription)
+        actionState = .failed(progress, error.localizedDescription)
     }
 
     private func notifyActionSucceeded(
