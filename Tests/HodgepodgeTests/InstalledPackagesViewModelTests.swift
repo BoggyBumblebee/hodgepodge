@@ -408,7 +408,7 @@ final class InstalledPackagesViewModelTests: XCTestCase {
         )
         let picker = MockBrewfileDumpDestinationPicker(result: destinationURL)
         let settingsStore = MockAppSettingsStore(
-            snapshot: AppSettingsSnapshot(brewfileDefaultExportScope: .formula)
+            snapshot: AppSettingsSnapshot(brewfile: .init(defaultExportScope: .formula))
         )
         let viewModel = InstalledPackagesViewModel(
             provider: MockInstalledPackagesProvider(result: .success([makePackage()])),
@@ -441,7 +441,7 @@ final class InstalledPackagesViewModelTests: XCTestCase {
             commandExecutor: MockInstalledPackagesCommandExecutor(),
             destinationPicker: MockBrewfileDumpDestinationPicker(),
             settingsStore: MockAppSettingsStore(
-                snapshot: AppSettingsSnapshot(brewfileDefaultExportScope: .all)
+                snapshot: AppSettingsSnapshot(brewfile: .init(defaultExportScope: .all))
             ),
             notificationCenter: notificationCenter
         )
@@ -451,7 +451,7 @@ final class InstalledPackagesViewModelTests: XCTestCase {
             object: nil,
             userInfo: [
                 AppSettingsNotificationUserInfoKey.snapshot: AppSettingsSnapshot(
-                    brewfileDefaultExportScope: .cask
+                    brewfile: .init(defaultExportScope: .cask)
                 )
             ]
         )

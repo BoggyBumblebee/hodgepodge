@@ -160,9 +160,7 @@ final class ViewRenderingTests: XCTestCase {
             store: PreviewAppSettingsStore(
                 snapshot: AppSettingsSnapshot(
                     defaultLaunchSection: .installed,
-                    completionNotificationsEnabled: true,
-                    notificationSoundEnabled: false,
-                    restoreLastSelectedBrewfile: true
+                    notifications: .init(soundEnabled: false)
                 )
             )
         )
@@ -936,13 +934,13 @@ final class ViewRenderingTests: XCTestCase {
         XCTAssertNotNil(render(TapsView(viewModel: viewModel)))
     }
 
-    func testBrewfileViewRendersLoadedState() {
+    func testBrewfileViewRendersLoadedState() throws {
         let document = BrewfileDocument.fixture()
         let viewModel = makeBrewfileModel()
         viewModel.documentState = .loaded(document)
         viewModel.selectedFileURL = document.fileURL
         viewModel.selectedLine = document.lines.first
-        let command = BrewfileActionCommand(kind: .check, fileURL: document.fileURL)
+        let command = try XCTUnwrap(BrewfileActionCommand.make(kind: .check, fileURL: document.fileURL))
         viewModel.actionState = .running(
             BrewfileActionProgress(
                 command: command,
@@ -974,7 +972,7 @@ final class ViewRenderingTests: XCTestCase {
         XCTAssertNotNil(render(BrewfileView(viewModel: viewModel)))
     }
 
-    func testBrewfileViewRendersActionDetailsWhenLogsExist() {
+    func testBrewfileViewRendersActionDetailsWhenLogsExist() throws {
         let document = BrewfileDocument.fixture()
         let viewModel = makeBrewfileModel()
         viewModel.documentState = .loaded(document)
@@ -982,7 +980,7 @@ final class ViewRenderingTests: XCTestCase {
         viewModel.selectedLine = document.lines.first
         viewModel.actionState = .succeeded(
             BrewfileActionProgress(
-                command: BrewfileActionCommand(kind: .install, fileURL: document.fileURL),
+                command: try XCTUnwrap(BrewfileActionCommand.make(kind: .install, fileURL: document.fileURL)),
                 startedAt: Date(timeIntervalSince1970: 1_000),
                 finishedAt: Date(timeIntervalSince1970: 1_030)
             ),
@@ -1000,7 +998,7 @@ final class ViewRenderingTests: XCTestCase {
         XCTAssertNotNil(render(BrewfileView(viewModel: viewModel)))
     }
 
-    func testBrewfileViewRendersLoadedOverviewWhenNoLineIsSelected() {
+    func testBrewfileViewRendersLoadedOverviewWhenNoLineIsSelected() throws {
         let document = BrewfileDocument.fixture()
         let viewModel = makeBrewfileModel()
         viewModel.documentState = .loaded(document)
@@ -1008,7 +1006,7 @@ final class ViewRenderingTests: XCTestCase {
         viewModel.selectedLine = nil
         viewModel.actionState = .failed(
             BrewfileActionProgress(
-                command: BrewfileActionCommand(kind: .install, fileURL: document.fileURL),
+                command: try XCTUnwrap(BrewfileActionCommand.make(kind: .install, fileURL: document.fileURL)),
                 startedAt: Date(timeIntervalSince1970: 1_000),
                 finishedAt: Date(timeIntervalSince1970: 1_020)
             ),

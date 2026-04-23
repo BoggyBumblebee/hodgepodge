@@ -70,6 +70,42 @@ enum CatalogHistoryRetentionLimit: Int, Codable, CaseIterable, Identifiable, Equ
 }
 
 struct AppSettingsSnapshot: Codable, Equatable, Sendable {
+    struct NotificationPreferences: Equatable, Sendable {
+        var isEnabled: Bool
+        var scope: CompletionNotificationScope
+        var categories: Set<CompletionNotificationCategory>
+        var soundEnabled: Bool
+
+        init(
+            isEnabled: Bool = true,
+            scope: CompletionNotificationScope = .allCompletions,
+            categories: Set<CompletionNotificationCategory> = Set(CompletionNotificationCategory.allCases),
+            soundEnabled: Bool = true
+        ) {
+            self.isEnabled = isEnabled
+            self.scope = scope
+            self.categories = categories
+            self.soundEnabled = soundEnabled
+        }
+
+        static let standard = NotificationPreferences()
+    }
+
+    struct BrewfilePreferences: Equatable, Sendable {
+        var restoreLastSelectedBrewfile: Bool
+        var defaultExportScope: CatalogScope
+
+        init(
+            restoreLastSelectedBrewfile: Bool = true,
+            defaultExportScope: CatalogScope = .all
+        ) {
+            self.restoreLastSelectedBrewfile = restoreLastSelectedBrewfile
+            self.defaultExportScope = defaultExportScope
+        }
+
+        static let standard = BrewfilePreferences()
+    }
+
     var defaultLaunchSection: AppSection
     var completionNotificationsEnabled: Bool
     var completionNotificationScope: CompletionNotificationScope
@@ -81,21 +117,17 @@ struct AppSettingsSnapshot: Codable, Equatable, Sendable {
 
     init(
         defaultLaunchSection: AppSection = .catalog,
-        completionNotificationsEnabled: Bool = true,
-        completionNotificationScope: CompletionNotificationScope = .allCompletions,
-        completionNotificationCategories: Set<CompletionNotificationCategory> = Set(CompletionNotificationCategory.allCases),
-        notificationSoundEnabled: Bool = true,
-        restoreLastSelectedBrewfile: Bool = true,
-        brewfileDefaultExportScope: CatalogScope = .all,
+        notifications: NotificationPreferences = .standard,
+        brewfile: BrewfilePreferences = .standard,
         catalogHistoryRetentionLimit: CatalogHistoryRetentionLimit = .fifty
     ) {
         self.defaultLaunchSection = defaultLaunchSection
-        self.completionNotificationsEnabled = completionNotificationsEnabled
-        self.completionNotificationScope = completionNotificationScope
-        self.completionNotificationCategories = completionNotificationCategories
-        self.notificationSoundEnabled = notificationSoundEnabled
-        self.restoreLastSelectedBrewfile = restoreLastSelectedBrewfile
-        self.brewfileDefaultExportScope = brewfileDefaultExportScope
+        self.completionNotificationsEnabled = notifications.isEnabled
+        self.completionNotificationScope = notifications.scope
+        self.completionNotificationCategories = notifications.categories
+        self.notificationSoundEnabled = notifications.soundEnabled
+        self.restoreLastSelectedBrewfile = brewfile.restoreLastSelectedBrewfile
+        self.brewfileDefaultExportScope = brewfile.defaultExportScope
         self.catalogHistoryRetentionLimit = catalogHistoryRetentionLimit
     }
 

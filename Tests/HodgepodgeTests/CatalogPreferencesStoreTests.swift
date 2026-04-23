@@ -111,21 +111,29 @@ final class CatalogPreferencesStoreTests: XCTestCase {
             notificationCenter: notificationCenter
         )
         let expectation = expectation(description: "favorite change notification")
-        var receivedIDs: [String] = []
+        let receivedIDs = SendableBox<[String]>([])
         let observer = notificationCenter.addObserver(
             forName: .favoritePackageIDsDidChange,
             object: nil,
             queue: nil
         ) { notification in
-            receivedIDs = notification.userInfo?[FavoritePackageNotificationUserInfoKey.ids] as? [String] ?? []
+            receivedIDs.value = notification.userInfo?[FavoritePackageNotificationUserInfoKey.ids] as? [String] ?? []
             expectation.fulfill()
         }
 
         store.saveFavoritePackageIDs(["formula:wget"])
 
         wait(for: [expectation], timeout: 1)
-        XCTAssertEqual(receivedIDs, ["formula:wget"])
+        XCTAssertEqual(receivedIDs.value, ["formula:wget"])
         notificationCenter.removeObserver(observer)
         try? FileManager.default.removeItem(at: rootURL)
+    }
+}
+
+private final class SendableBox<Value>: @unchecked Sendable {
+    var value: Value
+
+    init(_ value: Value) {
+        self.value = value
     }
 }

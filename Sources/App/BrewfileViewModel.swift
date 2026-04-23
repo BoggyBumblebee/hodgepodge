@@ -106,14 +106,8 @@ final class BrewfileViewModel: ObservableObject {
     }
 
     var dumpCommandPreview: String {
-        guard let selectedFileURL else {
-            return BrewfileActionCommand(
-                kind: .dump,
-                fileURL: fileManager.homeDirectoryForCurrentUser.appendingPathComponent("Brewfile")
-            ).command
-        }
-
-        return BrewfileActionCommand(kind: .dump, fileURL: selectedFileURL).command
+        let fileURL = selectedFileURL ?? fileManager.homeDirectoryForCurrentUser.appendingPathComponent("Brewfile")
+        return BrewfileActionCommand.make(kind: .dump, fileURL: fileURL)?.command ?? ""
     }
 
     var removableSelectedEntry: BrewfileEntry? {
@@ -130,7 +124,7 @@ final class BrewfileViewModel: ObservableObject {
             return nil
         }
 
-        return BrewfileActionCommand(kind: kind, fileURL: selectedFileURL)
+        return BrewfileActionCommand.make(kind: kind, fileURL: selectedFileURL)
     }
 
     func removeCommandForSelectedEntry() -> BrewfileActionCommand? {
@@ -139,7 +133,7 @@ final class BrewfileViewModel: ObservableObject {
             return nil
         }
 
-        return BrewfileActionCommand(
+        return BrewfileActionCommand.make(
             kind: .remove,
             fileURL: selectedFileURL,
             entryName: entry.name,
@@ -205,7 +199,9 @@ final class BrewfileViewModel: ObservableObject {
             return
         }
 
-        let command = BrewfileActionCommand(kind: actionKind, fileURL: selectedFileURL)
+        guard let command = BrewfileActionCommand.make(kind: actionKind, fileURL: selectedFileURL) else {
+            return
+        }
         runAction(
             command,
             documentURLForReload: selectedFileURL,
@@ -264,12 +260,13 @@ final class BrewfileViewModel: ObservableObject {
         guard let destinationURL = dumpDestinationPicker.chooseDestination(
             suggestedFileName: selectedFileURL.lastPathComponent,
             startingDirectory: selectedFileURL.deletingLastPathComponent()
-        ) else {
+        ),
+        let command = BrewfileActionCommand.make(kind: .dump, fileURL: destinationURL) else {
             return
         }
 
         runAction(
-            BrewfileActionCommand(kind: .dump, fileURL: destinationURL),
+            command,
             documentURLForReload: selectedFileURL,
             shouldReloadAfterSuccess: destinationURL == selectedFileURL
         )

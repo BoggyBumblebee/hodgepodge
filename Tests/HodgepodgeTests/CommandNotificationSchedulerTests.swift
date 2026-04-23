@@ -89,9 +89,7 @@ final class CommandNotificationSchedulerTests: XCTestCase {
             settingsStore: TestAppSettingsStore(
                 snapshot: AppSettingsSnapshot(
                     defaultLaunchSection: .catalog,
-                    completionNotificationsEnabled: false,
-                    notificationSoundEnabled: true,
-                    restoreLastSelectedBrewfile: true
+                    notifications: .init(isEnabled: false)
                 )
             )
         )
@@ -117,9 +115,7 @@ final class CommandNotificationSchedulerTests: XCTestCase {
             settingsStore: TestAppSettingsStore(
                 snapshot: AppSettingsSnapshot(
                     defaultLaunchSection: .catalog,
-                    completionNotificationsEnabled: true,
-                    notificationSoundEnabled: false,
-                    restoreLastSelectedBrewfile: true
+                    notifications: .init(soundEnabled: false)
                 )
             )
         )
@@ -144,7 +140,7 @@ final class CommandNotificationSchedulerTests: XCTestCase {
             center: center,
             settingsStore: TestAppSettingsStore(
                 snapshot: AppSettingsSnapshot(
-                    completionNotificationScope: .longRunningOnly
+                    notifications: .init(scope: .longRunningOnly)
                 )
             )
         )
@@ -169,7 +165,7 @@ final class CommandNotificationSchedulerTests: XCTestCase {
             center: center,
             settingsStore: TestAppSettingsStore(
                 snapshot: AppSettingsSnapshot(
-                    completionNotificationScope: .longRunningOnly
+                    notifications: .init(scope: .longRunningOnly)
                 )
             )
         )
@@ -194,7 +190,7 @@ final class CommandNotificationSchedulerTests: XCTestCase {
             center: center,
             settingsStore: TestAppSettingsStore(
                 snapshot: AppSettingsSnapshot(
-                    completionNotificationCategories: [.services]
+                    notifications: .init(categories: [.services])
                 )
             )
         )
@@ -219,7 +215,7 @@ final class CommandNotificationSchedulerTests: XCTestCase {
             center: center,
             settingsStore: TestAppSettingsStore(
                 snapshot: AppSettingsSnapshot(
-                    completionNotificationCategories: [.services]
+                    notifications: .init(categories: [.services])
                 )
             )
         )

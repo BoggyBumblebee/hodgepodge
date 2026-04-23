@@ -70,6 +70,38 @@ final class AppKitIntegrationTests: XCTestCase {
         XCTAssertEqual(bundle.requestedNames, ["AppBrandIcon"])
     }
 
+    func testAppIconResolverBundledIconFallsBackToAppIconAsset() {
+        let expectedIcon = NSImage(size: NSSize(width: 64, height: 64))
+        let bundle = MockBundleImageQuery(
+            bundlePath: "/Bundle",
+            imageForName: { name in
+                switch name {
+                case "AppBrandIcon":
+                    nil
+                case "AppIcon":
+                    expectedIcon
+                default:
+                    nil
+                }
+            }
+        )
+
+        let resolvedIcon = AppIconResolver.bundledApplicationIcon(bundle: bundle)
+
+        XCTAssertEqual(resolvedIcon, expectedIcon)
+        XCTAssertEqual(bundle.requestedNames, ["AppBrandIcon", "AppIcon"])
+    }
+
+    func testAppIconResolverReturnsNilWhenNoValidIconIsAvailable() {
+        let resolvedIcon = AppIconResolver.resolvedApplicationIcon(
+            bundle: MockBundleImageQuery(bundlePath: "/Bundle", image: nil),
+            workspace: MockWorkspaceFileIconProvider(icon: makeInvalidImage()),
+            application: MockApplicationIconProvider(icon: nil)
+        )
+
+        XCTAssertNil(resolvedIcon)
+    }
+
     func testStandardAboutPanelPresenterUsesResolvedIconAndAppName() {
         let application = MockAboutPanelApplication()
         let expectedIcon = NSImage(size: NSSize(width: 32, height: 32))

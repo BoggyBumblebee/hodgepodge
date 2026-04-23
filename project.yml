@@ -19,8 +19,6 @@ targets:
         buildPhase: resources
       - path: Resources/Help
         buildPhase: resources
-      - path: Resources/Assets
-        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.boggybumblebee.hodgepodge

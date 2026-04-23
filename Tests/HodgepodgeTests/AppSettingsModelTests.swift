@@ -20,12 +20,16 @@ final class AppSettingsModelTests: XCTestCase {
             model.settings,
             AppSettingsSnapshot(
                 defaultLaunchSection: .services,
-                completionNotificationsEnabled: false,
-                completionNotificationScope: .longRunningOnly,
-                completionNotificationCategories: Set(CompletionNotificationCategory.allCases).subtracting([.maintenance]),
-                notificationSoundEnabled: false,
-                restoreLastSelectedBrewfile: false,
-                brewfileDefaultExportScope: .formula,
+                notifications: .init(
+                    isEnabled: false,
+                    scope: .longRunningOnly,
+                    categories: Set(CompletionNotificationCategory.allCases).subtracting([.maintenance]),
+                    soundEnabled: false
+                ),
+                brewfile: .init(
+                    restoreLastSelectedBrewfile: false,
+                    defaultExportScope: .formula
+                ),
                 catalogHistoryRetentionLimit: .oneHundred
             )
         )

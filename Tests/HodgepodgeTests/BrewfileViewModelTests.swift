@@ -414,7 +414,7 @@ final class BrewfileViewModelTests: XCTestCase {
         XCTAssertEqual(message, "brew bundle can't satisfy your Brewfile's dependencies.")
     }
 
-    func testClearActionOutputResetsActionState() {
+    func testClearActionOutputResetsActionState() throws {
         let viewModel = BrewfileViewModel(
             loader: MockBrewfileLoader(documents: [:]),
             selectionStore: MockBrewfileSelectionStore(),
@@ -424,7 +424,7 @@ final class BrewfileViewModelTests: XCTestCase {
         )
         let fileURL = URL(fileURLWithPath: "/tmp/Brewfile")
         viewModel.selectedFileURL = fileURL
-        let command = BrewfileActionCommand(kind: .check, fileURL: fileURL)
+        let command = try XCTUnwrap(BrewfileActionCommand.make(kind: .check, fileURL: fileURL))
         viewModel.actionState = .running(
             BrewfileActionProgress(
                 command: command,
@@ -454,9 +454,7 @@ final class BrewfileViewModelTests: XCTestCase {
             settingsStore: MockAppSettingsStore(
                 snapshot: AppSettingsSnapshot(
                     defaultLaunchSection: .catalog,
-                    completionNotificationsEnabled: true,
-                    notificationSoundEnabled: true,
-                    restoreLastSelectedBrewfile: false
+                    brewfile: .init(restoreLastSelectedBrewfile: false)
                 )
             ),
             picker: MockBrewfilePicker(),
@@ -480,9 +478,7 @@ final class BrewfileViewModelTests: XCTestCase {
             settingsStore: MockAppSettingsStore(
                 snapshot: AppSettingsSnapshot(
                     defaultLaunchSection: .catalog,
-                    completionNotificationsEnabled: true,
-                    notificationSoundEnabled: true,
-                    restoreLastSelectedBrewfile: false
+                    brewfile: .init(restoreLastSelectedBrewfile: false)
                 )
             ),
             picker: MockBrewfilePicker(result: fileURL),

@@ -2,6 +2,25 @@ import Foundation
 
 @MainActor
 final class InstalledPackagesViewModel: ObservableObject {
+    struct Runtime {
+        let settingsStore: any AppSettingsStoring
+        let notificationScheduler: any CommandNotificationScheduling
+        let notificationCenter: NotificationCenter
+        let fileManager: FileManager
+
+        init(
+            settingsStore: any AppSettingsStoring = AppSettingsStore(),
+            notificationScheduler: any CommandNotificationScheduling = NullCommandNotificationScheduler(),
+            notificationCenter: NotificationCenter = .default,
+            fileManager: FileManager = .default
+        ) {
+            self.settingsStore = settingsStore
+            self.notificationScheduler = notificationScheduler
+            self.notificationCenter = notificationCenter
+            self.fileManager = fileManager
+        }
+    }
+
     @Published var packagesState: InstalledPackagesLoadState = .idle
     @Published var actionState: InstalledPackageActionState = .idle
     @Published var actionLogs: [CommandLogEntry] = []
@@ -37,34 +56,53 @@ final class InstalledPackagesViewModel: ObservableObject {
         commandExecutor: any BrewCommandExecuting,
         destinationPicker: any BrewfileDumpDestinationPicking,
         favoritesStore: any FavoritePackageStoring = CatalogPreferencesStore(),
-        settingsStore: any AppSettingsStoring = AppSettingsStore(),
-        notificationScheduler: any CommandNotificationScheduling = NullCommandNotificationScheduler(),
-        notificationCenter: NotificationCenter = .default,
-        fileManager: FileManager = .default
+        runtime: Runtime = Runtime()
     ) {
-        let settings = settingsStore.loadSettings()
+        let settings = runtime.settingsStore.loadSettings()
         self.provider = provider
         self.commandExecutor = commandExecutor
         self.destinationPicker = destinationPicker
         self.favoritesStore = favoritesStore
-        self.settingsStore = settingsStore
-        self.notificationScheduler = notificationScheduler
-        self.homebrewStateNotifier = HomebrewStateNotifier(notificationCenter: notificationCenter)
-        self.fileManager = fileManager
+        self.settingsStore = runtime.settingsStore
+        self.notificationScheduler = runtime.notificationScheduler
+        self.homebrewStateNotifier = HomebrewStateNotifier(notificationCenter: runtime.notificationCenter)
+        self.fileManager = runtime.fileManager
         self.exportScope = settings.brewfileDefaultExportScope
         favoritePackageIDs = Set(favoritesStore.loadFavoritePackageIDs())
-        favoritesObserver = FavoritePackageIDsObserver(notificationCenter: notificationCenter) { [weak self] ids in
+        favoritesObserver = FavoritePackageIDsObserver(notificationCenter: runtime.notificationCenter) { [weak self] ids in
             self?.favoritePackageIDs = Set(ids)
         }
-        settingsObserver = AppSettingsObserver(notificationCenter: notificationCenter) { [weak self] snapshot in
+        settingsObserver = AppSettingsObserver(notificationCenter: runtime.notificationCenter) { [weak self] snapshot in
             self?.exportScope = snapshot.brewfileDefaultExportScope
         }
-        homebrewStateObserver = HomebrewStateObserver(notificationCenter: notificationCenter) { [weak self] sourceID in
+        homebrewStateObserver = HomebrewStateObserver(notificationCenter: runtime.notificationCenter) { [weak self] sourceID in
             guard let self, sourceID != self.homebrewStateSourceID else {
                 return
             }
             self.handleHomebrewStateChange()
         }
+    }
+
+    convenience init(
+        provider: any InstalledPackagesProviding,
+        commandExecutor: any BrewCommandExecuting,
+        destinationPicker: any BrewfileDumpDestinationPicking,
+        favoritesStore: any FavoritePackageStoring = CatalogPreferencesStore(),
+        settingsStore: any AppSettingsStoring = AppSettingsStore(),
+        notificationScheduler: any CommandNotificationScheduling = NullCommandNotificationScheduler(),
+        notificationCenter: NotificationCenter = .default
+    ) {
+        self.init(
+            provider: provider,
+            commandExecutor: commandExecutor,
+            destinationPicker: destinationPicker,
+            favoritesStore: favoritesStore,
+            runtime: Runtime(
+                settingsStore: settingsStore,
+                notificationScheduler: notificationScheduler,
+                notificationCenter: notificationCenter
+            )
+        )
     }
 
     deinit {
@@ -675,9 +713,11 @@ extension InstalledPackagesViewModel {
             commandExecutor: commandExecutor,
             destinationPicker: BrewfileDumpDestinationPicker(),
             favoritesStore: CatalogPreferencesStore(),
-            settingsStore: settingsStore,
-            notificationScheduler: notificationScheduler,
-            notificationCenter: .default
+            runtime: Runtime(
+                settingsStore: settingsStore,
+                notificationScheduler: notificationScheduler,
+                notificationCenter: .default
+            )
         )
     }
 }

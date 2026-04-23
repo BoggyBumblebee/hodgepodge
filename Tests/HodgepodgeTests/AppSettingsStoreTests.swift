@@ -20,12 +20,16 @@ final class AppSettingsStoreTests: XCTestCase {
         let store = AppSettingsStore(fileURL: fileURL)
         let snapshot = AppSettingsSnapshot(
             defaultLaunchSection: .installed,
-            completionNotificationsEnabled: false,
-            completionNotificationScope: .longRunningOnly,
-            completionNotificationCategories: [.services, .maintenance],
-            notificationSoundEnabled: false,
-            restoreLastSelectedBrewfile: false,
-            brewfileDefaultExportScope: .cask,
+            notifications: .init(
+                isEnabled: false,
+                scope: .longRunningOnly,
+                categories: [.services, .maintenance],
+                soundEnabled: false
+            ),
+            brewfile: .init(
+                restoreLastSelectedBrewfile: false,
+                defaultExportScope: .cask
+            ),
             catalogHistoryRetentionLimit: .oneHundred
         )
 
@@ -41,9 +45,11 @@ final class AppSettingsStoreTests: XCTestCase {
         let fileURL = directoryURL.appendingPathComponent("app-settings.json", isDirectory: false)
         let store = AppSettingsStore(fileURL: fileURL, notificationCenter: notificationCenter)
         let snapshot = AppSettingsSnapshot(
-            completionNotificationScope: .longRunningOnly,
-            completionNotificationCategories: [.brewfiles],
-            brewfileDefaultExportScope: .formula,
+            notifications: .init(
+                scope: .longRunningOnly,
+                categories: [.brewfiles]
+            ),
+            brewfile: .init(defaultExportScope: .formula),
             catalogHistoryRetentionLimit: .twoHundredFifty
         )
         let expectation = expectation(description: "Settings change notification")

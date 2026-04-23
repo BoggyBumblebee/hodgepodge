@@ -102,7 +102,7 @@ struct BrewfileEntryDraft: Equatable, Sendable {
             return nil
         }
 
-        return BrewfileActionCommand(
+        return BrewfileActionCommand.make(
             kind: .add,
             fileURL: fileURL,
             entryName: trimmedName,
@@ -118,32 +118,39 @@ struct BrewfileActionCommand: Equatable, Sendable {
     let entryKind: BrewfileEntryKind?
     let arguments: [String]
 
-    init(
+    static func make(
         kind: BrewfileActionKind,
         fileURL: URL,
         entryName: String? = nil,
         entryKind: BrewfileEntryKind? = nil
-    ) {
-        self.kind = kind
-        self.fileURL = fileURL
-        self.entryName = entryName
-        self.entryKind = entryKind
-
+    ) -> BrewfileActionCommand? {
         switch kind {
         case .check:
-            self.arguments = ["bundle", "check", "--file", fileURL.path, "--verbose", "--no-upgrade"]
+            return BrewfileActionCommand(
+                kind: kind,
+                fileURL: fileURL,
+                arguments: ["bundle", "check", "--file", fileURL.path, "--verbose", "--no-upgrade"]
+            )
         case .install:
-            self.arguments = ["bundle", "install", "--file", fileURL.path, "--verbose"]
+            return BrewfileActionCommand(
+                kind: kind,
+                fileURL: fileURL,
+                arguments: ["bundle", "install", "--file", fileURL.path, "--verbose"]
+            )
         case .dump:
-            self.arguments = BrewfileDumpCommand(
-                scope: .all,
-                destinationURL: fileURL
-            ).arguments
+            return BrewfileActionCommand(
+                kind: kind,
+                fileURL: fileURL,
+                arguments: BrewfileDumpCommand(
+                    scope: .all,
+                    destinationURL: fileURL
+                ).arguments
+            )
         case .add:
             guard let entryName,
                   let entryKind,
                   entryKind.supportsBundleAdd else {
-                preconditionFailure("Brewfile add commands require a supported entry name and kind.")
+                return nil
             }
 
             var arguments = ["bundle", "add"]
@@ -152,16 +159,43 @@ struct BrewfileActionCommand: Equatable, Sendable {
             }
             arguments.append(entryName)
             arguments.append(contentsOf: ["--file", fileURL.path])
-            self.arguments = arguments
+
+            return BrewfileActionCommand(
+                kind: kind,
+                fileURL: fileURL,
+                entryName: entryName,
+                entryKind: entryKind,
+                arguments: arguments
+            )
         case .remove:
             guard let entryName,
                   let entryKind,
                   let kindFlag = entryKind.bundleRemoveFlag else {
-                preconditionFailure("Brewfile remove commands require a removable entry name and kind.")
+                return nil
             }
 
-            self.arguments = ["bundle", "remove", kindFlag, entryName, "--file", fileURL.path]
+            return BrewfileActionCommand(
+                kind: kind,
+                fileURL: fileURL,
+                entryName: entryName,
+                entryKind: entryKind,
+                arguments: ["bundle", "remove", kindFlag, entryName, "--file", fileURL.path]
+            )
         }
+    }
+
+    private init(
+        kind: BrewfileActionKind,
+        fileURL: URL,
+        entryName: String? = nil,
+        entryKind: BrewfileEntryKind? = nil,
+        arguments: [String]
+    ) {
+        self.kind = kind
+        self.fileURL = fileURL
+        self.entryName = entryName
+        self.entryKind = entryKind
+        self.arguments = arguments
     }
 
     var command: String {

@@ -2,6 +2,22 @@ import Foundation
 
 @MainActor
 final class CatalogViewModel: ObservableObject {
+    struct Runtime {
+        let settingsStore: any AppSettingsStoring
+        let notificationScheduler: any CommandNotificationScheduling
+        let notificationCenter: NotificationCenter
+
+        init(
+            settingsStore: any AppSettingsStoring = AppSettingsStore(),
+            notificationScheduler: any CommandNotificationScheduling = NullCommandNotificationScheduler(),
+            notificationCenter: NotificationCenter = .default
+        ) {
+            self.settingsStore = settingsStore
+            self.notificationScheduler = notificationScheduler
+            self.notificationCenter = notificationCenter
+        }
+    }
+
     @Published var packagesState: CatalogPackagesLoadState = .idle
     @Published var detailState: CatalogDetailLoadState = .idle
     @Published var analyticsState: CatalogAnalyticsLoadState = .idle
@@ -41,19 +57,17 @@ final class CatalogViewModel: ObservableObject {
         actionHistoryStore: any CatalogActionHistoryStoring,
         actionHistoryExporter: any CatalogActionHistoryExporting,
         preferencesStore: any CatalogPreferencesStoring,
-        settingsStore: any AppSettingsStoring = AppSettingsStore(),
-        notificationScheduler: any CommandNotificationScheduling = NullCommandNotificationScheduler(),
-        notificationCenter: NotificationCenter = .default
+        runtime: Runtime = Runtime()
     ) {
         self.apiClient = apiClient
         self.commandExecutor = commandExecutor
         self.actionHistoryStore = actionHistoryStore
         self.actionHistoryExporter = actionHistoryExporter
         self.preferencesStore = preferencesStore
-        self.settingsStore = settingsStore
-        self.notificationScheduler = notificationScheduler
-        self.homebrewStateNotifier = HomebrewStateNotifier(notificationCenter: notificationCenter)
-        let retentionLimit = settingsStore.loadSettings().catalogHistoryRetentionLimit.rawValue
+        self.settingsStore = runtime.settingsStore
+        self.notificationScheduler = runtime.notificationScheduler
+        self.homebrewStateNotifier = HomebrewStateNotifier(notificationCenter: runtime.notificationCenter)
+        let retentionLimit = runtime.settingsStore.loadSettings().catalogHistoryRetentionLimit.rawValue
         let restoredHistory = actionHistoryStore.loadHistory()
         actionHistory = Self.trimHistory(restoredHistory, limit: retentionLimit)
         if actionHistory != restoredHistory {
@@ -65,12 +79,34 @@ final class CatalogViewModel: ObservableObject {
         savedSearches = restoredPreferences.savedSearches.sorted {
             $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
         }
-        favoritesObserver = FavoritePackageIDsObserver(notificationCenter: notificationCenter) { [weak self] ids in
+        favoritesObserver = FavoritePackageIDsObserver(notificationCenter: runtime.notificationCenter) { [weak self] ids in
             self?.favoritePackageIDs = Set(ids)
         }
-        settingsObserver = AppSettingsObserver(notificationCenter: notificationCenter) { [weak self] snapshot in
+        settingsObserver = AppSettingsObserver(notificationCenter: runtime.notificationCenter) { [weak self] snapshot in
             self?.applySettings(snapshot)
         }
+    }
+
+    convenience init(
+        apiClient: any HomebrewAPIClienting,
+        commandExecutor: any BrewCommandExecuting,
+        actionHistoryStore: any CatalogActionHistoryStoring,
+        actionHistoryExporter: any CatalogActionHistoryExporting,
+        preferencesStore: any CatalogPreferencesStoring,
+        settingsStore: any AppSettingsStoring = AppSettingsStore(),
+        notificationCenter: NotificationCenter = .default
+    ) {
+        self.init(
+            apiClient: apiClient,
+            commandExecutor: commandExecutor,
+            actionHistoryStore: actionHistoryStore,
+            actionHistoryExporter: actionHistoryExporter,
+            preferencesStore: preferencesStore,
+            runtime: Runtime(
+                settingsStore: settingsStore,
+                notificationCenter: notificationCenter
+            )
+        )
     }
 
     deinit {
@@ -747,9 +783,11 @@ extension CatalogViewModel {
             actionHistoryStore: CatalogActionHistoryStore(),
             actionHistoryExporter: CatalogActionHistoryExporter(),
             preferencesStore: CatalogPreferencesStore(),
-            settingsStore: AppSettingsStore(),
-            notificationScheduler: notificationScheduler,
-            notificationCenter: .default
+            runtime: Runtime(
+                settingsStore: AppSettingsStore(),
+                notificationScheduler: notificationScheduler,
+                notificationCenter: .default
+            )
         )
     }
 }
