@@ -52,25 +52,13 @@ struct InstalledPackagesView: View {
         .searchable(text: $viewModel.searchText, placement: .toolbar, prompt: "Search installed packages")
         .toolbar {
             ToolbarItemGroup {
-                Menu {
-                    ForEach(InstalledPackageFilterOption.allCases) { filter in
-                        Toggle(isOn: filterBinding(filter)) {
-                            Text(filter.title)
-                        }
-                    }
-
-                    Divider()
-
-                    Button("Clear Filters") {
-                        viewModel.clearFilters()
-                    }
-                    .disabled(viewModel.activeFilters.isEmpty)
-                } label: {
-                    Label(
-                        viewModel.activeFilterCount == 0 ? "Filters" : "Filters (\(viewModel.activeFilterCount))",
-                        systemImage: "line.3.horizontal.decrease.circle"
-                    )
-                }
+                SectionFilterMenu(
+                    activeCount: viewModel.activeFilterCount,
+                    activeFilters: viewModel.activeFilters,
+                    title: { $0.title },
+                    toggle: viewModel.toggleFilter(_:),
+                    clear: viewModel.clearFilters
+                )
 
                 Picker("Sort", selection: $viewModel.sortOption) {
                     ForEach(InstalledPackageSortOption.allCases) { option in
@@ -185,12 +173,7 @@ struct InstalledPackagesView: View {
             Text("Inspect what is currently installed on this Mac through Homebrew.")
                 .foregroundStyle(.secondary)
 
-            Picker("Package Scope", selection: $viewModel.scope) {
-                ForEach(CatalogScope.allCases) { scope in
-                    Text(scope.title).tag(scope)
-                }
-            }
-            .pickerStyle(.segmented)
+            CatalogScopePicker(scope: $viewModel.scope)
 
             if !viewModel.stateCounts.isEmpty {
                 InstalledPackageStateSummary(counts: viewModel.stateCounts)
@@ -198,9 +181,7 @@ struct InstalledPackagesView: View {
 
             HStack(spacing: 12) {
                 if case .loaded(let packages) = viewModel.packagesState {
-                    Text("\(packages.count) packages")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    SectionCountLabel(count: packages.count, noun: "packages")
                 }
             }
         }
@@ -292,17 +273,6 @@ struct InstalledPackagesView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-    }
-
-    private func filterBinding(_ filter: InstalledPackageFilterOption) -> Binding<Bool> {
-        Binding(
-            get: { viewModel.isFilterActive(filter) },
-            set: { isActive in
-                if isActive != viewModel.isFilterActive(filter) {
-                    viewModel.toggleFilter(filter)
-                }
-            }
-        )
     }
 
     private func handleAction(_ action: InstalledPackageActionKind, for package: InstalledPackage) {

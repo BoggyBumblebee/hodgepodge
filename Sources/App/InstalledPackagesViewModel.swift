@@ -259,17 +259,14 @@ final class InstalledPackagesViewModel: ObservableObject {
         Task { @MainActor [provider] in
             do {
                 let packages = try await provider.fetchInstalledPackages()
-                packagesState = .loaded(packages)
-
-                if let analyticsItem,
-                   let package = installedPackage(for: analyticsItem, in: packages) {
-                    selectedPackage = package
-                } else if let selectedPackage,
-                   let refreshedSelection = packages.first(where: { $0.id == selectedPackage.id }) {
-                    self.selectedPackage = refreshedSelection
-                } else {
-                    selectedPackage = defaultSelection(from: packages)
-                }
+                applyLoadedPackages(
+                    packages,
+                    selection: selection(
+                        in: packages,
+                        analyticsItem: analyticsItem,
+                        preservingSelectionID: selectedPackage?.id
+                    )
+                )
             } catch {
                 packagesState = .failed(error.localizedDescription)
                 selectedPackage = nil
@@ -523,7 +520,7 @@ final class InstalledPackagesViewModel: ObservableObject {
         switch option {
         case .name:
             return { lhs, rhs in
-                Self.compare(lhs.title, rhs.title, fallback: lhs.slug < rhs.slug)
+                LocalizedSorting.ascending(lhs.title, rhs.title, fallback: lhs.slug < rhs.slug)
             }
         case .installDate:
             return { lhs, rhs in
@@ -535,7 +532,7 @@ final class InstalledPackagesViewModel: ObservableObject {
                 case (nil, .some):
                     return false
                 default:
-                    return Self.compare(lhs.title, rhs.title, fallback: lhs.slug < rhs.slug)
+                    return LocalizedSorting.ascending(lhs.title, rhs.title, fallback: lhs.slug < rhs.slug)
                 }
             }
         case .packageType:
@@ -543,7 +540,7 @@ final class InstalledPackagesViewModel: ObservableObject {
                 if lhs.kind != rhs.kind {
                     return lhs.kind.rawValue < rhs.kind.rawValue
                 }
-                return Self.compare(lhs.title, rhs.title, fallback: lhs.slug < rhs.slug)
+                return LocalizedSorting.ascending(lhs.title, rhs.title, fallback: lhs.slug < rhs.slug)
             }
         case .tap:
             return { lhs, rhs in
@@ -551,7 +548,7 @@ final class InstalledPackagesViewModel: ObservableObject {
                 if result != .orderedSame {
                     return result == .orderedAscending
                 }
-                return Self.compare(lhs.title, rhs.title, fallback: lhs.slug < rhs.slug)
+                return LocalizedSorting.ascending(lhs.title, rhs.title, fallback: lhs.slug < rhs.slug)
             }
         }
     }
@@ -560,31 +557,45 @@ final class InstalledPackagesViewModel: ObservableObject {
         packages.sorted(by: sorter(for: sortOption)).first
     }
 
+    private func applyLoadedPackages(
+        _ packages: [InstalledPackage],
+        selection: InstalledPackage?
+    ) {
+        packagesState = .loaded(packages)
+        selectedPackage = selection
+    }
+
+    private func selection(
+        in packages: [InstalledPackage],
+        analyticsItem: CatalogAnalyticsItem? = nil,
+        preservingSelectionID: String? = nil
+    ) -> InstalledPackage? {
+        if let analyticsItem,
+           let package = installedPackage(for: analyticsItem, in: packages) {
+            return package
+        }
+
+        if let preservingSelectionID,
+           let refreshedSelection = packages.first(where: { $0.id == preservingSelectionID }) {
+            return refreshedSelection
+        }
+
+        return defaultSelection(from: packages)
+    }
+
     private func reloadPackagesAfterAction(preservingSelectionID: String?) {
         Task { @MainActor [provider] in
             do {
                 let packages = try await provider.fetchInstalledPackages()
-                packagesState = .loaded(packages)
-
-                if let preservingSelectionID,
-                   let refreshedSelection = packages.first(where: { $0.id == preservingSelectionID }) {
-                    selectedPackage = refreshedSelection
-                } else {
-                    selectedPackage = defaultSelection(from: packages)
-                }
+                applyLoadedPackages(
+                    packages,
+                    selection: selection(in: packages, preservingSelectionID: preservingSelectionID)
+                )
             } catch {
                 packagesState = .failed(error.localizedDescription)
                 selectedPackage = nil
             }
         }
-    }
-
-    private static func compare(_ lhs: String, _ rhs: String, fallback: Bool) -> Bool {
-        let result = lhs.localizedCaseInsensitiveCompare(rhs)
-        if result != .orderedSame {
-            return result == .orderedAscending
-        }
-        return fallback
     }
 
     private func exportCommand(for destinationURL: URL) -> InstalledPackagesBrewfileExportCommand {

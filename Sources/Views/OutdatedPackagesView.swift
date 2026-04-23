@@ -51,25 +51,13 @@ struct OutdatedPackagesView: View {
         .searchable(text: $viewModel.searchText, placement: .toolbar, prompt: "Search outdated packages")
         .toolbar {
             ToolbarItemGroup {
-                Menu {
-                    ForEach(OutdatedPackageFilterOption.allCases) { filter in
-                        Toggle(isOn: filterBinding(filter)) {
-                            Text(filter.title)
-                        }
-                    }
-
-                    Divider()
-
-                    Button("Clear Filters") {
-                        viewModel.clearFilters()
-                    }
-                    .disabled(viewModel.activeFilters.isEmpty)
-                } label: {
-                    Label(
-                        viewModel.activeFilterCount == 0 ? "Filters" : "Filters (\(viewModel.activeFilterCount))",
-                        systemImage: "line.3.horizontal.decrease.circle"
-                    )
-                }
+                SectionFilterMenu(
+                    activeCount: viewModel.activeFilterCount,
+                    activeFilters: viewModel.activeFilters,
+                    title: { $0.title },
+                    toggle: viewModel.toggleFilter(_:),
+                    clear: viewModel.clearFilters
+                )
 
                 Picker("Sort", selection: $viewModel.sortOption) {
                     ForEach(OutdatedPackageSortOption.allCases) { option in
@@ -178,18 +166,11 @@ struct OutdatedPackagesView: View {
             Text("Review upgrade candidates from this Mac’s Homebrew installation before taking action.")
                 .foregroundStyle(.secondary)
 
-            Picker("Package Scope", selection: $viewModel.scope) {
-                ForEach(CatalogScope.allCases) { scope in
-                    Text(scope.title).tag(scope)
-                }
-            }
-            .pickerStyle(.segmented)
+            CatalogScopePicker(scope: $viewModel.scope)
 
             HStack(spacing: 12) {
                 if case .loaded(let packages) = viewModel.packagesState {
-                    Text("\(packages.count) packages")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    SectionCountLabel(count: packages.count, noun: "packages")
                 }
             }
         }
@@ -290,17 +271,6 @@ struct OutdatedPackagesView: View {
         } else {
             viewModel.runAction(action, for: package)
         }
-    }
-
-    private func filterBinding(_ filter: OutdatedPackageFilterOption) -> Binding<Bool> {
-        Binding(
-            get: { viewModel.isFilterActive(filter) },
-            set: { isActive in
-                if isActive != viewModel.isFilterActive(filter) {
-                    viewModel.toggleFilter(filter)
-                }
-            }
-        )
     }
 
 }

@@ -48,7 +48,7 @@ struct HomebrewAPIClient: HomebrewAPIClienting, @unchecked Sendable {
 
         return (mappedFormulae + mappedCasks)
             .sorted { lhs, rhs in
-                lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+                LocalizedSorting.ascending(lhs.title, rhs.title, fallback: lhs.id < rhs.id)
             }
     }
 
@@ -64,43 +64,48 @@ struct HomebrewAPIClient: HomebrewAPIClienting, @unchecked Sendable {
     }
 
     func fetchAnalytics(period: CatalogAnalyticsPeriod) async throws -> CatalogAnalyticsSnapshot {
-        async let formulaInstalls: AnalyticsLeaderboardResponse = fetchJSON(
+        async let formulaInstalls = fetchAnalyticsLeaderboard(
+            kind: .formulaInstalls,
+            period: period,
             path: "analytics/install/\(period.rawValue).json"
         )
-        async let formulaInstallsOnRequest: AnalyticsLeaderboardResponse = fetchJSON(
+        async let formulaInstallsOnRequest = fetchAnalyticsLeaderboard(
+            kind: .formulaInstallsOnRequest,
+            period: period,
             path: "analytics/install-on-request/\(period.rawValue).json"
         )
-        async let caskInstalls: AnalyticsLeaderboardResponse = fetchJSON(
+        async let caskInstalls = fetchAnalyticsLeaderboard(
+            kind: .caskInstalls,
+            period: period,
             path: "analytics/cask-install/\(period.rawValue).json"
         )
-        async let buildErrors: AnalyticsLeaderboardResponse = fetchJSON(
+        async let buildErrors = fetchAnalyticsLeaderboard(
+            kind: .buildErrors,
+            period: period,
             path: "analytics/build-error/\(period.rawValue).json"
         )
 
         return CatalogAnalyticsSnapshot(
             period: period,
             leaderboards: [
-                Self.makeAnalyticsLeaderboard(
-                    kind: .formulaInstalls,
-                    period: period,
-                    response: try await formulaInstalls
-                ),
-                Self.makeAnalyticsLeaderboard(
-                    kind: .formulaInstallsOnRequest,
-                    period: period,
-                    response: try await formulaInstallsOnRequest
-                ),
-                Self.makeAnalyticsLeaderboard(
-                    kind: .caskInstalls,
-                    period: period,
-                    response: try await caskInstalls
-                ),
-                Self.makeAnalyticsLeaderboard(
-                    kind: .buildErrors,
-                    period: period,
-                    response: try await buildErrors
-                )
+                try await formulaInstalls,
+                try await formulaInstallsOnRequest,
+                try await caskInstalls,
+                try await buildErrors
             ]
+        )
+    }
+
+    private func fetchAnalyticsLeaderboard(
+        kind: CatalogAnalyticsLeaderboardKind,
+        period: CatalogAnalyticsPeriod,
+        path: String
+    ) async throws -> CatalogAnalyticsLeaderboard {
+        let response: AnalyticsLeaderboardResponse = try await fetchJSON(path: path)
+        return Self.makeAnalyticsLeaderboard(
+            kind: kind,
+            period: period,
+            response: response
         )
     }
 

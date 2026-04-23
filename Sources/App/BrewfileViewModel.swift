@@ -292,17 +292,9 @@ final class BrewfileViewModel: ObservableObject {
         Task { @MainActor [loader] in
             do {
                 let document = try loader.loadDocument(at: fileURL)
-                documentState = .loaded(document)
-
-                if let selectedLine,
-                   let refreshedSelection = document.lines.first(where: { $0.id == selectedLine.id }) {
-                    self.selectedLine = refreshedSelection
-                } else {
-                    selectedLine = defaultSelection(from: document.lines)
-                }
+                applyLoadedDocument(document)
             } catch {
-                documentState = .failed(error.localizedDescription)
-                selectedLine = nil
+                failDocumentLoad(error.localizedDescription)
             }
         }
     }
@@ -317,23 +309,31 @@ final class BrewfileViewModel: ObservableObject {
                     return
                 }
 
-                documentState = .loaded(document)
-
-                if let selectedLine,
-                   let refreshedSelection = document.lines.first(where: { $0.id == selectedLine.id }) {
-                    self.selectedLine = refreshedSelection
-                } else {
-                    selectedLine = defaultSelection(from: document.lines)
-                }
+                applyLoadedDocument(document)
             } catch {
                 guard selectedFileURL == fileURL else {
                     return
                 }
 
-                documentState = .failed(error.localizedDescription)
-                selectedLine = nil
+                failDocumentLoad(error.localizedDescription)
             }
         }
+    }
+
+    private func applyLoadedDocument(_ document: BrewfileDocument) {
+        documentState = .loaded(document)
+
+        if let selectedLine,
+           let refreshedSelection = document.lines.first(where: { $0.id == selectedLine.id }) {
+            self.selectedLine = refreshedSelection
+        } else {
+            selectedLine = defaultSelection(from: document.lines)
+        }
+    }
+
+    private func failDocumentLoad(_ message: String) {
+        documentState = .failed(message)
+        selectedLine = nil
     }
 
     private func runAction(
@@ -431,23 +431,11 @@ final class BrewfileViewModel: ObservableObject {
             return { $0.lineNumber < $1.lineNumber }
         case .name:
             return { lhs, rhs in
-                let lhsText = lhs.title
-                let rhsText = rhs.title
-                let result = lhsText.localizedCaseInsensitiveCompare(rhsText)
-                if result != .orderedSame {
-                    return result == .orderedAscending
-                }
-                return lhs.lineNumber < rhs.lineNumber
+                LocalizedSorting.ascending(lhs.title, rhs.title, fallback: lhs.lineNumber < rhs.lineNumber)
             }
         case .kind:
             return { lhs, rhs in
-                let lhsText = lhs.subtitle
-                let rhsText = rhs.subtitle
-                let result = lhsText.localizedCaseInsensitiveCompare(rhsText)
-                if result != .orderedSame {
-                    return result == .orderedAscending
-                }
-                return lhs.lineNumber < rhs.lineNumber
+                LocalizedSorting.ascending(lhs.subtitle, rhs.subtitle, fallback: lhs.lineNumber < rhs.lineNumber)
             }
         }
     }

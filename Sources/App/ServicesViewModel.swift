@@ -235,11 +235,7 @@ final class ServicesViewModel: ObservableObject {
         Task { @MainActor [provider] in
             do {
                 let services = try await provider.fetchServices()
-                servicesState = .loaded(services)
-                selectedService = selection(
-                    in: services,
-                    preservingSelectionID: preservingSelectionID
-                )
+                applyLoadedServices(services, preservingSelectionID: preservingSelectionID)
             } catch {
                 servicesState = .failed(error.localizedDescription)
                 selectedService = nil
@@ -251,15 +247,22 @@ final class ServicesViewModel: ObservableObject {
         Task { @MainActor [provider] in
             do {
                 let services = try await provider.fetchServices()
-                servicesState = .loaded(services)
-                selectedService = selection(
-                    in: services,
-                    preservingSelectionID: preservingSelectionID
-                )
+                applyLoadedServices(services, preservingSelectionID: preservingSelectionID)
             } catch {
                 appendLog(.system, error.localizedDescription)
             }
         }
+    }
+
+    private func applyLoadedServices(
+        _ services: [BrewService],
+        preservingSelectionID: String?
+    ) {
+        servicesState = .loaded(services)
+        selectedService = selection(
+            in: services,
+            preservingSelectionID: preservingSelectionID
+        )
     }
 
     private func appendPreparationLog(for command: BrewServiceActionCommand) {
@@ -305,7 +308,7 @@ final class ServicesViewModel: ObservableObject {
         switch option {
         case .name:
             return { lhs, rhs in
-                Self.compare(lhs.title, rhs.title, fallback: lhs.id < rhs.id)
+                LocalizedSorting.ascending(lhs.title, rhs.title, fallback: lhs.id < rhs.id)
             }
         case .status:
             return { lhs, rhs in
@@ -313,7 +316,7 @@ final class ServicesViewModel: ObservableObject {
                 if result != .orderedSame {
                     return result == .orderedAscending
                 }
-                return Self.compare(lhs.title, rhs.title, fallback: lhs.id < rhs.id)
+                return LocalizedSorting.ascending(lhs.title, rhs.title, fallback: lhs.id < rhs.id)
             }
         case .user:
             return { lhs, rhs in
@@ -323,7 +326,7 @@ final class ServicesViewModel: ObservableObject {
                 if result != .orderedSame {
                     return result == .orderedAscending
                 }
-                return Self.compare(lhs.title, rhs.title, fallback: lhs.id < rhs.id)
+                return LocalizedSorting.ascending(lhs.title, rhs.title, fallback: lhs.id < rhs.id)
             }
         case .processID:
             return { lhs, rhs in
@@ -335,18 +338,10 @@ final class ServicesViewModel: ObservableObject {
                 case (nil, .some):
                     return false
                 default:
-                    return Self.compare(lhs.title, rhs.title, fallback: lhs.id < rhs.id)
+                    return LocalizedSorting.ascending(lhs.title, rhs.title, fallback: lhs.id < rhs.id)
                 }
             }
         }
-    }
-
-    private static func compare(_ lhs: String, _ rhs: String, fallback: Bool) -> Bool {
-        let result = lhs.localizedCaseInsensitiveCompare(rhs)
-        if result != .orderedSame {
-            return result == .orderedAscending
-        }
-        return fallback
     }
 
     private func resetActionOutput() {

@@ -7,8 +7,8 @@ final class CommandRunningTests: XCTestCase {
         let runner = ProcessCommandRunner()
 
         let result = try await runner.run(
-            executable: "/bin/sh",
-            arguments: ["-c", "printf 'hello'"]
+            executable: "/usr/bin/printf",
+            arguments: ["hello"]
         )
 
         XCTAssertEqual(result.stdout, "hello")

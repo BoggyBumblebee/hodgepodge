@@ -39,25 +39,13 @@ struct CatalogView: View {
         .searchable(text: $viewModel.searchText, placement: .toolbar, prompt: "Search formulae and casks")
         .toolbar {
             ToolbarItemGroup {
-                Menu {
-                    ForEach(CatalogFilterOption.allCases) { filter in
-                        Toggle(isOn: filterBinding(filter)) {
-                            Text(filter.title)
-                        }
-                    }
-
-                    Divider()
-
-                    Button("Clear Filters") {
-                        viewModel.clearFilters()
-                    }
-                    .disabled(viewModel.activeFilters.isEmpty)
-                } label: {
-                    Label(
-                        viewModel.activeFilterCount == 0 ? "Filters" : "Filters (\(viewModel.activeFilterCount))",
-                        systemImage: "line.3.horizontal.decrease.circle"
-                    )
-                }
+                SectionFilterMenu(
+                    activeCount: viewModel.activeFilterCount,
+                    activeFilters: viewModel.activeFilters,
+                    title: { $0.title },
+                    toggle: viewModel.toggleFilter(_:),
+                    clear: viewModel.clearFilters
+                )
                 .accessibilityLabel("Catalog filters")
 
                 Picker("Sort", selection: $viewModel.sortOption) {
@@ -172,12 +160,7 @@ struct CatalogView: View {
             Text("Browse Homebrew formulae and casks from the hosted API.")
                 .foregroundStyle(.secondary)
 
-            Picker("Package Scope", selection: $viewModel.scope) {
-                ForEach(CatalogScope.allCases) { scope in
-                    Text(scope.title).tag(scope)
-                }
-            }
-            .pickerStyle(.segmented)
+            CatalogScopePicker(scope: $viewModel.scope)
 
             HStack(spacing: 12) {
                 Button("Save Search...") {
@@ -187,9 +170,7 @@ struct CatalogView: View {
                 .disabled(!viewModel.hasSearchConfiguration)
 
                 if case .loaded(let packages) = viewModel.packagesState {
-                    Text("\(packages.count) packages")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    SectionCountLabel(count: packages.count, noun: "packages")
                 }
             }
         }
@@ -302,17 +283,6 @@ struct CatalogView: View {
         Binding(
             get: { viewModel.selectedPackage },
             set: { viewModel.selectPackage($0) }
-        )
-    }
-
-    private func filterBinding(_ filter: CatalogFilterOption) -> Binding<Bool> {
-        Binding(
-            get: { viewModel.isFilterActive(filter) },
-            set: { isActive in
-                if isActive != viewModel.isFilterActive(filter) {
-                    viewModel.toggleFilter(filter)
-                }
-            }
         )
     }
 

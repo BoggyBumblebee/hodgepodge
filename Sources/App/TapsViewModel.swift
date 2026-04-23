@@ -244,14 +244,14 @@ final class TapsViewModel: ObservableObject {
         switch option {
         case .name:
             return { lhs, rhs in
-                Self.compare(lhs.name, rhs.name, fallback: lhs.id < rhs.id)
+                LocalizedSorting.ascending(lhs.name, rhs.name, fallback: lhs.id < rhs.id)
             }
         case .packageCount:
             return { lhs, rhs in
                 if lhs.packageCount != rhs.packageCount {
                     return lhs.packageCount > rhs.packageCount
                 }
-                return Self.compare(lhs.name, rhs.name, fallback: lhs.id < rhs.id)
+                return LocalizedSorting.ascending(lhs.name, rhs.name, fallback: lhs.id < rhs.id)
             }
         case .lastCommit:
             return { lhs, rhs in
@@ -261,7 +261,7 @@ final class TapsViewModel: ObservableObject {
                 if result != .orderedSame {
                     return result == .orderedAscending
                 }
-                return Self.compare(lhs.name, rhs.name, fallback: lhs.id < rhs.id)
+                return LocalizedSorting.ascending(lhs.name, rhs.name, fallback: lhs.id < rhs.id)
             }
         }
     }
@@ -311,14 +311,6 @@ final class TapsViewModel: ObservableObject {
 
         addTapName = ""
         addTapRemoteURL = ""
-    }
-
-    private static func compare(_ lhs: String, _ rhs: String, fallback: Bool) -> Bool {
-        let result = lhs.localizedCaseInsensitiveCompare(rhs)
-        if result != .orderedSame {
-            return result == .orderedAscending
-        }
-        return fallback
     }
 
     private func resetActionOutput() {

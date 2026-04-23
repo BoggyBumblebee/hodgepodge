@@ -44,25 +44,13 @@ struct TapsView: View {
         .searchable(text: $viewModel.searchText, placement: .toolbar, prompt: "Search taps")
         .toolbar {
             ToolbarItemGroup {
-                Menu {
-                    ForEach(BrewTapFilterOption.allCases) { filter in
-                        Toggle(isOn: filterBinding(filter)) {
-                            Text(filter.title)
-                        }
-                    }
-
-                    Divider()
-
-                    Button("Clear Filters") {
-                        viewModel.clearFilters()
-                    }
-                    .disabled(viewModel.activeFilters.isEmpty)
-                } label: {
-                    Label(
-                        viewModel.activeFilterCount == 0 ? "Filters" : "Filters (\(viewModel.activeFilterCount))",
-                        systemImage: "line.3.horizontal.decrease.circle"
-                    )
-                }
+                SectionFilterMenu(
+                    activeCount: viewModel.activeFilterCount,
+                    activeFilters: viewModel.activeFilters,
+                    title: { $0.title },
+                    toggle: viewModel.toggleFilter(_:),
+                    clear: viewModel.clearFilters
+                )
 
                 Picker("Sort", selection: $viewModel.sortOption) {
                     ForEach(BrewTapSortOption.allCases) { option in
@@ -156,9 +144,7 @@ struct TapsView: View {
 
             HStack(spacing: 12) {
                 if case .loaded(let taps) = viewModel.tapsState {
-                    Text("\(taps.count) taps")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    SectionCountLabel(count: taps.count, noun: "taps")
                 }
             }
         }
@@ -233,16 +219,6 @@ struct TapsView: View {
         }
     }
 
-    private func filterBinding(_ filter: BrewTapFilterOption) -> Binding<Bool> {
-        Binding(
-            get: { viewModel.isFilterActive(filter) },
-            set: { isActive in
-                if isActive != viewModel.isFilterActive(filter) {
-                    viewModel.toggleFilter(filter)
-                }
-            }
-        )
-    }
 }
 
 private struct TapDetailView: View {

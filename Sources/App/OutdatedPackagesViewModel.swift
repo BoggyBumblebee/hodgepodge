@@ -131,14 +131,10 @@ final class OutdatedPackagesViewModel: ObservableObject {
         Task { @MainActor [provider] in
             do {
                 let packages = try await provider.fetchOutdatedPackages()
-                packagesState = .loaded(packages)
-
-                if let selectedPackage,
-                   let refreshedSelection = packages.first(where: { $0.id == selectedPackage.id }) {
-                    self.selectedPackage = refreshedSelection
-                } else {
-                    selectedPackage = defaultSelection(from: packages)
-                }
+                applyLoadedPackages(
+                    packages,
+                    selection: refreshedSelection(in: packages, preservingSelectionID: selectedPackage?.id)
+                )
             } catch {
                 packagesState = .failed(error.localizedDescription)
                 selectedPackage = nil
@@ -226,7 +222,7 @@ final class OutdatedPackagesViewModel: ObservableObject {
         switch option {
         case .name:
             return { lhs, rhs in
-                Self.compare(lhs.title, rhs.title, fallback: lhs.slug < rhs.slug)
+                LocalizedSorting.ascending(lhs.title, rhs.title, fallback: lhs.slug < rhs.slug)
             }
         case .currentVersion:
             return { lhs, rhs in
@@ -234,20 +230,41 @@ final class OutdatedPackagesViewModel: ObservableObject {
                 if result != .orderedSame {
                     return result == .orderedDescending
                 }
-                return Self.compare(lhs.title, rhs.title, fallback: lhs.slug < rhs.slug)
+                return LocalizedSorting.ascending(lhs.title, rhs.title, fallback: lhs.slug < rhs.slug)
             }
         case .packageType:
             return { lhs, rhs in
                 if lhs.kind != rhs.kind {
                     return lhs.kind.rawValue < rhs.kind.rawValue
                 }
-                return Self.compare(lhs.title, rhs.title, fallback: lhs.slug < rhs.slug)
+                return LocalizedSorting.ascending(lhs.title, rhs.title, fallback: lhs.slug < rhs.slug)
             }
         }
     }
 
     private func defaultSelection(from packages: [OutdatedPackage]) -> OutdatedPackage? {
         packages.sorted(by: sorter(for: sortOption)).first
+    }
+
+    private func applyLoadedPackages(
+        _ packages: [OutdatedPackage],
+        selection: OutdatedPackage?
+    ) {
+        packagesState = .loaded(packages)
+        selectedPackage = selection
+    }
+
+    private func refreshedSelection(
+        in packages: [OutdatedPackage],
+        preservingSelectionID: String?,
+        fallbackSelection: OutdatedPackage? = nil
+    ) -> OutdatedPackage? {
+        if let preservingSelectionID,
+           let refreshedSelection = packages.first(where: { $0.id == preservingSelectionID }) {
+            return refreshedSelection
+        }
+
+        return fallbackSelection ?? defaultSelection(from: packages)
     }
 
     private func reloadPackagesAfterAction(
@@ -257,14 +274,14 @@ final class OutdatedPackagesViewModel: ObservableObject {
         Task { @MainActor [provider] in
             do {
                 let packages = try await provider.fetchOutdatedPackages()
-                packagesState = .loaded(packages)
-
-                if let preservingSelectionID,
-                   let refreshedSelection = packages.first(where: { $0.id == preservingSelectionID }) {
-                    selectedPackage = refreshedSelection
-                } else {
-                    selectedPackage = fallbackSelection ?? defaultSelection(from: packages)
-                }
+                applyLoadedPackages(
+                    packages,
+                    selection: refreshedSelection(
+                        in: packages,
+                        preservingSelectionID: preservingSelectionID,
+                        fallbackSelection: fallbackSelection
+                    )
+                )
             } catch {
                 appendLog(.system, error.localizedDescription)
             }
@@ -333,14 +350,6 @@ final class OutdatedPackagesViewModel: ObservableObject {
     private func flushPendingLogs() {
         logBuffer.flush()
         actionLogs = logBuffer.entries
-    }
-
-    private static func compare(_ lhs: String, _ rhs: String, fallback: Bool) -> Bool {
-        let result = lhs.localizedCaseInsensitiveCompare(rhs)
-        if result != .orderedSame {
-            return result == .orderedAscending
-        }
-        return fallback
     }
 
     private func notifyActionSucceeded(
