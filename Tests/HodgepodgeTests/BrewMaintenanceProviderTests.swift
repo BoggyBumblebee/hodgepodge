@@ -49,12 +49,14 @@ final class BrewMaintenanceProviderTests: XCTestCase {
         XCTAssertEqual(dashboard.cleanup.itemCount, 1)
         XCTAssertEqual(dashboard.cleanup.spaceFreedEstimate, "2.3KB")
         XCTAssertEqual(dashboard.autoremove.warnings, ["Skipping pydantic: most recent version 2.13.3 not installed"])
-        XCTAssertEqual(runner.recordedArguments, [
+        let expectedArguments = [
             ["config"],
             ["doctor"],
             ["cleanup", "--dry-run"],
             ["autoremove", "--dry-run"]
-        ])
+        ]
+        XCTAssertEqual(runner.recordedArguments.count, expectedArguments.count)
+        XCTAssertEqual(Set(runner.recordedArguments), Set(expectedArguments))
     }
 }
 

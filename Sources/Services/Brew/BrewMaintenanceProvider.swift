@@ -20,28 +20,28 @@ struct BrewMaintenanceProvider: BrewMaintenanceProviding, @unchecked Sendable {
         let installation = try await brewLocator.locate()
         let executable = installation.brewPath
 
-        let configOutput = try await runCollectingOutput(
+        async let configOutput = runCollectingOutput(
             executable: executable,
             arguments: ["config"]
         )
-        let doctorOutput = try await runCollectingOutput(
+        async let doctorOutput = runCollectingOutput(
             executable: executable,
             arguments: ["doctor"]
         )
-        let cleanupOutput = try await runCollectingOutput(
+        async let cleanupOutput = runCollectingOutput(
             executable: executable,
             arguments: ["cleanup", "--dry-run"]
         )
-        let autoremoveOutput = try await runCollectingOutput(
+        async let autoremoveOutput = runCollectingOutput(
             executable: executable,
             arguments: ["autoremove", "--dry-run"]
         )
 
         return BrewMaintenanceDashboard(
-            config: BrewMaintenanceParser.configSnapshot(from: configOutput),
-            doctor: BrewMaintenanceParser.doctorSnapshot(from: doctorOutput),
-            cleanup: BrewMaintenanceParser.dryRunSnapshot(task: .cleanup, from: cleanupOutput),
-            autoremove: BrewMaintenanceParser.dryRunSnapshot(task: .autoremove, from: autoremoveOutput),
+            config: BrewMaintenanceParser.configSnapshot(from: try await configOutput),
+            doctor: BrewMaintenanceParser.doctorSnapshot(from: try await doctorOutput),
+            cleanup: BrewMaintenanceParser.dryRunSnapshot(task: .cleanup, from: try await cleanupOutput),
+            autoremove: BrewMaintenanceParser.dryRunSnapshot(task: .autoremove, from: try await autoremoveOutput),
             capturedAt: .now
         )
     }

@@ -60,8 +60,7 @@ struct HodgepodgeApp: App {
                         NSApplication.shared.applicationIconImage = icon
                     }
                     model.loadIfNeeded()
-                    outdatedPackagesModel.loadIfNeeded()
-                    maintenanceModel.loadIfNeeded()
+                    await loadStartupBadgeData()
                 }
         }
         .commands {
@@ -71,5 +70,19 @@ struct HodgepodgeApp: App {
         Settings {
             SettingsView(model: settingsModel)
         }
+    }
+
+    private func loadStartupBadgeData() async {
+        try? await Task.sleep(for: .milliseconds(700))
+        guard !Task.isCancelled else {
+            return
+        }
+        outdatedPackagesModel.loadIfNeeded()
+
+        try? await Task.sleep(for: .milliseconds(1_200))
+        guard !Task.isCancelled else {
+            return
+        }
+        maintenanceModel.loadIfNeeded()
     }
 }
