@@ -21,7 +21,11 @@ final class InstalledPackagesViewModel: ObservableObject {
         }
     }
 
-    @Published var packagesState: InstalledPackagesLoadState = .idle
+    @Published var packagesState: InstalledPackagesLoadState = .idle {
+        didSet {
+            installedPackageIDs = Self.packageIDs(from: packagesState)
+        }
+    }
     @Published var actionState: InstalledPackageActionState = .idle
     @Published var actionLogs: [CommandLogEntry] = []
     @Published var exportState: InstalledPackagesBrewfileExportState = .idle
@@ -50,6 +54,7 @@ final class InstalledPackagesViewModel: ObservableObject {
     private var homebrewStateObserver: HomebrewStateObserver?
     private var logBuffer = CommandLogBuffer()
     private var exportLogBuffer = CommandLogBuffer()
+    private var installedPackageIDs: Set<String> = []
 
     init(
         provider: any InstalledPackagesProviding,
@@ -215,27 +220,15 @@ final class InstalledPackagesViewModel: ObservableObject {
     }
 
     func isInstalled(_ analyticsItem: CatalogAnalyticsItem) -> Bool {
-        installedPackage(for: analyticsItem) != nil
+        installedPackageIDs.contains(Self.packageID(kind: analyticsItem.kind, slug: analyticsItem.slug))
     }
 
     func isInstalled(_ package: CatalogPackageSummary) -> Bool {
-        guard case .loaded(let packages) = packagesState else {
-            return false
-        }
-
-        return packages.contains { installedPackage in
-            installedPackage.kind == package.kind && installedPackage.slug == package.slug
-        }
+        installedPackageIDs.contains(package.id)
     }
 
     func isInstalled(_ detail: CatalogPackageDetail) -> Bool {
-        guard case .loaded(let packages) = packagesState else {
-            return false
-        }
-
-        return packages.contains { installedPackage in
-            installedPackage.kind == detail.kind && installedPackage.slug == detail.slug
-        }
+        installedPackageIDs.contains(detail.packageID)
     }
 
     func openAnalyticsItem(_ analyticsItem: CatalogAnalyticsItem) {
@@ -563,6 +556,18 @@ final class InstalledPackagesViewModel: ObservableObject {
     ) {
         packagesState = .loaded(packages)
         selectedPackage = selection
+    }
+
+    private static func packageIDs(from state: InstalledPackagesLoadState) -> Set<String> {
+        guard case .loaded(let packages) = state else {
+            return []
+        }
+
+        return Set(packages.map(\.id))
+    }
+
+    private static func packageID(kind: CatalogPackageKind, slug: String) -> String {
+        "\(kind.rawValue):\(slug)"
     }
 
     private func selection(

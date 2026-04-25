@@ -97,8 +97,9 @@ struct InstalledPackagesView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             case .loaded:
+                let filteredPackages = viewModel.filteredPackages
                 ScrollViewReader { proxy in
-                    List(viewModel.filteredPackages, selection: $viewModel.selectedPackage) { package in
+                    List(filteredPackages, selection: $viewModel.selectedPackage) { package in
                         VStack(alignment: .leading, spacing: 6) {
                             HStack(alignment: .top) {
                                 VStack(alignment: .leading, spacing: 4) {
@@ -152,15 +153,15 @@ struct InstalledPackagesView: View {
                     }
                     .listStyle(.sidebar)
                     .overlay {
-                        if viewModel.filteredPackages.isEmpty {
+                        if filteredPackages.isEmpty {
                             ContentUnavailableView.search(text: viewModel.searchText)
                         }
                     }
                     .task(id: viewModel.selectedPackage?.id) {
-                        scrollSelectionIntoView(using: proxy)
+                        scrollSelectionIntoView(using: proxy, filteredPackages: filteredPackages)
                     }
-                    .task(id: viewModel.filteredPackages.map(\.id)) {
-                        scrollSelectionIntoView(using: proxy)
+                    .task(id: filteredPackages.map(\.id)) {
+                        scrollSelectionIntoView(using: proxy, filteredPackages: filteredPackages)
                     }
                 }
             }
@@ -283,9 +284,12 @@ struct InstalledPackagesView: View {
         }
     }
 
-    private func scrollSelectionIntoView(using proxy: ScrollViewProxy) {
+    private func scrollSelectionIntoView(
+        using proxy: ScrollViewProxy,
+        filteredPackages: [InstalledPackage]
+    ) {
         guard let selectedID = viewModel.selectedPackage?.id,
-              viewModel.filteredPackages.contains(where: { $0.id == selectedID }) else {
+              filteredPackages.contains(where: { $0.id == selectedID }) else {
             return
         }
 
