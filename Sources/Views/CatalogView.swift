@@ -873,12 +873,6 @@ private struct CatalogDetailView: View {
                 actionHistoryMetric("Output", "\(entry.outputLineCount) lines")
             }
 
-            HStack(spacing: 12) {
-                Button("\(entry.command.kind.title)...") {
-                    beginAction(entry.command.kind)
-                }
-                .disabled(hasRunningAction)
-            }
         }
         .padding(14)
         .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
