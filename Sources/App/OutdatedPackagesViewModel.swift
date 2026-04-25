@@ -69,6 +69,14 @@ final class OutdatedPackagesViewModel: ObservableObject {
         activeFilters.count
     }
 
+    var upgradeablePackageCount: Int {
+        guard case .loaded(let packages) = packagesState else {
+            return 0
+        }
+
+        return packages.filter(\.isUpgradeAvailable).count
+    }
+
     var hasRunningAction: Bool {
         actionState.isRunning
     }

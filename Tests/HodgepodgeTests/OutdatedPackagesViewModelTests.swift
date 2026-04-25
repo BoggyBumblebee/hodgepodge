@@ -85,6 +85,24 @@ final class OutdatedPackagesViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.filteredPackages.map(\.title), ["Docker Desktop", "Beta", "Alpha"])
     }
 
+    func testUpgradeablePackageCountCountsOnlyLoadedUpgradeablePackages() {
+        let packages = [
+            OutdatedPackage.fixture(slug: "wget"),
+            OutdatedPackage.fixture(kind: .cask, slug: "docker-desktop"),
+            OutdatedPackage.fixture(slug: "python@3.12", isPinned: true, pinnedVersion: "3.12.4")
+        ]
+        let viewModel = OutdatedPackagesViewModel(
+            provider: MockOutdatedPackagesProvider(result: .success(packages)),
+            commandExecutor: MockOutdatedBrewCommandExecutor()
+        )
+
+        XCTAssertEqual(viewModel.upgradeablePackageCount, 0)
+
+        viewModel.packagesState = .loaded(packages)
+
+        XCTAssertEqual(viewModel.upgradeablePackageCount, 2)
+    }
+
     func testRefreshPackagesStoresFailureMessage() async {
         let viewModel = OutdatedPackagesViewModel(
             provider: MockOutdatedPackagesProvider(

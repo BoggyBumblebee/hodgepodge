@@ -34,6 +34,24 @@ final class MaintenanceViewModelTests: XCTestCase {
         }
     }
 
+    func testIssueCountCombinesWarningsAndQueuedMaintenanceItems() {
+        let dashboard = BrewMaintenanceDashboard.fixture(
+            doctor: .fixture(warningCount: 2, warnings: ["First warning", "Second warning"]),
+            cleanup: .fixture(task: .cleanup, itemCount: 3),
+            autoremove: .fixture(task: .autoremove, itemCount: 1)
+        )
+        let viewModel = MaintenanceViewModel(
+            provider: MockBrewMaintenanceProvider(result: .success(dashboard)),
+            commandExecutor: MockMaintenanceCommandExecutor()
+        )
+
+        XCTAssertEqual(viewModel.issueCount, 0)
+
+        viewModel.dashboardState = .loaded(dashboard)
+
+        XCTAssertEqual(viewModel.issueCount, 6)
+    }
+
     func testRunActionStoresSuccessStateAndRefreshesDashboard() async {
         let refreshed = BrewMaintenanceDashboard.fixture(
             doctor: .fixture(warningCount: 0, warnings: [], rawOutput: "No issues.")

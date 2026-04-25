@@ -34,6 +34,14 @@ final class MaintenanceViewModel: ObservableObject {
         return dashboard
     }
 
+    var issueCount: Int {
+        guard let dashboard else {
+            return 0
+        }
+
+        return dashboard.doctor.warningCount + dashboard.cleanup.itemCount + dashboard.autoremove.itemCount
+    }
+
     func loadIfNeeded() {
         guard case .idle = dashboardState else {
             return

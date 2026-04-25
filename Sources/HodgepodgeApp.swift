@@ -60,6 +60,8 @@ struct HodgepodgeApp: App {
                         NSApplication.shared.applicationIconImage = icon
                     }
                     model.loadIfNeeded()
+                    outdatedPackagesModel.loadIfNeeded()
+                    maintenanceModel.loadIfNeeded()
                 }
         }
         .commands {
