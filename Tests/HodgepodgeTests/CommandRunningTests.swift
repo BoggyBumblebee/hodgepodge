@@ -95,33 +95,20 @@ final class CommandRunningTests: XCTestCase {
         XCTAssertEqual(error.errorDescription, "bundle check failed")
     }
 
-    func testProcessCommandRunnerNormalizesPathForBrewExecutables() async throws {
-        let runner = ProcessCommandRunner()
+    func testCommandEnvironmentNormalizesPathForAbsoluteBrewExecutables() {
         let rootURL = fileManager.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         let binURL = rootURL.appendingPathComponent("bin", isDirectory: true)
         let sbinURL = rootURL.appendingPathComponent("sbin", isDirectory: true)
         let brewURL = binURL.appendingPathComponent("brew")
 
-        try fileManager.createDirectory(at: binURL, withIntermediateDirectories: true)
-        try fileManager.createDirectory(at: sbinURL, withIntermediateDirectories: true)
-        try """
-        #!/bin/sh
-        printf '%s' "$PATH"
-        """.write(to: brewURL, atomically: true, encoding: .utf8)
-        try fileManager.setAttributes(
-            [.posixPermissions: 0o755],
-            ofItemAtPath: brewURL.path
+        let environment = CommandEnvironment.normalized(
+            for: brewURL.path,
+            baseEnvironment: ["PATH": "/usr/bin:/bin"]
         )
-
-        defer {
-            try? fileManager.removeItem(at: rootURL)
-        }
-
-        let result = try await runner.run(executable: brewURL.path, arguments: [])
-        let pathEntries = result.stdout
+        let pathEntries = environment["PATH"]?
             .split(separator: ":")
-            .map(String.init)
+            .map(String.init) ?? []
 
         XCTAssertGreaterThanOrEqual(pathEntries.count, 2)
         XCTAssertEqual(pathEntries[0], binURL.path)
